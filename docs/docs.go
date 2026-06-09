@@ -107,6 +107,296 @@ const docTemplate = `{
                 }
             }
         },
+        "/api/pixez/ping": {
+            "get": {
+                "security": [
+                    {
+                        "SessionCookie": []
+                    }
+                ],
+                "description": "Verifies that the PixEz sync API is reachable with Wavelet authentication.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "pixez"
+                ],
+                "summary": "PixEz sync ping",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/util.ResponseAny"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/util.ResponseAny"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/pixez/users": {
+            "get": {
+                "security": [
+                    {
+                        "SessionCookie": []
+                    }
+                ],
+                "description": "Retrieves all saved Pixiv users without sensitive token fields.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "pixez"
+                ],
+                "summary": "List Pixiv users",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/util.ResponseAny"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/pixez/users/{pixiv_user_id}": {
+            "get": {
+                "security": [
+                    {
+                        "SessionCookie": []
+                    }
+                ],
+                "description": "Retrieves a Pixiv user's stored credentials, including access and refresh tokens.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "pixez"
+                ],
+                "summary": "Get Pixiv user credentials",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Pixiv user ID",
+                        "name": "pixiv_user_id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/util.ResponseAny"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/util.ResponseAny"
+                        }
+                    }
+                }
+            },
+            "put": {
+                "security": [
+                    {
+                        "SessionCookie": []
+                    }
+                ],
+                "description": "Inserts or updates a Pixiv user's stored credentials. The path Pixiv user ID is authoritative.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "pixez"
+                ],
+                "summary": "Upsert Pixiv user credentials",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Pixiv user ID",
+                        "name": "pixiv_user_id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "Pixiv user credentials",
+                        "name": "payload",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/model.PixezPixivUser"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/util.ResponseAny"
+                        }
+                    }
+                }
+            },
+            "delete": {
+                "security": [
+                    {
+                        "SessionCookie": []
+                    }
+                ],
+                "description": "Deletes a Pixiv user and the migrated backup sync data associated with that user.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "pixez"
+                ],
+                "summary": "Delete Pixiv user",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Pixiv user ID",
+                        "name": "pixiv_user_id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/util.ResponseAny"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/pixez/users/{pixiv_user_id}/sync-data": {
+            "get": {
+                "security": [
+                    {
+                        "SessionCookie": []
+                    }
+                ],
+                "description": "Fetches all or selected synced data tables for a Pixiv user.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "pixez"
+                ],
+                "summary": "Get synced user data",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Pixiv user ID",
+                        "name": "pixiv_user_id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Comma-separated table names",
+                        "name": "tables",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/util.ResponseAny"
+                        }
+                    }
+                }
+            },
+            "post": {
+                "security": [
+                    {
+                        "SessionCookie": []
+                    }
+                ],
+                "description": "Replaces only the submitted synced data tables for a Pixiv user in a single transaction.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "pixez"
+                ],
+                "summary": "Replace synced user data",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Pixiv user ID",
+                        "name": "pixiv_user_id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "Synced data payload",
+                        "name": "payload",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/model.PixezUserDataPayload"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/util.ResponseAny"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/pixez/users/{pixiv_user_id}/sync-data/hashes": {
+            "get": {
+                "security": [
+                    {
+                        "SessionCookie": []
+                    }
+                ],
+                "description": "Returns MD5 checksums for each synced table of a Pixiv user.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "pixez"
+                ],
+                "summary": "Get synced data hashes",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Pixiv user ID",
+                        "name": "pixiv_user_id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/util.ResponseAny"
+                        }
+                    }
+                }
+            }
+        },
         "/api/v1/admin/auth-sources": {
             "get": {
                 "security": [
@@ -4077,6 +4367,201 @@ const docTemplate = `{
                 },
                 "id": {
                     "type": "integer"
+                }
+            }
+        },
+        "model.PixezBanComment": {
+            "type": "object",
+            "properties": {
+                "comment_id": {
+                    "type": "string"
+                },
+                "name": {
+                    "type": "string"
+                }
+            }
+        },
+        "model.PixezBanIllust": {
+            "type": "object",
+            "properties": {
+                "illust_id": {
+                    "type": "string"
+                },
+                "name": {
+                    "type": "string"
+                }
+            }
+        },
+        "model.PixezBanTag": {
+            "type": "object",
+            "properties": {
+                "name": {
+                    "type": "string"
+                },
+                "translate_name": {
+                    "type": "string"
+                }
+            }
+        },
+        "model.PixezBanUser": {
+            "type": "object",
+            "properties": {
+                "name": {
+                    "type": "string"
+                },
+                "user_id": {
+                    "type": "string"
+                }
+            }
+        },
+        "model.PixezIllustHistory": {
+            "type": "object",
+            "properties": {
+                "illust_id": {
+                    "type": "integer"
+                },
+                "picture_url": {
+                    "type": "string"
+                },
+                "time": {
+                    "type": "integer"
+                },
+                "title": {
+                    "type": "string"
+                },
+                "user_id": {
+                    "type": "integer"
+                },
+                "user_name": {
+                    "type": "string"
+                }
+            }
+        },
+        "model.PixezNovelHistory": {
+            "type": "object",
+            "properties": {
+                "novel_id": {
+                    "type": "integer"
+                },
+                "picture_url": {
+                    "type": "string"
+                },
+                "time": {
+                    "type": "integer"
+                },
+                "title": {
+                    "type": "string"
+                },
+                "user_id": {
+                    "type": "integer"
+                },
+                "user_name": {
+                    "type": "string"
+                }
+            }
+        },
+        "model.PixezPixivUser": {
+            "type": "object",
+            "properties": {
+                "access_token": {
+                    "type": "string"
+                },
+                "account": {
+                    "type": "string"
+                },
+                "created_at": {
+                    "type": "string"
+                },
+                "device_token": {
+                    "type": "string"
+                },
+                "is_mail_authorized": {
+                    "type": "integer"
+                },
+                "is_premium": {
+                    "type": "integer"
+                },
+                "mail_address": {
+                    "type": "string"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "pixiv_user_id": {
+                    "type": "string"
+                },
+                "refresh_token": {
+                    "type": "string"
+                },
+                "updated_at": {
+                    "type": "string"
+                },
+                "user_image": {
+                    "type": "string"
+                },
+                "x_restrict": {
+                    "type": "integer"
+                }
+            }
+        },
+        "model.PixezTagHistory": {
+            "type": "object",
+            "properties": {
+                "name": {
+                    "type": "string"
+                },
+                "translated_name": {
+                    "type": "string"
+                },
+                "type": {
+                    "type": "integer"
+                }
+            }
+        },
+        "model.PixezUserDataPayload": {
+            "type": "object",
+            "properties": {
+                "ban_comments": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/model.PixezBanComment"
+                    }
+                },
+                "ban_illusts": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/model.PixezBanIllust"
+                    }
+                },
+                "ban_tags": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/model.PixezBanTag"
+                    }
+                },
+                "ban_users": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/model.PixezBanUser"
+                    }
+                },
+                "illust_histories": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/model.PixezIllustHistory"
+                    }
+                },
+                "novel_histories": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/model.PixezNovelHistory"
+                    }
+                },
+                "tag_histories": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/model.PixezTagHistory"
+                    }
                 }
             }
         },

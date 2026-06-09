@@ -48,8 +48,17 @@ func SetupTestEnvironment(t *testing.T) (*gorm.DB, *miniredis.Miniredis, func())
 		&model.ExternalAccount{},
 		&model.SystemConfig{},
 		&model.Upload{},
+		&model.AccessToken{},
 		&model.TaskExecution{},
 		&model.Template{},
+		&model.PixezPixivUser{},
+		&model.PixezBanComment{},
+		&model.PixezBanIllust{},
+		&model.PixezBanTag{},
+		&model.PixezBanUser{},
+		&model.PixezIllustHistory{},
+		&model.PixezNovelHistory{},
+		&model.PixezTagHistory{},
 	)
 	if err != nil {
 		t.Fatalf("failed to auto migrate tables: %v", err)

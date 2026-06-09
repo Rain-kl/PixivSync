@@ -236,6 +236,133 @@ definitions:
       id:
         type: integer
     type: object
+  model.PixezBanComment:
+    properties:
+      comment_id:
+        type: string
+      name:
+        type: string
+    type: object
+  model.PixezBanIllust:
+    properties:
+      illust_id:
+        type: string
+      name:
+        type: string
+    type: object
+  model.PixezBanTag:
+    properties:
+      name:
+        type: string
+      translate_name:
+        type: string
+    type: object
+  model.PixezBanUser:
+    properties:
+      name:
+        type: string
+      user_id:
+        type: string
+    type: object
+  model.PixezIllustHistory:
+    properties:
+      illust_id:
+        type: integer
+      picture_url:
+        type: string
+      time:
+        type: integer
+      title:
+        type: string
+      user_id:
+        type: integer
+      user_name:
+        type: string
+    type: object
+  model.PixezNovelHistory:
+    properties:
+      novel_id:
+        type: integer
+      picture_url:
+        type: string
+      time:
+        type: integer
+      title:
+        type: string
+      user_id:
+        type: integer
+      user_name:
+        type: string
+    type: object
+  model.PixezPixivUser:
+    properties:
+      access_token:
+        type: string
+      account:
+        type: string
+      created_at:
+        type: string
+      device_token:
+        type: string
+      is_mail_authorized:
+        type: integer
+      is_premium:
+        type: integer
+      mail_address:
+        type: string
+      name:
+        type: string
+      pixiv_user_id:
+        type: string
+      refresh_token:
+        type: string
+      updated_at:
+        type: string
+      user_image:
+        type: string
+      x_restrict:
+        type: integer
+    type: object
+  model.PixezTagHistory:
+    properties:
+      name:
+        type: string
+      translated_name:
+        type: string
+      type:
+        type: integer
+    type: object
+  model.PixezUserDataPayload:
+    properties:
+      ban_comments:
+        items:
+          $ref: '#/definitions/model.PixezBanComment'
+        type: array
+      ban_illusts:
+        items:
+          $ref: '#/definitions/model.PixezBanIllust'
+        type: array
+      ban_tags:
+        items:
+          $ref: '#/definitions/model.PixezBanTag'
+        type: array
+      ban_users:
+        items:
+          $ref: '#/definitions/model.PixezBanUser'
+        type: array
+      illust_histories:
+        items:
+          $ref: '#/definitions/model.PixezIllustHistory'
+        type: array
+      novel_histories:
+        items:
+          $ref: '#/definitions/model.PixezNovelHistory'
+        type: array
+      tag_histories:
+        items:
+          $ref: '#/definitions/model.PixezTagHistory'
+        type: array
+    type: object
   model.SystemConfig:
     properties:
       created_at:
@@ -968,6 +1095,191 @@ paths:
       summary: 校验人机验证解答
       tags:
       - cap
+  /api/pixez/ping:
+    get:
+      description: Verifies that the PixEz sync API is reachable with Wavelet authentication.
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/util.ResponseAny'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/util.ResponseAny'
+      security:
+      - SessionCookie: []
+      summary: PixEz sync ping
+      tags:
+      - pixez
+  /api/pixez/users:
+    get:
+      description: Retrieves all saved Pixiv users without sensitive token fields.
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/util.ResponseAny'
+      security:
+      - SessionCookie: []
+      summary: List Pixiv users
+      tags:
+      - pixez
+  /api/pixez/users/{pixiv_user_id}:
+    delete:
+      description: Deletes a Pixiv user and the migrated backup sync data associated
+        with that user.
+      parameters:
+      - description: Pixiv user ID
+        in: path
+        name: pixiv_user_id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/util.ResponseAny'
+      security:
+      - SessionCookie: []
+      summary: Delete Pixiv user
+      tags:
+      - pixez
+    get:
+      description: Retrieves a Pixiv user's stored credentials, including access and
+        refresh tokens.
+      parameters:
+      - description: Pixiv user ID
+        in: path
+        name: pixiv_user_id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/util.ResponseAny'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/util.ResponseAny'
+      security:
+      - SessionCookie: []
+      summary: Get Pixiv user credentials
+      tags:
+      - pixez
+    put:
+      consumes:
+      - application/json
+      description: Inserts or updates a Pixiv user's stored credentials. The path
+        Pixiv user ID is authoritative.
+      parameters:
+      - description: Pixiv user ID
+        in: path
+        name: pixiv_user_id
+        required: true
+        type: string
+      - description: Pixiv user credentials
+        in: body
+        name: payload
+        required: true
+        schema:
+          $ref: '#/definitions/model.PixezPixivUser'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/util.ResponseAny'
+      security:
+      - SessionCookie: []
+      summary: Upsert Pixiv user credentials
+      tags:
+      - pixez
+  /api/pixez/users/{pixiv_user_id}/sync-data:
+    get:
+      description: Fetches all or selected synced data tables for a Pixiv user.
+      parameters:
+      - description: Pixiv user ID
+        in: path
+        name: pixiv_user_id
+        required: true
+        type: string
+      - description: Comma-separated table names
+        in: query
+        name: tables
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/util.ResponseAny'
+      security:
+      - SessionCookie: []
+      summary: Get synced user data
+      tags:
+      - pixez
+    post:
+      consumes:
+      - application/json
+      description: Replaces only the submitted synced data tables for a Pixiv user
+        in a single transaction.
+      parameters:
+      - description: Pixiv user ID
+        in: path
+        name: pixiv_user_id
+        required: true
+        type: string
+      - description: Synced data payload
+        in: body
+        name: payload
+        required: true
+        schema:
+          $ref: '#/definitions/model.PixezUserDataPayload'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/util.ResponseAny'
+      security:
+      - SessionCookie: []
+      summary: Replace synced user data
+      tags:
+      - pixez
+  /api/pixez/users/{pixiv_user_id}/sync-data/hashes:
+    get:
+      description: Returns MD5 checksums for each synced table of a Pixiv user.
+      parameters:
+      - description: Pixiv user ID
+        in: path
+        name: pixiv_user_id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/util.ResponseAny'
+      security:
+      - SessionCookie: []
+      summary: Get synced data hashes
+      tags:
+      - pixez
   /api/v1/admin/auth-sources:
     get:
       description: 返回所有已配置的 OAuth/OIDC 认证源列表，包括已启用和未启用的，需要管理员权限

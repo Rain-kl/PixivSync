@@ -49,6 +49,7 @@ import (
 	_ "github.com/Rain-kl/Wavelet/docs"
 	"github.com/Rain-kl/Wavelet/internal/apps/admin/system_config"
 	"github.com/Rain-kl/Wavelet/internal/apps/oauth"
+	"github.com/Rain-kl/Wavelet/internal/apps/pixez"
 	"github.com/Rain-kl/Wavelet/internal/config"
 	"github.com/Rain-kl/Wavelet/internal/otel_trace"
 	"github.com/gin-contrib/sessions"
@@ -60,6 +61,8 @@ import (
 )
 
 // Serve 启动 HTTP API 服务
+//
+//nolint:maintidx // Serve is the central route composition point by project convention.
 func Serve() {
 	// 运行模式
 	if config.Config.App.IsProduction() {
@@ -188,6 +191,21 @@ func Serve() {
 			configRouter := apiV1Router.Group("/config")
 			{
 				configRouter.GET("/public", publicconfig.GetPublicConfig)
+			}
+
+			// PixEz companion sync API keeps its historical /api/pixez path while
+			// using Wavelet AccessToken/session authentication.
+			pixezRouter := apiGroup.Group("/pixez")
+			pixezRouter.Use(oauth.LoginRequired())
+			{
+				pixezRouter.GET("/ping", pixez.Ping)
+				pixezRouter.GET("/users", pixez.ListUsers)
+				pixezRouter.GET("/users/:pixiv_user_id", pixez.GetUser)
+				pixezRouter.PUT("/users/:pixiv_user_id", pixez.UpsertUser)
+				pixezRouter.DELETE("/users/:pixiv_user_id", pixez.DeleteUser)
+				pixezRouter.GET("/users/:pixiv_user_id/sync-data", pixez.GetUserData)
+				pixezRouter.POST("/users/:pixiv_user_id/sync-data", pixez.PostUserData)
+				pixezRouter.GET("/users/:pixiv_user_id/sync-data/hashes", pixez.GetUserDataHashes)
 			}
 
 			// Admin
