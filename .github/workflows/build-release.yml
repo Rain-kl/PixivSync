@@ -1,0 +1,259 @@
+name: Build Release
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Release version/tag to build, for example v1.0.0-beta"
+        required: true
+        type: string
+
+env:
+  APP_NAME: wavelet
+  GO_MAIN: ./main.go
+  GO_BUILD_TAGS: embed_frontend
+  GO_LDFLAGS: -s -w
+  NODE_VERSION: "22"
+  PNPM_VERSION: "10.10.0"
+  FRONTEND_DIR: frontend
+  FRONTEND_BUILD_COMMAND: pnpm build:embed
+  FRONTEND_OUT_DIR: frontend/out
+  EMBED_DIST_DIR: internal/router/dist
+  EXTRA_FILES: |
+    LICENSE
+    README.md
+    README_zh.md
+    config.example.yaml
+    DEPLOYMENT_zh.md
+
+permissions:
+  contents: write
+
+jobs:
+  create-release:
+    name: Create Release
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.metadata.outputs.version }}
+      version_without_v: ${{ steps.metadata.outputs.version_without_v }}
+      build_date: ${{ steps.metadata.outputs.build_date }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          fetch-tags: true
+
+      - name: Set release metadata
+        id: metadata
+        shell: bash
+        env:
+          INPUT_VERSION: ${{ github.event.inputs.version }}
+        run: |
+          set -euo pipefail
+
+          input_version="${INPUT_VERSION//[[:space:]]/}"
+          if [[ "$GITHUB_REF" == refs/tags/* ]]; then
+            version="$GITHUB_REF_NAME"
+          elif [[ -n "$input_version" ]]; then
+            version="$input_version"
+          else
+            echo "workflow_dispatch requires a version input" >&2
+            exit 1
+          fi
+
+          {
+            echo "version=$version"
+            echo "version_without_v=${version#v}"
+            echo "build_date=$(date -u +'%Y-%m-%d %H:%M:%S')"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Create release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.metadata.outputs.version }}
+          name: ${{ steps.metadata.outputs.version }}
+          generate_release_notes: true
+          prerelease: ${{ contains(steps.metadata.outputs.version, 'alpha') || contains(steps.metadata.outputs.version, 'beta') || contains(steps.metadata.outputs.version, 'rc') }}
+
+  build-frontend:
+    name: Build Embedded Frontend
+    runs-on: ubuntu-latest
+    needs: create-release
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: ${{ env.PNPM_VERSION }}
+          run_install: false
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+          cache-dependency-path: ${{ env.FRONTEND_DIR }}/pnpm-lock.yaml
+
+      - name: Install frontend dependencies
+        working-directory: ${{ env.FRONTEND_DIR }}
+        run: pnpm install --frozen-lockfile
+
+      - name: Stamp frontend package metadata
+        working-directory: ${{ env.FRONTEND_DIR }}
+        shell: bash
+        env:
+          VERSION: ${{ needs.create-release.outputs.version_without_v }}
+          BUILD_DATE: ${{ needs.create-release.outputs.build_date }}
+        run: |
+          set -euo pipefail
+          if [[ -f package.json ]]; then
+            node - <<'NODE'
+          const fs = require('fs');
+          const path = './package.json';
+          const pkg = JSON.parse(fs.readFileSync(path, 'utf8'));
+          if (process.env.VERSION && Object.hasOwn(pkg, 'version')) {
+            pkg.version = process.env.VERSION;
+          }
+          if (process.env.BUILD_DATE && Object.hasOwn(pkg, 'buildDate')) {
+            pkg.buildDate = process.env.BUILD_DATE;
+          }
+          fs.writeFileSync(path, JSON.stringify(pkg, null, 2) + '\n');
+          NODE
+          fi
+
+      - name: Build frontend
+        run: ${{ env.FRONTEND_BUILD_COMMAND }}
+        working-directory: ${{ env.FRONTEND_DIR }}
+
+      - name: Prepare embed directory
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -rf "$EMBED_DIST_DIR"
+          mkdir -p "$(dirname "$EMBED_DIST_DIR")"
+          cp -R "$FRONTEND_OUT_DIR" "$EMBED_DIST_DIR"
+
+      - name: Upload embedded frontend
+        uses: actions/upload-artifact@v4
+        with:
+          name: embedded-frontend
+          path: ${{ env.EMBED_DIST_DIR }}
+          if-no-files-found: error
+          retention-days: 1
+
+  build-binaries:
+    name: Build ${{ matrix.goos }}/${{ matrix.goarch }}
+    runs-on: ubuntu-latest
+    needs:
+      - create-release
+      - build-frontend
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - goos: linux
+            goarch: amd64
+            archive: tar.gz
+          - goos: linux
+            goarch: arm64
+            archive: tar.gz
+          - goos: darwin
+            goarch: amd64
+            archive: tar.gz
+          - goos: darwin
+            goarch: arm64
+            archive: tar.gz
+          - goos: windows
+            goarch: amd64
+            archive: zip
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Download embedded frontend
+        uses: actions/download-artifact@v4
+        with:
+          name: embedded-frontend
+          path: ${{ env.EMBED_DIST_DIR }}
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - name: Build binary
+        shell: bash
+        env:
+          GOOS: ${{ matrix.goos }}
+          GOARCH: ${{ matrix.goarch }}
+          CGO_ENABLED: "0"
+        run: |
+          set -euo pipefail
+
+          mkdir -p dist
+          binary_name="$APP_NAME"
+          if [[ "$GOOS" == "windows" ]]; then
+            binary_name="${binary_name}.exe"
+          fi
+
+          build_args=(
+            -trimpath
+            -ldflags "$GO_LDFLAGS"
+            -o "dist/$binary_name"
+          )
+
+          if [[ -n "$GO_BUILD_TAGS" ]]; then
+            build_args=(-tags "$GO_BUILD_TAGS" "${build_args[@]}")
+          fi
+
+          go build "${build_args[@]}" "$GO_MAIN"
+
+      - name: Package artifact
+        id: package
+        shell: bash
+        env:
+          VERSION: ${{ needs.create-release.outputs.version }}
+          GOOS: ${{ matrix.goos }}
+          GOARCH: ${{ matrix.goarch }}
+          ARCHIVE_FORMAT: ${{ matrix.archive }}
+        run: |
+          set -euo pipefail
+
+          package_name="${APP_NAME}_${VERSION}_${GOOS}_${GOARCH}"
+          staging_dir="dist/$package_name"
+          mkdir -p "$staging_dir"
+
+          if [[ "$GOOS" == "windows" ]]; then
+            cp "dist/${APP_NAME}.exe" "$staging_dir/"
+          else
+            cp "dist/${APP_NAME}" "$staging_dir/"
+          fi
+
+          while IFS= read -r extra_file; do
+            [[ -z "$extra_file" ]] && continue
+            if [[ -e "$extra_file" ]]; then
+              cp -R "$extra_file" "$staging_dir/"
+            fi
+          done <<< "$EXTRA_FILES"
+
+          if [[ "$ARCHIVE_FORMAT" == "zip" ]]; then
+            (cd dist && zip -r "${package_name}.zip" "$package_name")
+            artifact="dist/${package_name}.zip"
+          else
+            tar -C dist -czf "dist/${package_name}.tar.gz" "$package_name"
+            artifact="dist/${package_name}.tar.gz"
+          fi
+
+          echo "artifact=$artifact" >> "$GITHUB_OUTPUT"
+
+      - name: Upload release artifact
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ needs.create-release.outputs.version }}
+          files: ${{ steps.package.outputs.artifact }}

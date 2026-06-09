@@ -1,0 +1,39 @@
+# syntax=docker/dockerfile:1.7
+
+ARG GO_VERSION=1.25
+ARG ALPINE_VERSION=3.23
+
+FROM golang:${GO_VERSION}-alpine AS builder
+
+RUN apk add --no-cache ca-certificates git
+
+WORKDIR /workspace
+
+COPY go.mod go.sum ./
+RUN go mod download
+
+COPY . .
+
+RUN CGO_ENABLED=0 GOOS=linux go build \
+    -trimpath \
+    -ldflags="-s -w" \
+    -o /out/wavelet \
+    ./main.go
+
+FROM alpine:${ALPINE_VERSION}
+
+ARG TZ=Asia/Shanghai
+
+RUN apk add --no-cache ca-certificates tzdata postgresql-client && \
+    cp /usr/share/zoneinfo/${TZ} /etc/localtime && \
+    echo "${TZ}" > /etc/timezone
+
+WORKDIR /app
+
+COPY --from=builder /out/wavelet ./wavelet
+COPY docs ./docs
+
+EXPOSE 8000
+
+ENTRYPOINT ["./wavelet"]
+CMD ["api"]

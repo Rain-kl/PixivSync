@@ -1,0 +1,78 @@
+services:
+
+  wavelet:
+#    build:
+#      context: .
+#      dockerfile: docker/Dockerfile
+    image: ghcr.io/rain-kl/wavelet:latest
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      TZ: ${TZ:-Asia/Shanghai}
+    ports:
+      - "${APP_PORT:-8000}:8000"
+    volumes:
+      - ./uploads:/app/uploads
+      - ./data/sqlite:/app/data
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  postgres:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-wavelet}
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+      TZ: ${TZ:-Asia/Shanghai}
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - ./data/postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres} -d ${POSTGRES_DB:-wavelet}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    command: ["redis-server", "--appendonly", "yes"]
+    ports:
+      - "${REDIS_PORT:-6379}:6379"
+    volumes:
+      - ./data/redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 5s
+#
+#  clickhouse:
+#    image: clickhouse/clickhouse-server:25.3-alpine
+#    restart: unless-stopped
+#    profiles:
+#      - clickhouse
+#    environment:
+#      CLICKHOUSE_DB: ${CLICKHOUSE_DB:-wavelet}
+#      CLICKHOUSE_USER: ${CLICKHOUSE_USER:-default}
+#      CLICKHOUSE_PASSWORD: ${CLICKHOUSE_PASSWORD:-123456}
+#      CLICKHOUSE_DEFAULT_ACCESS_MANAGEMENT: 1
+#      TZ: ${TZ:-Asia/Shanghai}
+#    ports:
+#      - "${CLICKHOUSE_HTTP_PORT:-8123}:8123"
+#      - "${CLICKHOUSE_NATIVE_PORT:-9000}:9000"
+#    volumes:
+#      - ./data/clickhouse_data:/var/lib/clickhouse
+#    healthcheck:
+#      test: ["CMD", "clickhouse-client", "--query", "SELECT 1"]
+#      interval: 10s
+#      timeout: 5s
+#      retries: 5
+#      start_period: 15s

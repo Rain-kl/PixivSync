@@ -1,0 +1,3145 @@
+basePath: /
+definitions:
+  auth_source.AuthSourceRequest:
+    properties:
+      client_id:
+        type: string
+      client_secret:
+        type: string
+      display_name:
+        type: string
+      icon_url:
+        type: string
+      is_active:
+        type: boolean
+      name:
+        type: string
+      openid_discovery_url:
+        type: string
+      scopes:
+        type: string
+      type:
+        type: string
+    type: object
+  auth_source.ToggleAuthSourceRequest:
+    properties:
+      is_active:
+        type: boolean
+    type: object
+  cap.ChallengeResponse:
+    properties:
+      challenge:
+        properties:
+          c:
+            type: integer
+          d:
+            type: integer
+          s:
+            type: integer
+        type: object
+      expires:
+        description: ms timestamp
+        type: integer
+      token:
+        type: string
+    type: object
+  cap.RedeemResponse:
+    properties:
+      error:
+        type: string
+      expires:
+        type: integer
+      success:
+        type: boolean
+      token:
+        type: string
+    type: object
+  cap.challengeRequest:
+    properties:
+      scope:
+        type: string
+    type: object
+  cap.redeemRequest:
+    properties:
+      scope:
+        type: string
+      solutions:
+        items:
+          type: integer
+        type: array
+      token:
+        type: string
+    required:
+    - solutions
+    - token
+    type: object
+  logger.LogEntry:
+    properties:
+      data:
+        description: 一行日志原文（含换行符）
+        type: string
+      index:
+        description: 全局递增序号
+        type: integer
+    type: object
+  logs.accessLogItem:
+    properties:
+      created_at:
+        type: string
+      headers:
+        type: string
+      id:
+        example: "0"
+        type: string
+      ip:
+        type: string
+      latency:
+        type: integer
+      method:
+        type: string
+      nickname:
+        type: string
+      path:
+        type: string
+      status:
+        type: integer
+      user_agent:
+        type: string
+      user_id:
+        example: "0"
+        type: string
+      username:
+        type: string
+    type: object
+  logs.accessLogsResponse:
+    properties:
+      list:
+        items:
+          $ref: '#/definitions/logs.accessLogItem'
+        type: array
+      total:
+        type: integer
+    type: object
+  logs.browserItem:
+    properties:
+      browser:
+        type: string
+      count:
+        type: integer
+    type: object
+  logs.logsAnalyticsResponse:
+    properties:
+      browsers:
+        items:
+          $ref: '#/definitions/logs.browserItem'
+        type: array
+      top_users:
+        items:
+          $ref: '#/definitions/logs.topUserItem'
+        type: array
+      trend:
+        items:
+          $ref: '#/definitions/logs.trendItem'
+        type: array
+    type: object
+  logs.logsResponse:
+    properties:
+      has_more:
+        type: boolean
+      lines:
+        items:
+          $ref: '#/definitions/logger.LogEntry'
+        type: array
+      next_cursor:
+        description: 用于加载更早日志的 cursor
+        type: integer
+    type: object
+  logs.topUserItem:
+    properties:
+      count:
+        type: integer
+      nickname:
+        type: string
+      user_id:
+        example: "0"
+        type: string
+      username:
+        type: string
+    type: object
+  logs.trendItem:
+    properties:
+      count:
+        type: integer
+      date:
+        type: string
+    type: object
+  model.AccessToken:
+    properties:
+      created_at:
+        type: string
+      id:
+        type: integer
+      last_used_at:
+        type: string
+      masked_token:
+        type: string
+      name:
+        type: string
+      updated_at:
+        type: string
+      user_id:
+        type: integer
+    type: object
+  model.AuthSource:
+    properties:
+      client_id:
+        type: string
+      client_secret_configured:
+        type: boolean
+      created_at:
+        type: string
+      display_name:
+        type: string
+      icon_url:
+        type: string
+      id:
+        type: integer
+      is_active:
+        type: boolean
+      name:
+        type: string
+      openid_discovery_url:
+        type: string
+      scopes:
+        type: string
+      type:
+        type: string
+      updated_at:
+        type: string
+    type: object
+  model.ExternalAccountView:
+    properties:
+      auth_source_id:
+        type: integer
+      auth_source_label:
+        type: string
+      auth_source_name:
+        type: string
+      auth_source_type:
+        type: string
+      created_at:
+        type: string
+      email:
+        type: string
+      external_username:
+        type: string
+      id:
+        type: integer
+    type: object
+  model.SystemConfig:
+    properties:
+      created_at:
+        type: string
+      description:
+        type: string
+      key:
+        type: string
+      type:
+        type: string
+      updated_at:
+        type: string
+      value:
+        type: string
+      visibility:
+        type: integer
+    type: object
+  model.TaskExecution:
+    properties:
+      created_at:
+        type: string
+      duration:
+        type: integer
+      error_message:
+        type: string
+      finished_at:
+        type: string
+      id:
+        example: "0"
+        type: string
+      log:
+        type: string
+      max_retry:
+        type: integer
+      payload:
+        type: string
+      result:
+        type: string
+      retry_count:
+        type: integer
+      retryable:
+        type: boolean
+      started_at:
+        type: string
+      status:
+        $ref: '#/definitions/model.TaskExecutionStatus'
+      task_id:
+        type: string
+      task_name:
+        type: string
+      task_type:
+        type: string
+      triggered_by:
+        type: string
+      updated_at:
+        type: string
+    type: object
+  model.TaskExecutionStatus:
+    enum:
+    - pending
+    - running
+    - succeeded
+    - failed
+    type: string
+    x-enum-varnames:
+    - TaskExecutionStatusPending
+    - TaskExecutionStatusRunning
+    - TaskExecutionStatusSucceeded
+    - TaskExecutionStatusFailed
+  model.Template:
+    properties:
+      content:
+        type: string
+      created_at:
+        type: string
+      description:
+        type: string
+      id:
+        type: integer
+      is_system:
+        type: boolean
+      key:
+        type: string
+      name:
+        type: string
+      subject:
+        type: string
+      type:
+        type: string
+      updated_at:
+        type: string
+    type: object
+  model.Upload:
+    properties:
+      created_at:
+        type: string
+      extension:
+        description: 文件后缀名 (不含点，如 png, pdf)
+        type: string
+      file_name:
+        description: '原始文件名 (例如: image.png)'
+        type: string
+      file_path:
+        description: 文件相对路径 / S3 Key
+        type: string
+      file_size:
+        description: 文件大小（字节）
+        type: integer
+      hash:
+        description: 文件哈希 (SHA-256/MD5，可用于排重)
+        type: string
+      id:
+        example: "0"
+        type: string
+      metadata:
+        allOf:
+        - $ref: '#/definitions/model.UploadMetadata'
+        description: 业务扩展元数据
+      mime_type:
+        description: 媒体类型 (MIME, 如 image/png)
+        type: string
+      status:
+        allOf:
+        - $ref: '#/definitions/model.UploadStatus'
+        description: 状态
+      storage_driver:
+        description: 存储引擎驱动 (如 local, s3, oss)
+        type: string
+      type:
+        description: 业务标识类型 (如 avatar, doc, attachment)
+        type: string
+      updated_at:
+        type: string
+      user_id:
+        example: "0"
+        type: string
+    type: object
+  model.UploadMetadata:
+    properties:
+      bucket:
+        description: 存储桶名称 (适用于 S3 等)
+        type: string
+      client_ip:
+        description: 上传者 IP
+        type: string
+      duration:
+        description: 音视频时长 (s)
+        type: number
+      extra:
+        additionalProperties: {}
+        description: 其它任意业务自定义元数据
+        type: object
+      height:
+        description: 图像/视频高度 (px)
+        type: integer
+      original_mime:
+        description: 原始 MIME 类型
+        type: string
+      user_agent:
+        description: 上传者的 UA
+        type: string
+      width:
+        description: 图像/视频宽度 (px)
+        type: integer
+    type: object
+  model.UploadStatus:
+    enum:
+    - pending
+    - used
+    - deleted
+    type: string
+    x-enum-comments:
+      UploadStatusDeleted: 已删除
+      UploadStatusPending: 待使用
+      UploadStatusUsed: 已使用
+    x-enum-descriptions:
+    - 待使用
+    - 已使用
+    - 已删除
+    x-enum-varnames:
+    - UploadStatusPending
+    - UploadStatusUsed
+    - UploadStatusDeleted
+  oauth.AuthSourceView:
+    properties:
+      client_secret_configured:
+        type: boolean
+      display_name:
+        type: string
+      icon_url:
+        type: string
+      id:
+        type: integer
+      is_active:
+        type: boolean
+      name:
+        type: string
+      type:
+        type: string
+    type: object
+  oauth.BasicUserInfo:
+    properties:
+      avatar_url:
+        type: string
+      bio:
+        type: string
+      email:
+        type: string
+      gender:
+        type: string
+      id:
+        type: integer
+      is_admin:
+        type: boolean
+      location:
+        type: string
+      need_change_password:
+        type: boolean
+      nickname:
+        type: string
+      phone:
+        type: string
+      username:
+        type: string
+      website:
+        type: string
+    type: object
+  oauth.CallbackRequest:
+    properties:
+      code:
+        type: string
+      state:
+        type: string
+    required:
+    - code
+    - state
+    type: object
+  oauth.OAuthAuthorizeResponse:
+    properties:
+      authorize_url:
+        type: string
+    type: object
+  oauth.OAuthCallbackResult:
+    properties:
+      status:
+        type: string
+      user:
+        $ref: '#/definitions/oauth.BasicUserInfo'
+    type: object
+  status.DatabaseInfoResponse:
+    properties:
+      name:
+        type: string
+      type:
+        type: string
+      version:
+        type: string
+    type: object
+  status.SystemStatusResponse:
+    properties:
+      alloc:
+        type: string
+      buck_hash_sys:
+        type: string
+      frees:
+        type: integer
+      gc_sys:
+        type: string
+      heap_alloc:
+        type: string
+      heap_idle:
+        type: string
+      heap_inuse:
+        type: string
+      heap_objects:
+        type: integer
+      heap_released:
+        type: string
+      heap_sys:
+        type: string
+      last_gc_time:
+        type: string
+      last_pause:
+        type: string
+      lookups:
+        type: integer
+      mallocs:
+        type: integer
+      mcache_inuse:
+        type: string
+      mcache_sys:
+        type: string
+      mspan_inuse:
+        type: string
+      mspan_sys:
+        type: string
+      next_gc:
+        type: string
+      num_gc:
+        type: integer
+      num_goroutine:
+        type: integer
+      other_sys:
+        type: string
+      pause_total_ns:
+        type: string
+      stack_inuse:
+        type: string
+      stack_sys:
+        type: string
+      sys:
+        type: string
+      total_alloc:
+        type: string
+      uptime:
+        type: string
+    type: object
+  system_config.CreateSystemConfigRequest:
+    properties:
+      description:
+        maxLength: 255
+        type: string
+      key:
+        maxLength: 64
+        type: string
+      type:
+        enum:
+        - system
+        - business
+        type: string
+      value:
+        maxLength: 255
+        type: string
+      visibility:
+        enum:
+        - 0
+        - 1
+        type: integer
+    required:
+    - key
+    - type
+    - value
+    type: object
+  system_config.TestSMTPRequest:
+    properties:
+      smtp_host:
+        maxLength: 255
+        type: string
+      smtp_password:
+        maxLength: 255
+        type: string
+      smtp_port:
+        type: integer
+      smtp_username:
+        maxLength: 255
+        type: string
+      to:
+        type: string
+    required:
+    - smtp_host
+    - smtp_password
+    - smtp_port
+    - smtp_username
+    - to
+    type: object
+  system_config.TestSMTPResponse:
+    properties:
+      error:
+        type: string
+      log:
+        type: string
+      success:
+        type: boolean
+    type: object
+  system_config.UpdateSystemConfigRequest:
+    properties:
+      description:
+        maxLength: 255
+        type: string
+      value:
+        maxLength: 255
+        type: string
+      visibility:
+        enum:
+        - 0
+        - 1
+        type: integer
+    required:
+    - value
+    type: object
+  task.DispatchTaskRequest:
+    properties:
+      end_time:
+        type: string
+      payload:
+        type: string
+      start_time:
+        type: string
+      task_type:
+        type: string
+      user_id:
+        type: integer
+    required:
+    - task_type
+    type: object
+  task.TaskMeta:
+    properties:
+      asynqTask:
+        type: string
+      description:
+        type: string
+      maxRetry:
+        type: integer
+      name:
+        type: string
+      params:
+        items:
+          $ref: '#/definitions/task.TaskParam'
+        type: array
+      queue:
+        type: string
+      retryable:
+        description: 是否支持手动重试
+        type: boolean
+      supportsTime:
+        type: boolean
+      type:
+        type: string
+    type: object
+  task.TaskParam:
+    properties:
+      Description:
+        description: 描述
+        type: string
+      Label:
+        description: 显示名称
+        type: string
+      Name:
+        description: 参数键名
+        type: string
+      Placeholder:
+        description: 占位符
+        type: string
+      Required:
+        description: 是否必填
+        type: boolean
+      Type:
+        description: 类型：string, text, number
+        type: string
+    type: object
+  template.CreateTemplateRequest:
+    properties:
+      content:
+        type: string
+      description:
+        maxLength: 255
+        type: string
+      key:
+        maxLength: 80
+        type: string
+      name:
+        maxLength: 100
+        type: string
+      subject:
+        maxLength: 255
+        type: string
+      type:
+        maxLength: 20
+        type: string
+    required:
+    - content
+    - key
+    - name
+    - type
+    type: object
+  template.UpdateTemplateRequest:
+    properties:
+      content:
+        type: string
+      description:
+        maxLength: 255
+        type: string
+      name:
+        maxLength: 100
+        type: string
+      subject:
+        maxLength: 255
+        type: string
+      type:
+        maxLength: 20
+        type: string
+    required:
+    - content
+    - name
+    - type
+    type: object
+  upload.batchDownloadRequest:
+    properties:
+      ids:
+        items:
+          type: string
+        minItems: 1
+        type: array
+    required:
+    - ids
+    type: object
+  upload.listMyFilesResponse:
+    properties:
+      items:
+        items:
+          $ref: '#/definitions/model.Upload'
+        type: array
+      page:
+        type: integer
+      page_size:
+        type: integer
+      total:
+        type: integer
+    type: object
+  user.changePasswordRequest:
+    properties:
+      new_password:
+        type: string
+      old_password:
+        type: string
+    type: object
+  user.createTokenRequest:
+    properties:
+      name:
+        type: string
+    type: object
+  user.createUserRequest:
+    properties:
+      is_active:
+        type: boolean
+      is_admin:
+        type: boolean
+      nickname:
+        maxLength: 64
+        type: string
+      password:
+        maxLength: 64
+        minLength: 8
+        type: string
+      username:
+        maxLength: 64
+        minLength: 3
+        type: string
+    required:
+    - password
+    - username
+    type: object
+  user.listUsersResponse:
+    properties:
+      total:
+        type: integer
+      users:
+        items:
+          $ref: '#/definitions/user.user'
+        type: array
+    type: object
+  user.loginRequest:
+    properties:
+      code:
+        type: string
+      password:
+        type: string
+      username:
+        type: string
+    type: object
+  user.registerRequest:
+    properties:
+      code:
+        type: string
+      display_name:
+        type: string
+      email:
+        type: string
+      nickname:
+        type: string
+      password:
+        type: string
+      username:
+        type: string
+    type: object
+  user.sendEmailCodeRequest:
+    properties:
+      email:
+        type: string
+      scene:
+        type: string
+    required:
+    - email
+    - scene
+    type: object
+  user.tokenResponse:
+    properties:
+      record:
+        $ref: '#/definitions/model.AccessToken'
+      token:
+        type: string
+    type: object
+  user.updateProfileRequest:
+    properties:
+      avatar_url:
+        type: string
+      bio:
+        type: string
+      email:
+        type: string
+      gender:
+        type: string
+      location:
+        type: string
+      nickname:
+        type: string
+      phone:
+        type: string
+      website:
+        type: string
+    type: object
+  user.updateUserStatusRequest:
+    properties:
+      is_active:
+        type: boolean
+    type: object
+  user.user:
+    properties:
+      avatar_url:
+        type: string
+      bio:
+        type: string
+      created_at:
+        type: string
+      email:
+        type: string
+      gender:
+        type: string
+      id:
+        type: integer
+      is_active:
+        type: boolean
+      is_admin:
+        type: boolean
+      last_login_at:
+        type: string
+      location:
+        type: string
+      nickname:
+        type: string
+      phone:
+        type: string
+      updated_at:
+        type: string
+      username:
+        type: string
+      website:
+        type: string
+    type: object
+  util.ResponseAny:
+    properties:
+      data: {}
+      error_msg:
+        example: ""
+        type: string
+    type: object
+info:
+  contact:
+    name: Wavelet
+    url: https://github.com/Rain-kl/Wavelet
+  description: Wavelet 平台后端 API，提供用户认证、系统配置、任务调度等通用功能。
+  license:
+    name: Apache 2.0
+    url: http://www.apache.org/licenses/LICENSE-2.0.html
+  title: Wavelet API
+  version: 1.0.0
+paths:
+  /api/cap/challenge:
+    post:
+      consumes:
+      - application/json
+      description: 客户端获取 PoW 难题和签名的 JWT Token，并在后台计算。
+      parameters:
+      - description: 可选范围限制参数
+        in: body
+        name: request
+        schema:
+          $ref: '#/definitions/cap.challengeRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: 成功返回 PoW 难题
+          schema:
+            $ref: '#/definitions/cap.ChallengeResponse'
+        "500":
+          description: 内部服务错误
+          schema:
+            $ref: '#/definitions/cap.RedeemResponse'
+      summary: 生成人机验证难题
+      tags:
+      - cap
+  /api/cap/redeem:
+    post:
+      consumes:
+      - application/json
+      description: 提交 PoW 解答进行核销，成功后返回一次性 X-Cap-Token 凭证
+      parameters:
+      - description: 难题 Token 与解答 solutions 数组
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/cap.redeemRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: 核销成功，返回 X-Cap-Token
+          schema:
+            $ref: '#/definitions/cap.RedeemResponse'
+        "400":
+          description: 参数错误或核销失败
+          schema:
+            $ref: '#/definitions/cap.RedeemResponse'
+        "500":
+          description: 内部服务错误
+          schema:
+            $ref: '#/definitions/cap.RedeemResponse'
+      summary: 校验人机验证解答
+      tags:
+      - cap
+  /api/v1/admin/auth-sources:
+    get:
+      description: 返回所有已配置的 OAuth/OIDC 认证源列表，包括已启用和未启用的，需要管理员权限
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: 认证源列表
+          schema:
+            allOf:
+            - $ref: '#/definitions/util.ResponseAny'
+            - properties:
+                data:
+                  items:
+                    $ref: '#/definitions/model.AuthSource'
+                  type: array
+              type: object
+        "401":
+          description: 未登录
+          schema:
+            $ref: '#/definitions/util.ResponseAny'
+        "403":
+          description: 无管理员权限
+          schema:
+            $ref: '#/definitions/util.ResponseAny'
+        "500":
+          description: 内部错误
+          schema:
+            $ref: '#/definitions/util.ResponseAny'
+      security:
+      - SessionCookie: []
+      summary: 获取认证源列表
+      tags:
+      - admin
+    post:
+      consumes:
+      - application/json
+      description: 创建一个新的 OAuth/OIDC 认证源配置，认证源名称必须唯一且符合命名规范，需要管理员权限
+      parameters:
+      - description: 创建认证源参数
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/auth_source.AuthSourceRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: 创建成功，返回认证源信息
+          schema:
+            allOf:
+            - $ref: '#/definitions/util.ResponseAny'
+            - properties:
+                data:
+                  $ref: '#/definitions/model.AuthSource'
+              type: object
+        "400":
+          description: 参数错误或验证失败
+          schema:
+            $ref: '#/definitions/util.ResponseAny'
+        "401":
+          description: 未登录
+          schema:
+            $ref: '#/definitions/util.ResponseAny'
+        "403":
+          description: 无管理员权限
+          schema:
+            $ref: '#/definitions/util.ResponseAny'
+      security:
+      - SessionCookie: []
+      summary: 创建认证源
+      tags:
+      - admin
+  /api/v1/admin/auth-sources/{id}:
+    delete:
+      description: 删除指定认证源及其关联的所有外部帐号绑定记录，警告：删除后相关用户将无法通过该源登录，需要管理员权限
+      parameters:
+      - description: 认证源 ID 或名称
+        format: int64
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: 删除成功
+          schema:
+            allOf:
+            - $ref: '#/definitions/util.ResponseAny'
+            - properties:
+                data:
+                  type: string
+              type: object
+        "400":
+          description: ID 无效或删除失败
+          schema:
+            $ref: '#/definitions/util.ResponseAny'
+        "401":
+          description: 未登录
+          schema:
+            $ref: '#/definitions/util.ResponseAny'
+        "403":
+          description: 无管理员权限
+          schema:
+            $ref: '#/definitions/util.ResponseAny'
+      security:
+      - SessionCookie: []
+      summary: 删除认证源
+      tags:
+      - admin
+    put:
+      consumes:
+      - application/json
+      description: 更新指定 ID 的认证源配置。若 client_secret 字段为空，则保留原有密钥不变，需要管理员权限
+      parameters:
+      - description: 认证源 ID 或名称
+        format: int64
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: 更新认证源参数
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/auth_source.AuthSourceRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: 更新成功，返回更新后的认证源信息
+          schema:
+            allOf:
+            - $ref: '#/definitions/util.ResponseAny'
+            - properties:
+                data:
+                  $ref: '#/definitions/model.AuthSource'
+              type: object
+        "400":
+          description: 参数错误或验证失败
+          schema:
+            $ref: '#/definitions/util.ResponseAny'
+        "401":
+          description: 未登录
+          schema:
+            $ref: '#/definitions/util.ResponseAny'
+        "403":
+          description: 无管理员权限
+          schema:
+            $ref: '#/definitions/util.ResponseAny'
+        "500":
+          description: 内部错误
+          schema:
+            $ref: '#/definitions/util.ResponseAny'
+      security:
+      - SessionCookie: []
+      summary: 更新认证源
+      tags:
+      - admin
+  /api/v1/admin/auth-sources/{id}/toggle:
+    put:
+      consumes:
+      - application/json
+      description: 启用或禁用指定认证源。尝试启用时将验证 Client ID 和 Client Secret 是否已配置，需要管理员权限
+      parameters:
+      - description: 认证源 ID 或名称
+        format: int64
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: 启用状态
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/auth_source.ToggleAuthSourceRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: 切换成功
+          schema:
+            allOf:
+            - $ref: '#/definitions/util.ResponseAny'
+            - properties:
+                data:
+                  type: string
+              type: object
+        "400":
+          description: 验证失败或认证源不存在
+          schema:
+            $ref: '#/definitions/util.ResponseAny'
+        "401":
+          description: 未登录
+          schema:
+            $ref: '#/definitions/util.ResponseAny'
+        "403":
+          description: 无管理员权限
+          schema:
+            $ref: '#/definitions/util.ResponseAny'
+      security:
+      - SessionCookie: []
+      summary: 切换认证源启用状态
+      tags:
+      - admin
+  /api/v1/admin/db-export:
+    get:
+      description: SQLite 时直接下载 .db 文件；PostgreSQL 时执行 pg_dump 并流式下载 .sql 文件，需要管理员权限
+      produces:
+      - application/octet-stream
+      responses:
+        "200":
+          description: 数据库文件
+          schema:
+            type: file
+        "401":
+          description: 未登录
+          schema:
+            $ref: '#/definitions/util.ResponseAny'
+        "403":
+          description: 无管理员权限
+          schema:
+            $ref: '#/definitions/util.ResponseAny'
+        "500":
+          description: 导出失败
+          schema:
+            $ref: '#/definitions/util.ResponseAny'
+      security:
+      - SessionCookie: []
+      summary: 导出数据库
+      tags:
+      - admin
+  /api/v1/admin/db-info:
+    get:
+      description: 返回当前使用的数据库类型（sqlite/postgres）、名称/路径及版本字符串，需要管理员权限
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: 获取成功
+          schema:
+            allOf:
+            - $ref: '#/definitions/util.ResponseAny'
+            - properties:
+                data:
+                  $ref: '#/definitions/status.DatabaseInfoResponse'
+              type: object
+        "401":
+          description: 未登录
+          schema:
+            $ref: '#/definitions/util.ResponseAny'
+        "403":
+          description: 无管理员权限
+          schema:
+            $ref: '#/definitions/util.ResponseAny'
+      security:
+      - SessionCookie: []
+      summary: 获取数据库信息
+      tags:
+      - admin
+  /api/v1/admin/logs:
+    get:
+      description: 分页获取系统历史日志，cursor=0 获取最新日志，cursor>0 获取更早日志
+      parameters:
+      - default: 0
+        description: 日志游标，0=获取最新
+        in: query
+        name: cursor
+        type: integer
+      - default: 200
+        description: 每页条数
+        in: query
+        name: limit
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: 日志列表
+          schema:
+            allOf:
+            - $ref: '#/definitions/util.ResponseAny'
+            - properties:
+                data:
+                  $ref: '#/definitions/logs.logsResponse'
+              type: object
+        "401":
+          description: 未登录
+          schema:
+            $ref: '#/definitions/util.ResponseAny'
+        "403":
+          description: 无管理员权限
+          schema:
+            $ref: '#/definitions/util.ResponseAny'
+      security:
+      - SessionCookie: []
+      summary: 获取系统日志
+      tags:
+      - admin
+  /api/v1/admin/logs/access:
+    get:
+      description: 分页并按照用户、接口路径、时间范围等维度检索 ClickHouse 用户访问日志列表（需要管理员权限，ClickHouse 未启用时报错）
+      parameters:
+      - default: 1
+        description: 页码
+        in: query
+        name: page
+        type: integer
+      - default: 20
+        description: 每页条数
+        in: query
+        name: page_size
+        type: integer
+      - description: 用户名模糊搜索
+        in: query
+        name: username
+        type: string
+      - description: 接口路径模糊搜索
+        in: query
+        name: path
+        type: string
+      - description: 起始时间（RFC3339 或 YYYY-MM-DD HH:MM:SS）
+        in: query
+        name: start_time
+        type: string
+      - description: 结束时间（RFC3339 或 YYYY-MM-DD HH:MM:SS）
+        in: query
+        name: end_time
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: 访问日志列表
+          schema:
+            allOf:
+            - $ref: '#/definitions/util.ResponseAny'
+            - properties:
+                data:
+                  $ref: '#/definitions/logs.accessLogsResponse'
+              type: object
+        "400":
+          description: ClickHouse 未启用或参数错误
+          schema:
+            $ref: '#/definitions/util.ResponseAny'
+        "401":
+          description: 未登录
+          schema:
+            $ref: '#/definitions/util.ResponseAny'
+        "403":
+          description: 无管理员权限
+          schema:
+            $ref: '#/definitions/util.ResponseAny'
+      security:
+      - SessionCookie: []
+      summary: 获取用户访问日志
+      tags:
+      - admin
+  /api/v1/admin/logs/analytics:
+    get:
+      description: 聚合统计最近 7 天的每日访问趋势、浏览器分布以及前 10 名最活跃用户排行（需要管理员权限，ClickHouse 未启用时报错）
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: 分析统计数据
+          schema:
+            allOf:
+            - $ref: '#/definitions/util.ResponseAny'
+            - properties:
+                data:
+                  $ref: '#/definitions/logs.logsAnalyticsResponse'
+              type: object
+        "400":
+          description: ClickHouse 未启用
+          schema:
+            $ref: '#/definitions/util.ResponseAny'
+        "401":
+          description: 未登录
+          schema:
+            $ref: '#/definitions/util.ResponseAny'
+        "403":
+          description: 无管理员权限
+          schema:
+            $ref: '#/definitions/util.ResponseAny'
+      security:
+      - SessionCookie: []
+      summary: 获取访问日志分析数据
+      tags:
+      - admin
+  /api/v1/admin/logs/ws:
+    get:
+      description: 通过 WebSocket 实时推送系统日志，需要管理员权限
+      responses: {}
+      summary: 系统日志实时推送
+      tags:
+      - admin
+  /api/v1/admin/status:
+    get:
+      description: 获取后端服务运行状态、Goroutine、内存指标等详细统计数据，需要管理员权限
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: 获取成功
+          schema:
+            allOf:
+            - $ref: '#/definitions/util.ResponseAny'
+            - properties:
+                data:
+                  $ref: '#/definitions/status.SystemStatusResponse'
+              type: object
+        "401":
+          description: 未登录
+          schema:
+            $ref: '#/definitions/util.ResponseAny'
+        "403":
+          description: 无管理员权限
+          schema:
+            $ref: '#/definitions/util.ResponseAny'
+      security:
+      - SessionCookie: []
+      summary: 获取系统状态信息
+      tags:
+      - admin
+  /api/v1/admin/system-configs:
+    get:
+      description: 返回所有系统配置列表，支持按配置类型（system/business）过滤，需要管理员权限
+      parameters:
+      - description: 配置类型（system/business）
+        in: query
+        name: type
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: 系统配置列表
+          schema:
+            allOf:
+            - $ref: '#/definitions/util.ResponseAny'
+            - properties:
+                data:
+                  items:
+                    $ref: '#/definitions/model.SystemConfig'
+                  type: array
+              type: object
+        "401":
+          description: 未登录
+          schema:
+            $ref: '#/definitions/util.ResponseAny'
+        "403":
+          description: 无管理员权限
+          schema:
+            $ref: '#/definitions/util.ResponseAny'
+        "500":
+          description: 内部错误
+          schema:
+            $ref: '#/definitions/util.ResponseAny'
+      security:
+      - SessionCookie: []
+      summary: 获取系统配置列表
+      tags:
+      - admin
+    post:
+      consumes:
+      - application/json
+      description: 创建一条新的系统配置项，配置键不可重复，同时将新配置同步到 Redis，需要管理员权限
+      parameters:
+      - description: 创建请求参数
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/system_config.CreateSystemConfigRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: 创建成功
+          schema:
+            allOf:
+            - $ref: '#/definitions/util.ResponseAny'
+            - properties:
+                data:
+                  type: string
+              type: object
+        "400":
+          description: 参数错误或配置键已存在
+          schema:
+            $ref: '#/definitions/util.ResponseAny'
+        "401":
+          description: 未登录
+          schema:
+            $ref: '#/definitions/util.ResponseAny'
+        "403":
+          description: 无管理员权限
+          schema:
+            $ref: '#/definitions/util.ResponseAny'
+        "500":
+          description: 内部错误
+          schema:
+            $ref: '#/definitions/util.ResponseAny'
+      security:
+      - SessionCookie: []
+      summary: 创建系统配置
+      tags:
+      - admin
+  /api/v1/admin/system-configs/{key}:
+    get:
+      description: 根据配置键获取对应的系统配置详情，需要管理员权限
+      parameters:
+      - description: 配置键
+        in: path
+        name: key
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: 系统配置详情
+          schema:
+            allOf:
+            - $ref: '#/definitions/util.ResponseAny'
+            - properties:
+                data:
+                  $ref: '#/definitions/model.SystemConfig'
+              type: object
+        "401":
+          description: 未登录
+          schema:
+            $ref: '#/definitions/util.ResponseAny'
+        "403":
+          description: 无管理员权限
+          schema:
+            $ref: '#/definitions/util.ResponseAny'
+        "404":
+          description: 配置不存在
+          schema:
+            $ref: '#/definitions/util.ResponseAny'
+        "500":
+          description: 内部错误
+          schema:
+            $ref: '#/definitions/util.ResponseAny'
+      security:
+      - SessionCookie: []
+      summary: 获取单个系统配置
+      tags:
+      - admin
+    put:
+      consumes:
+      - application/json
+      description: 根据配置键更新对应的配置内容，同时将更新同步到 Redis，需要管理员权限
+      parameters:
+      - description: 配置键
+        in: path
+        name: key
+        required: true
+        type: string
+      - description: 更新请求参数
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/system_config.UpdateSystemConfigRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: 更新成功
+          schema:
+            allOf:
+            - $ref: '#/definitions/util.ResponseAny'
+            - properties:
+                data:
+                  type: string
+              type: object
+        "400":
+          description: 参数错误
+          schema:
+            $ref: '#/definitions/util.ResponseAny'
+        "401":
+          description: 未登录
+          schema:
+            $ref: '#/definitions/util.ResponseAny'
+        "403":
+          description: 无管理员权限
+          schema:
+            $ref: '#/definitions/util.ResponseAny'
+        "404":
+          description: 配置不存在
+          schema:
+            $ref: '#/definitions/util.ResponseAny'
+        "500":
+          description: 内部错误
+          schema:
+            $ref: '#/definitions/util.ResponseAny'
+      security:
+      - SessionCookie: []
+      summary: 更新系统配置
+      tags:
+      - admin
+  /api/v1/admin/system-configs/smtp/test:
+    post:
+      consumes:
+      - application/json
+      description: 使用传入的配置进行 SMTP 邮件发送测试，支持使用 ****** 占位符使用保存的数据库密码
+      parameters:
+      - description: 测试请求参数
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/system_config.TestSMTPRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: 测试执行完毕
+          schema:
+            allOf:
+            - $ref: '#/definitions/util.ResponseAny'
+            - properties:
+                data:
+                  $ref: '#/definitions/system_config.TestSMTPResponse'
+              type: object
+        "400":
+          description: 参数错误
+          schema:
+            $ref: '#/definitions/util.ResponseAny'
+      security:
+      - SessionCookie: []
+      summary: 测试 SMTP 邮件发送
+      tags:
+      - admin
+  /api/v1/admin/tasks/dispatch:
+    post:
+      consumes:
+      - application/json
+      description: 手动触发指定类型的异步任务，支持指定时间范围和用户，需要管理员权限
+      parameters:
+      - description: 任务请求参数
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/task.DispatchTaskRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: 任务已入队
+          schema:
+            allOf:
+            - $ref: '#/definitions/util.ResponseAny'
+            - properties:
+                data:
+                  type: string
+              type: object
+        "400":
+          description: 任务类型不存在或参数错误
+          schema:
+            $ref: '#/definitions/util.ResponseAny'
+        "401":
+          description: 未登录
+          schema:
+            $ref: '#/definitions/util.ResponseAny'
+        "403":
+          description: 无管理员权限
+          schema:
+            $ref: '#/definitions/util.ResponseAny'
+        "500":
+          description: 任务入队失败
+          schema:
+            $ref: '#/definitions/util.ResponseAny'
+      security:
+      - SessionCookie: []
+      summary: 下发异步任务
+      tags:
+      - admin
+  /api/v1/admin/tasks/executions:
+    get:
+      description: 分页查询任务执行记录，支持按状态和任务类型筛选，需要管理员权限
+      parameters:
+      - description: 状态筛选 (pending/running/succeeded/failed)
+        in: query
+        name: status
+        type: string
+      - description: 任务类型筛选
+        in: query
+        name: task_type
+        type: string
+      - default: 1
+        description: 页码
+        in: query
+        name: page
+        type: integer
+      - default: 20
+        description: 每页条数
+        in: query
+        name: page_size
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: 任务执行记录列表
+          schema:
+            allOf:
+            - $ref: '#/definitions/util.ResponseAny'
+            - properties:
+                data:
+                  type: object
+              type: object
+        "401":
+          description: 未登录
+          schema:
+            $ref: '#/definitions/util.ResponseAny'
+        "403":
+          description: 无管理员权限
+          schema:
+            $ref: '#/definitions/util.ResponseAny'
+      security:
+      - SessionCookie: []
+      summary: 查询任务执行记录
+      tags:
+      - admin
+  /api/v1/admin/tasks/executions/{id}:
+    get:
+      description: 根据 ID 查询任务执行记录详情，包含完整执行日志，需要管理员权限
+      parameters:
+      - description: 任务执行记录 ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: 任务执行详情
+          schema:
+            allOf:
+            - $ref: '#/definitions/util.ResponseAny'
+            - properties:
+                data:
+                  $ref: '#/definitions/model.TaskExecution'
+              type: object
+        "400":
+          description: 参数错误
+          schema:
+            $ref: '#/definitions/util.ResponseAny'
+        "401":
+          description: 未登录
+          schema:
+            $ref: '#/definitions/util.ResponseAny'
+        "403":
+          description: 无管理员权限
+          schema:
+            $ref: '#/definitions/util.ResponseAny'
+        "404":
+          description: 记录不存在
+          schema:
+            $ref: '#/definitions/util.ResponseAny'
+      security:
+      - SessionCookie: []
+      summary: 查询任务执行详情
+      tags:
+      - admin
+  /api/v1/admin/tasks/executions/{id}/retry:
+    post:
+      description: 重新下发一条失败的任务，创建新的执行记录，需要管理员权限
+      parameters:
+      - description: 任务执行记录 ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: 新任务的 TaskID
+          schema:
+            allOf:
+            - $ref: '#/definitions/util.ResponseAny'
+            - properties:
+                data:
+                  type: string
+              type: object
+        "400":
+          description: 任务不支持重试或参数错误
+          schema:
+            $ref: '#/definitions/util.ResponseAny'
+        "401":
+          description: 未登录
+          schema:
+            $ref: '#/definitions/util.ResponseAny'
+        "403":
+          description: 无管理员权限
+          schema:
+            $ref: '#/definitions/util.ResponseAny'
+        "404":
+          description: 记录不存在
+          schema:
+            $ref: '#/definitions/util.ResponseAny'
+        "500":
+          description: 重试失败
+          schema:
+            $ref: '#/definitions/util.ResponseAny'
+      security:
+      - SessionCookie: []
+      summary: 重试失败任务
+      tags:
+      - admin
+  /api/v1/admin/tasks/types:
+    get:
+      description: 返回系统支持的所有可调度任务类型列表，包括任务名称、描述、是否支持时间范围等元数据，需要管理员权限
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: 任务类型列表
+          schema:
+            allOf:
+            - $ref: '#/definitions/util.ResponseAny'
+            - properties:
+                data:
+                  items:
+                    $ref: '#/definitions/task.TaskMeta'
+                  type: array
+              type: object
+        "401":
+          description: 未登录
+          schema:
+            $ref: '#/definitions/util.ResponseAny'
+        "403":
+          description: 无管理员权限
+          schema:
+            $ref: '#/definitions/util.ResponseAny'
+      security:
+      - SessionCookie: []
+      summary: 获取支持的任务类型
+      tags:
+      - admin
+  /api/v1/admin/templates:
+    get:
+      description: 返回所有通知模板列表，需要管理员权限
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: 模板列表
+          schema:
+            allOf:
+            - $ref: '#/definitions/util.ResponseAny'
+            - properties:
+                data:
+                  items:
+                    $ref: '#/definitions/model.Template'
+                  type: array
+              type: object
+        "401":
+          description: 未登录
+          schema:
+            $ref: '#/definitions/util.ResponseAny'
+        "403":
+          description: 无管理员权限
+          schema:
+            $ref: '#/definitions/util.ResponseAny'
+        "500":
+          description: 内部错误
+          schema:
+            $ref: '#/definitions/util.ResponseAny'
+      security:
+      - SessionCookie: []
+      summary: 获取模板列表
+      tags:
+      - admin
+    post:
+      consumes:
+      - application/json
+      description: 创建一条新的自定义通知模板，模板标识符（Key）不可重复，需要管理员权限
+      parameters:
+      - description: 创建请求参数
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/template.CreateTemplateRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: 创建成功
+          schema:
+            allOf:
+            - $ref: '#/definitions/util.ResponseAny'
+            - properties:
+                data:
+                  type: string
+              type: object
+        "400":
+          description: 参数错误或模板标识符已存在
+          schema:
+            $ref: '#/definitions/util.ResponseAny'
+        "401":
+          description: 未登录
+          schema:
+            $ref: '#/definitions/util.ResponseAny'
+        "403":
+          description: 无管理员权限
+          schema:
+            $ref: '#/definitions/util.ResponseAny'
+        "500":
+          description: 内部错误
+          schema:
+            $ref: '#/definitions/util.ResponseAny'
+      security:
+      - SessionCookie: []
+      summary: 创建模板
+      tags:
+      - admin
+  /api/v1/admin/templates/{key}:
+    delete:
+      description: 根据模板标识符删除对应模板，系统预置模板不可删除，需要管理员权限
+      parameters:
+      - description: 模板标识符
+        in: path
+        name: key
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: 删除成功
+          schema:
+            allOf:
+            - $ref: '#/definitions/util.ResponseAny'
+            - properties:
+                data:
+                  type: string
+              type: object
+        "400":
+          description: 不可删除系统模板
+          schema:
+            $ref: '#/definitions/util.ResponseAny'
+        "401":
+          description: 未登录
+          schema:
+            $ref: '#/definitions/util.ResponseAny'
+        "403":
+          description: 无管理员权限
+          schema:
+            $ref: '#/definitions/util.ResponseAny'
+        "404":
+          description: 模板不存在
+          schema:
+            $ref: '#/definitions/util.ResponseAny'
+        "500":
+          description: 内部错误
+          schema:
+            $ref: '#/definitions/util.ResponseAny'
+      security:
+      - SessionCookie: []
+      summary: 删除模板
+      tags:
+      - admin
+    get:
+      description: 根据模板标识符获取对应的模板详情，需要管理员权限
+      parameters:
+      - description: 模板标识符
+        in: path
+        name: key
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: 模板详情
+          schema:
+            allOf:
+            - $ref: '#/definitions/util.ResponseAny'
+            - properties:
+                data:
+                  $ref: '#/definitions/model.Template'
+              type: object
+        "401":
+          description: 未登录
+          schema:
+            $ref: '#/definitions/util.ResponseAny'
+        "403":
+          description: 无管理员权限
+          schema:
+            $ref: '#/definitions/util.ResponseAny'
+        "404":
+          description: 模板不存在
+          schema:
+            $ref: '#/definitions/util.ResponseAny'
+        "500":
+          description: 内部错误
+          schema:
+            $ref: '#/definitions/util.ResponseAny'
+      security:
+      - SessionCookie: []
+      summary: 获取单个模板
+      tags:
+      - admin
+    put:
+      consumes:
+      - application/json
+      description: 根据模板标识符更新对应的模板内容，需要管理员权限
+      parameters:
+      - description: 模板标识符
+        in: path
+        name: key
+        required: true
+        type: string
+      - description: 更新请求参数
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/template.UpdateTemplateRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: 更新成功
+          schema:
+            allOf:
+            - $ref: '#/definitions/util.ResponseAny'
+            - properties:
+                data:
+                  $ref: '#/definitions/model.Template'
+              type: object
+        "400":
+          description: 参数错误
+          schema:
+            $ref: '#/definitions/util.ResponseAny'
+        "401":
+          description: 未登录
+          schema:
+            $ref: '#/definitions/util.ResponseAny'
+        "403":
+          description: 无管理员权限
+          schema:
+            $ref: '#/definitions/util.ResponseAny'
+        "404":
+          description: 模板不存在
+          schema:
+            $ref: '#/definitions/util.ResponseAny'
+        "500":
+          description: 内部错误
+          schema:
+            $ref: '#/definitions/util.ResponseAny'
+      security:
+      - SessionCookie: []
+      summary: 更新模板
+      tags:
+      - admin
+  /api/v1/admin/users:
+    get:
+      description: 分页返回用户列表，支持按用户 ID 和用户名筛选，需要管理员权限
+      parameters:
+      - in: query
+        minimum: 1
+        name: page
+        type: integer
+      - in: query
+        maximum: 100
+        minimum: 1
+        name: page_size
+        type: integer
+      - in: query
+        name: user_id
+        type: integer
+      - in: query
+        name: username
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: 用户列表
+          schema:
+            allOf:
+            - $ref: '#/definitions/util.ResponseAny'
+            - properties:
+                data:
+                  $ref: '#/definitions/user.listUsersResponse'
+              type: object
+        "400":
+          description: 参数错误
+          schema:
+            $ref: '#/definitions/util.ResponseAny'
+        "401":
+          description: 未登录
+          schema:
+            $ref: '#/definitions/util.ResponseAny'
+        "403":
+          description: 无管理员权限
+          schema:
+            $ref: '#/definitions/util.ResponseAny'
+        "500":
+          description: 内部错误
+          schema:
+            $ref: '#/definitions/util.ResponseAny'
+      security:
+      - SessionCookie: []
+      summary: 获取用户列表
+      tags:
+      - admin
+    post:
+      consumes:
+      - application/json
+      description: 创建一个本地密码登录的新用户，需要管理员权限
+      parameters:
+      - description: 创建用户参数
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/user.createUserRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: 创建成功
+          schema:
+            allOf:
+            - $ref: '#/definitions/util.ResponseAny'
+            - properties:
+                data:
+                  $ref: '#/definitions/user.user'
+              type: object
+        "400":
+          description: 参数错误或用户名已存在
+          schema:
+            $ref: '#/definitions/util.ResponseAny'
+        "401":
+          description: 未登录
+          schema:
+            $ref: '#/definitions/util.ResponseAny'
+        "403":
+          description: 无管理员权限
+          schema:
+            $ref: '#/definitions/util.ResponseAny'
+        "500":
+          description: 内部错误
+          schema:
+            $ref: '#/definitions/util.ResponseAny'
+      security:
+      - SessionCookie: []
+      summary: 创建用户
+      tags:
+      - admin
+  /api/v1/admin/users/{id}:
+    delete:
+      description: 删除指定非管理员用户，需要管理员权限，不能删除当前登录用户
+      parameters:
+      - description: 用户 ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: 删除成功
+          schema:
+            allOf:
+            - $ref: '#/definitions/util.ResponseAny'
+            - properties:
+                data:
+                  type: string
+              type: object
+        "400":
+          description: 参数错误
+          schema:
+            $ref: '#/definitions/util.ResponseAny'
+        "401":
+          description: 未登录
+          schema:
+            $ref: '#/definitions/util.ResponseAny'
+        "403":
+          description: 无管理员权限、尝试删除管理员或当前用户
+          schema:
+            $ref: '#/definitions/util.ResponseAny'
+        "404":
+          description: 用户不存在
+          schema:
+            $ref: '#/definitions/util.ResponseAny'
+        "500":
+          description: 内部错误
+          schema:
+            $ref: '#/definitions/util.ResponseAny'
+      security:
+      - SessionCookie: []
+      summary: 删除用户
+      tags:
+      - admin
+    get:
+      description: 返回指定用户的完整个人资料和系统状态，需要管理员权限，不返回密码等敏感字段
+      parameters:
+      - description: 用户 ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: 用户详情
+          schema:
+            allOf:
+            - $ref: '#/definitions/util.ResponseAny'
+            - properties:
+                data:
+                  $ref: '#/definitions/user.user'
+              type: object
+        "400":
+          description: 参数错误
+          schema:
+            $ref: '#/definitions/util.ResponseAny'
+        "401":
+          description: 未登录
+          schema:
+            $ref: '#/definitions/util.ResponseAny'
+        "403":
+          description: 无管理员权限
+          schema:
+            $ref: '#/definitions/util.ResponseAny'
+        "404":
+          description: 用户不存在
+          schema:
+            $ref: '#/definitions/util.ResponseAny'
+        "500":
+          description: 内部错误
+          schema:
+            $ref: '#/definitions/util.ResponseAny'
+      security:
+      - SessionCookie: []
+      summary: 获取用户详情
+      tags:
+      - admin
+  /api/v1/admin/users/{id}/status:
+    put:
+      consumes:
+      - application/json
+      description: 启用或禁用指定用户，管理员账号无法被禁用，需要管理员权限
+      parameters:
+      - description: 用户 ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: 状态参数
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/user.updateUserStatusRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: 更新成功
+          schema:
+            allOf:
+            - $ref: '#/definitions/util.ResponseAny'
+            - properties:
+                data:
+                  type: string
+              type: object
+        "400":
+          description: 参数错误
+          schema:
+            $ref: '#/definitions/util.ResponseAny'
+        "401":
+          description: 未登录
+          schema:
+            $ref: '#/definitions/util.ResponseAny'
+        "403":
+          description: 无管理员权限或尝试禁用管理员
+          schema:
+            $ref: '#/definitions/util.ResponseAny'
+        "404":
+          description: 用户不存在
+          schema:
+            $ref: '#/definitions/util.ResponseAny'
+        "500":
+          description: 内部错误
+          schema:
+            $ref: '#/definitions/util.ResponseAny'
+      security:
+      - SessionCookie: []
+      summary: 更新用户状态
+      tags:
+      - admin
+  /api/v1/config/public:
+    get:
+      consumes:
+      - application/json
+      description: 返回系统配置表中 visibility 为 1 的配置键值集合
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/util.ResponseAny'
+      summary: 获取公共配置
+      tags:
+      - config
+  /api/v1/health:
+    get:
+      description: 检查服务是否正常运行，可用于负载均衡存活探测
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: 服务正常
+          schema:
+            allOf:
+            - $ref: '#/definitions/util.ResponseAny'
+            - properties:
+                data:
+                  type: string
+              type: object
+      summary: 健康检查
+      tags:
+      - health
+  /api/v1/oauth/{source}/authorize:
+    get:
+      description: 根据指定认证源名称发起 OAuth 授权，支持 purpose 参数用于区分登录和账号绑定场景。认证源必须已启用。
+      parameters:
+      - description: 认证源名称
+        in: path
+        name: source
+        required: true
+        type: string
+      - description: 授权目的：login（登录）或 bind（绑定账号），默认 login
+        in: query
+        name: purpose
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: 授权 URL
+          schema:
+            allOf:
+            - $ref: '#/definitions/util.ResponseAny'
+            - properties:
+                data:
+                  $ref: '#/definitions/oauth.OAuthAuthorizeResponse'
+              type: object
+        "400":
+          description: 认证源不存在或未启用
+          schema:
+            $ref: '#/definitions/util.ResponseAny'
+        "500":
+          description: Redis 异常或构造 URL 失败
+          schema:
+            $ref: '#/definitions/util.ResponseAny'
+      summary: 发起指定认证源授权
+      tags:
+      - oauth
+  /api/v1/oauth/callback:
+    post:
+      consumes:
+      - application/json
+      description: 接收前端传回的 state 和 code，完成 OAuth/OIDC 认证并建立会话。支持登录（login）和账号绑定（bind）两种场景。
+      parameters:
+      - description: 回调请求参数
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/oauth.CallbackRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: 登录或绑定成功
+          schema:
+            allOf:
+            - $ref: '#/definitions/util.ResponseAny'
+            - properties:
+                data:
+                  $ref: '#/definitions/oauth.OAuthCallbackResult'
+              type: object
+        "400":
+          description: state 无效、参数错误或认证源错误
+          schema:
+            $ref: '#/definitions/util.ResponseAny'
+        "401":
+          description: 绑定场景未登录
+          schema:
+            $ref: '#/definitions/util.ResponseAny'
+        "500":
+          description: OAuth 认证失败或内部错误
+          schema:
+            $ref: '#/definitions/util.ResponseAny'
+      summary: OAuth 回调处理
+      tags:
+      - oauth
+  /api/v1/oauth/external-accounts:
+    get:
+      description: 返回当前登录用户已绑定的所有外部 OAuth 帐号信息，需要登录
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: 外部帐号列表
+          schema:
+            allOf:
+            - $ref: '#/definitions/util.ResponseAny'
+            - properties:
+                data:
+                  items:
+                    $ref: '#/definitions/model.ExternalAccountView'
+                  type: array
+              type: object
+        "401":
+          description: 未登录
+          schema:
+            $ref: '#/definitions/util.ResponseAny'
+        "500":
+          description: 内部错误
+          schema:
+            $ref: '#/definitions/util.ResponseAny'
+      security:
+      - SessionCookie: []
+      summary: 获取外部帐号列表
+      tags:
+      - oauth
+  /api/v1/oauth/external-accounts/{id}/delete:
+    post:
+      description: 解除当前登录用户与指定外部帐号的绑定关系，需要登录
+      parameters:
+      - description: 外部帐号绑定记录 ID
+        format: int64
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: 解除绑定成功
+          schema:
+            allOf:
+            - $ref: '#/definitions/util.ResponseAny'
+            - properties:
+                data:
+                  type: string
+              type: object
+        "400":
+          description: ID 无效或解除失败
+          schema:
+            $ref: '#/definitions/util.ResponseAny'
+        "401":
+          description: 未登录
+          schema:
+            $ref: '#/definitions/util.ResponseAny'
+      security:
+      - SessionCookie: []
+      summary: 解除外部帐号绑定
+      tags:
+      - oauth
+  /api/v1/oauth/login:
+    get:
+      description: 根据指定认证源生成 OAuth 授权 URL，前端跳转到该 URL 完成 OAuth 登录授权。source 参数为空时使用第一个启用的认证源。
+      parameters:
+      - description: 认证源名称，为空使用第一个启用的认证源
+        in: query
+        name: source
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: 授权 URL
+          schema:
+            allOf:
+            - $ref: '#/definitions/util.ResponseAny'
+            - properties:
+                data:
+                  $ref: '#/definitions/oauth.OAuthAuthorizeResponse'
+              type: object
+        "400":
+          description: 认证源不存在或未配置
+          schema:
+            $ref: '#/definitions/util.ResponseAny'
+        "500":
+          description: Redis 异常或构造 URL 失败
+          schema:
+            $ref: '#/definitions/util.ResponseAny'
+      summary: 获取登录授权地址
+      tags:
+      - oauth
+  /api/v1/oauth/logout:
+    get:
+      description: 清除当前用户的登录会话，完成退出。清除 Cookie 中的 Session 数据。
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: 退出成功
+          schema:
+            allOf:
+            - $ref: '#/definitions/util.ResponseAny'
+            - properties:
+                data:
+                  type: string
+              type: object
+        "500":
+          description: Session 清除失败
+          schema:
+            $ref: '#/definitions/util.ResponseAny'
+      security:
+      - SessionCookie: []
+      summary: 退出登录
+      tags:
+      - oauth
+  /api/v1/oauth/sources:
+    get:
+      description: 返回当前系统已启用的所有 OAuth 登录源，前端展示登录按钮列表时调用
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: 登录源列表
+          schema:
+            allOf:
+            - $ref: '#/definitions/util.ResponseAny'
+            - properties:
+                data:
+                  items:
+                    $ref: '#/definitions/oauth.AuthSourceView'
+                  type: array
+              type: object
+      summary: 获取可用登录源
+      tags:
+      - oauth
+  /api/v1/oauth/user-info:
+    get:
+      description: 返回当前登录用户的基本信息及余额数据，需要登录。包括用户 ID、用户名、信任等级、各类余额信息等。
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: 用户信息
+          schema:
+            allOf:
+            - $ref: '#/definitions/util.ResponseAny'
+            - properties:
+                data:
+                  $ref: '#/definitions/oauth.BasicUserInfo'
+              type: object
+        "401":
+          description: 未登录
+          schema:
+            $ref: '#/definitions/util.ResponseAny'
+      security:
+      - SessionCookie: []
+      summary: 获取当前登录用户信息
+      tags:
+      - oauth
+  /api/v1/upload:
+    post:
+      consumes:
+      - multipart/form-data
+      description: 支持各种类型的通用文件上传，支持自动文件类型检测、哈希计算与“秒传”去重
+      parameters:
+      - description: 要上传的文件
+        in: formData
+        name: file
+        required: true
+        type: file
+      - description: '业务分类 (例如: avatar, attachment, doc，默认为 generic)'
+        in: formData
+        name: type
+        type: string
+      - description: 额外的 JSON 格式元数据
+        in: formData
+        name: metadata
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: 上传成功
+          schema:
+            allOf:
+            - $ref: '#/definitions/util.ResponseAny'
+            - properties:
+                data:
+                  $ref: '#/definitions/model.Upload'
+              type: object
+        "400":
+          description: 请求参数错误或文件受限
+          schema:
+            $ref: '#/definitions/util.ResponseAny'
+        "401":
+          description: 未登录
+          schema:
+            $ref: '#/definitions/util.ResponseAny'
+        "500":
+          description: 内部错误
+          schema:
+            $ref: '#/definitions/util.ResponseAny'
+      security:
+      - SessionCookie: []
+      summary: 上传文件
+      tags:
+      - upload
+  /api/v1/upload/{id}:
+    delete:
+      description: 将文件状态置为 deleted（软删除），不会立即清理底层存储对象
+      parameters:
+      - description: 文件 ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: 删除成功
+          schema:
+            $ref: '#/definitions/util.ResponseAny'
+        "403":
+          description: 无权操作
+          schema:
+            $ref: '#/definitions/util.ResponseAny'
+        "404":
+          description: 文件不存在
+          schema:
+            $ref: '#/definitions/util.ResponseAny'
+      security:
+      - SessionCookie: []
+      summary: 删除文件
+      tags:
+      - upload
+  /api/v1/upload/download/{id}:
+    get:
+      description: 根据文件 ID 获取文件，以附件形式 (Attachment) 强制开启客户端浏览器下载
+      parameters:
+      - description: 文件 ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/octet-stream
+      responses:
+        "200":
+          description: 成功下载文件
+          schema:
+            type: file
+        "400":
+          description: 参数错误
+          schema:
+            $ref: '#/definitions/util.ResponseAny'
+        "404":
+          description: 文件不存在
+          schema:
+            $ref: '#/definitions/util.ResponseAny'
+        "500":
+          description: 服务内部错误
+          schema:
+            $ref: '#/definitions/util.ResponseAny'
+      security:
+      - SessionCookie: []
+      summary: 下载单文件
+      tags:
+      - upload
+  /api/v1/upload/download/batch:
+    post:
+      consumes:
+      - application/json
+      description: 传入多个文件 ID，后台实时将其打包压缩为 ZIP 流并输出，自动处理文件名重复冲突
+      parameters:
+      - description: 包含文件 ID 数组的请求体
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/upload.batchDownloadRequest'
+      produces:
+      - application/octet-stream
+      responses:
+        "200":
+          description: 成功下载打包后的 ZIP
+          schema:
+            type: file
+        "400":
+          description: 参数错误
+          schema:
+            $ref: '#/definitions/util.ResponseAny'
+        "500":
+          description: 打包失败
+          schema:
+            $ref: '#/definitions/util.ResponseAny'
+      security:
+      - SessionCookie: []
+      summary: 批量打包下载
+      tags:
+      - upload
+  /api/v1/upload/my:
+    get:
+      description: 分页获取当前登录用户上传的文件，支持文件名关键词、业务类型、扩展名过滤
+      parameters:
+      - description: 页码（默认 1）
+        in: query
+        name: page
+        type: integer
+      - description: 每页数量（默认 20，最大 100）
+        in: query
+        name: page_size
+        type: integer
+      - description: 文件名关键词（模糊匹配）
+        in: query
+        name: keyword
+        type: string
+      - description: 业务分类过滤
+        in: query
+        name: type
+        type: string
+      - description: 扩展名过滤
+        in: query
+        name: extension
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: 查询成功
+          schema:
+            allOf:
+            - $ref: '#/definitions/util.ResponseAny'
+            - properties:
+                data:
+                  $ref: '#/definitions/upload.listMyFilesResponse'
+              type: object
+        "401":
+          description: 未登录
+          schema:
+            $ref: '#/definitions/util.ResponseAny'
+      security:
+      - SessionCookie: []
+      summary: 获取我的文件列表
+      tags:
+      - upload
+  /api/v1/user-info:
+    get:
+      description: 返回当前登录用户的基本信息及余额数据，需要登录。包括用户 ID、用户名、信任等级、各类余额信息等。
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: 用户信息
+          schema:
+            allOf:
+            - $ref: '#/definitions/util.ResponseAny'
+            - properties:
+                data:
+                  $ref: '#/definitions/oauth.BasicUserInfo'
+              type: object
+        "401":
+          description: 未登录
+          schema:
+            $ref: '#/definitions/util.ResponseAny'
+      security:
+      - SessionCookie: []
+      summary: 获取当前登录用户信息
+      tags:
+      - oauth
+  /api/v1/user/access-tokens:
+    get:
+      description: 返回当前登录用户的所有 active access tokens（脱敏后）
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: 令牌列表
+          schema:
+            allOf:
+            - $ref: '#/definitions/util.ResponseAny'
+            - properties:
+                data:
+                  items:
+                    $ref: '#/definitions/model.AccessToken'
+                  type: array
+              type: object
+        "401":
+          description: 未登录
+          schema:
+            $ref: '#/definitions/util.ResponseAny'
+      security:
+      - SessionCookie: []
+      summary: 获取当前用户的 AccessToken 列表
+      tags:
+      - user
+    post:
+      consumes:
+      - application/json
+      description: 为当前用户新建一个 API 访问令牌，仅在此接口返回一次明文令牌值，请妥善保存。
+      parameters:
+      - description: 令牌名称
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/user.createTokenRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: 新建令牌成功
+          schema:
+            allOf:
+            - $ref: '#/definitions/util.ResponseAny'
+            - properties:
+                data:
+                  $ref: '#/definitions/user.tokenResponse'
+              type: object
+        "400":
+          description: 参数错误或超限
+          schema:
+            $ref: '#/definitions/util.ResponseAny'
+      security:
+      - SessionCookie: []
+      summary: 创建一个新的 AccessToken
+      tags:
+      - user
+  /api/v1/user/access-tokens/{id}:
+    delete:
+      description: 撤销并删除一个属于当前用户的 API 访问令牌
+      parameters:
+      - description: 令牌ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: 删除成功
+          schema:
+            allOf:
+            - $ref: '#/definitions/util.ResponseAny'
+            - properties:
+                data:
+                  type: string
+              type: object
+        "400":
+          description: 参数错误
+          schema:
+            $ref: '#/definitions/util.ResponseAny'
+      security:
+      - SessionCookie: []
+      summary: 删除一个 AccessToken
+      tags:
+      - user
+  /api/v1/user/access-tokens/{id}/rotate:
+    post:
+      description: 轮换（重新生成）一个属于当前用户的 API 访问令牌的密钥，旧令牌将立即失效
+      parameters:
+      - description: 令牌ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: 令牌轮换成功
+          schema:
+            allOf:
+            - $ref: '#/definitions/util.ResponseAny'
+            - properties:
+                data:
+                  $ref: '#/definitions/user.tokenResponse'
+              type: object
+        "400":
+          description: 参数错误
+          schema:
+            $ref: '#/definitions/util.ResponseAny'
+      security:
+      - SessionCookie: []
+      summary: 轮换一个 AccessToken
+      tags:
+      - user
+  /api/v1/user/change-password:
+    post:
+      consumes:
+      - application/json
+      description: 修改当前登录用户的密码。修改成功后，如果是首次明文登录的升级提示，则清除修改密码的提示状态。
+      parameters:
+      - description: 修改密码请求参数
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/user.changePasswordRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: 修改密码成功
+          schema:
+            allOf:
+            - $ref: '#/definitions/util.ResponseAny'
+            - properties:
+                data:
+                  type: string
+              type: object
+        "400":
+          description: 原密码错误或新密码不符合要求
+          schema:
+            $ref: '#/definitions/util.ResponseAny'
+        "401":
+          description: 请先登录
+          schema:
+            $ref: '#/definitions/util.ResponseAny'
+      summary: 修改用户密码
+      tags:
+      - user
+  /api/v1/user/login:
+    post:
+      consumes:
+      - application/json
+      description: 使用用户名和密码登录，登录成功后建立 Session。若管理员已关闭密码登录功能则返回错误。
+      parameters:
+      - description: 登录请求参数
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/user.loginRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: 登录成功，返回用户信息
+          schema:
+            allOf:
+            - $ref: '#/definitions/util.ResponseAny'
+            - properties:
+                data:
+                  $ref: '#/definitions/oauth.BasicUserInfo'
+              type: object
+        "400":
+          description: 用户名或密码错误、帐号已禁用等
+          schema:
+            $ref: '#/definitions/util.ResponseAny'
+        "500":
+          description: 服务内部错误
+          schema:
+            $ref: '#/definitions/util.ResponseAny'
+      summary: 用户密码登录
+      tags:
+      - user
+  /api/v1/user/logout:
+    get:
+      description: 清除用户登录 Session，完成退出
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: 退出成功
+          schema:
+            allOf:
+            - $ref: '#/definitions/util.ResponseAny'
+            - properties:
+                data:
+                  type: string
+              type: object
+        "500":
+          description: Session 清除失败
+          schema:
+            $ref: '#/definitions/util.ResponseAny'
+      security:
+      - SessionCookie: []
+      summary: 用户退出登录
+      tags:
+      - user
+  /api/v1/user/profile:
+    put:
+      consumes:
+      - application/json
+      description: 修改当前登录用户的昵称、邮箱、头像、简介、电话、性别、个人网站和所在地。
+      parameters:
+      - description: 更新请求参数
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/user.updateProfileRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: 修改成功，返回更新后的用户信息
+          schema:
+            allOf:
+            - $ref: '#/definitions/util.ResponseAny'
+            - properties:
+                data:
+                  $ref: '#/definitions/oauth.BasicUserInfo'
+              type: object
+        "400":
+          description: 邮箱已被占用或参数错误
+          schema:
+            $ref: '#/definitions/util.ResponseAny'
+        "401":
+          description: 未登录
+          schema:
+            $ref: '#/definitions/util.ResponseAny'
+      summary: 修改当前登录用户的个人资料
+      tags:
+      - user
+  /api/v1/user/register:
+    post:
+      consumes:
+      - application/json
+      description: 使用用户名和密码注册新账号，注册成功后自动登录并建立 Session。密码长度不能少于 8 位。
+      parameters:
+      - description: 注册请求参数
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/user.registerRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: 注册并登录成功，返回用户信息
+          schema:
+            allOf:
+            - $ref: '#/definitions/util.ResponseAny'
+            - properties:
+                data:
+                  $ref: '#/definitions/oauth.BasicUserInfo'
+              type: object
+        "400":
+          description: 参数错误、用户名已存在或注册已关闭
+          schema:
+            $ref: '#/definitions/util.ResponseAny'
+        "500":
+          description: 服务内部错误
+          schema:
+            $ref: '#/definitions/util.ResponseAny'
+      summary: 用户注册
+      tags:
+      - user
+  /api/v1/user/self:
+    get:
+      description: 返回当前登录用户的基本信息及余额数据，需要登录。包括用户 ID、用户名、信任等级、各类余额信息等。
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: 用户信息
+          schema:
+            allOf:
+            - $ref: '#/definitions/util.ResponseAny'
+            - properties:
+                data:
+                  $ref: '#/definitions/oauth.BasicUserInfo'
+              type: object
+        "401":
+          description: 未登录
+          schema:
+            $ref: '#/definitions/util.ResponseAny'
+      security:
+      - SessionCookie: []
+      summary: 获取当前登录用户信息
+      tags:
+      - oauth
+  /api/v1/user/send-email-code:
+    post:
+      consumes:
+      - application/json
+      description: 向指定邮箱发送验证码（用于注册场景）
+      parameters:
+      - description: 发送验证码请求参数
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/user.sendEmailCodeRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: 发送成功
+          schema:
+            $ref: '#/definitions/util.ResponseAny'
+        "400":
+          description: 参数错误
+          schema:
+            $ref: '#/definitions/util.ResponseAny'
+      summary: 发送邮箱验证码
+      tags:
+      - user
+  /f/{id}:
+    get:
+      description: 根据文件 ID 获取并提供已上传的临时或正式文件，若配置了缓存则优先走本地缓存，否则从 S3 等后端存储读取并流式返回
+      parameters:
+      - description: 文件 ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/octet-stream
+      responses:
+        "200":
+          description: 成功获取文件内容
+          schema:
+            type: file
+        "400":
+          description: 文件 ID 格式错误
+          schema:
+            $ref: '#/definitions/util.ResponseAny'
+        "404":
+          description: 文件未找到
+          schema:
+            $ref: '#/definitions/util.ResponseAny'
+        "500":
+          description: 服务内部错误
+          schema:
+            $ref: '#/definitions/util.ResponseAny'
+      summary: 获取已上传文件
+      tags:
+      - upload
+  /robots.txt:
+    get:
+      description: 根据系统配置决定是否允许搜索引擎检索，并返回相应的 robots.txt 文件内容
+      produces:
+      - text/plain
+      responses:
+        "200":
+          description: robots.txt 内容
+          schema:
+            type: string
+      summary: 获取 robots.txt
+      tags:
+      - config
+securityDefinitions:
+  SessionCookie:
+    in: cookie
+    name: session
+    type: apiKey
+swagger: "2.0"

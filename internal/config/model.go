@@ -1,0 +1,174 @@
+/*
+Copyright 2025 linux.do
+Modified by Arctel.net, 2026
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+*/
+
+package config
+
+import "time"
+
+type configModel struct {
+	App        appConfig        `mapstructure:"app"`
+	Database   databaseConfig   `mapstructure:"database"`
+	Redis      redisConfig      `mapstructure:"redis"`
+	Log        logConfig        `mapstructure:"log"`
+	Scheduler  schedulerConfig  `mapstructure:"scheduler"`
+	Worker     workerConfig     `mapstructure:"worker"`
+	ClickHouse clickHouseConfig `mapstructure:"clickhouse"`
+	Otel       otelConfig       `mapstructure:"otel"`
+	S3         s3Config         `mapstructure:"s3"`
+}
+
+// appConfig 应用基本配置
+type appConfig struct {
+	AppName                 string `mapstructure:"app_name"`
+	Env                     string `mapstructure:"env"`
+	Addr                    string `mapstructure:"addr"`
+	NodeID                  int64  `mapstructure:"node_id"`
+	APIPrefix               string `mapstructure:"api_prefix"`
+	GracefulShutdownTimeout int    `mapstructure:"graceful_shutdown_timeout"`
+	SessionCookieName       string `mapstructure:"session_cookie_name"`
+	SessionSecret           string `mapstructure:"session_secret"`
+	SessionDomain           string `mapstructure:"session_domain"`
+	SessionAge              int    `mapstructure:"session_age"`
+	SessionHTTPOnly         bool   `mapstructure:"session_http_only"`
+	SessionSecure           bool   `mapstructure:"session_secure"`
+}
+
+// IsProduction 检查当前环境是否为生产环境
+func (a *appConfig) IsProduction() bool {
+	return a.Env == "production"
+}
+
+// databaseConfig 数据库配置
+type databaseConfig struct {
+	Enabled                bool                    `mapstructure:"enabled"`
+	SQLitePath             string                  `mapstructure:"sqlite_path"` // PostgreSQL 禁用时的 SQLite 文件路径
+	Host                   string                  `mapstructure:"host"`
+	Port                   int                     `mapstructure:"port"`
+	Username               string                  `mapstructure:"username"`
+	Password               string                  `mapstructure:"password"`
+	Database               string                  `mapstructure:"database"`
+	MaxIdleConn            int                     `mapstructure:"max_idle_conn"`
+	MaxOpenConn            int                     `mapstructure:"max_open_conn"`
+	ConnMaxLifetime        int                     `mapstructure:"conn_max_lifetime"`
+	ConnMaxIdleTime        int                     `mapstructure:"conn_max_idle_time"`
+	LogLevel               string                  `mapstructure:"log_level"`
+	SSLMode                string                  `mapstructure:"ssl_mode"`
+	TimeZone               string                  `mapstructure:"time_zone"`
+	ApplicationName        string                  `mapstructure:"application_name"`
+	SearchPath             string                  `mapstructure:"search_path"`
+	PreferSimpleProtocol   bool                    `mapstructure:"prefer_simple_protocol"`
+	StatementCacheCapacity int                     `mapstructure:"statement_cache_capacity"`
+	DefaultQueryExecMode   string                  `mapstructure:"default_query_exec_mode"`
+	Replicas               []databaseReplicaConfig `mapstructure:"replicas"`
+	SlowThreshold          time.Duration           `mapstructure:"slow_threshold"`
+}
+
+// databaseReplicaConfig 只读副本配置
+type databaseReplicaConfig struct {
+	Host     string `mapstructure:"host"`
+	Port     int    `mapstructure:"port"`
+	Username string `mapstructure:"username"`
+	Password string `mapstructure:"password"`
+}
+
+// clickhouse 配置
+type clickHouseConfig struct {
+	Enabled         bool     `mapstructure:"enabled"`
+	Hosts           []string `mapstructure:"hosts"`
+	Username        string   `mapstructure:"username"`
+	Password        string   `mapstructure:"password"`
+	Database        string   `mapstructure:"database"`
+	MaxIdleConn     int      `mapstructure:"max_idle_conn"`
+	MaxOpenConn     int      `mapstructure:"max_open_conn"`
+	ConnMaxLifetime int      `mapstructure:"conn_max_lifetime"`
+	DialTimeout     int      `mapstructure:"dial_timeout"`
+	BlockBufferSize uint8    `mapstructure:"block_buffer_size"`
+}
+
+// redisConfig Redis配置
+type redisConfig struct {
+	Enabled         bool     `mapstructure:"enabled"`
+	Addrs           []string `mapstructure:"addrs"`
+	Username        string   `mapstructure:"username"`
+	Password        string   `mapstructure:"password"`
+	DB              int      `mapstructure:"db"`
+	ClusterMode     bool     `mapstructure:"cluster_mode"`
+	MasterName      string   `mapstructure:"master_name"`
+	KeyPrefix       string   `mapstructure:"key_prefix"`
+	PoolSize        int      `mapstructure:"pool_size"`
+	MinIdleConn     int      `mapstructure:"min_idle_conn"`
+	DialTimeout     int      `mapstructure:"dial_timeout"`
+	ReadTimeout     int      `mapstructure:"read_timeout"`
+	WriteTimeout    int      `mapstructure:"write_timeout"`
+	MaxRetries      int      `mapstructure:"max_retries"`
+	PoolTimeout     int      `mapstructure:"pool_timeout"`
+	ConnMaxIdleTime int      `mapstructure:"conn_max_idle_time"`
+}
+
+// logConfig 日志配置
+type logConfig struct {
+	Level      string `mapstructure:"level"`
+	Format     string `mapstructure:"format"`
+	Output     string `mapstructure:"output"`
+	FilePath   string `mapstructure:"file_path"`
+	MaxSize    int    `mapstructure:"max_size"`
+	MaxAge     int    `mapstructure:"max_age"`
+	MaxBackups int    `mapstructure:"max_backups"`
+	Compress   bool   `mapstructure:"compress"`
+}
+
+// schedulerConfig 定时任务配置
+type schedulerConfig struct {
+	CleanupUnusedUploadsTaskCron string `mapstructure:"cleanup_unused_uploads_task_cron"`
+}
+
+// workerConfig 工作配置
+type workerConfig struct {
+	Concurrency    int           `mapstructure:"concurrency"`
+	StrictPriority bool          `mapstructure:"strict_priority"`
+	Queues         []QueueConfig `mapstructure:"queues"`
+}
+
+// QueueConfig 队列配置
+type QueueConfig struct {
+	Name     string `mapstructure:"name"`
+	Priority int    `mapstructure:"priority"`
+}
+
+// otelConfig OpenTelemetry 配置
+type otelConfig struct {
+	SamplingRate float64 `mapstructure:"sampling_rate"`
+}
+
+// s3Config S3 compatible storage configuration
+type s3Config struct {
+	Enabled         bool             `mapstructure:"enabled"`
+	Endpoint        string           `mapstructure:"endpoint"`
+	Region          string           `mapstructure:"region"`
+	Bucket          string           `mapstructure:"bucket"`
+	AccessKeyID     string           `mapstructure:"access_key_id" json:"-"`
+	SecretAccessKey string           `mapstructure:"secret_access_key" json:"-"`
+	PathStyle       bool             `mapstructure:"path_style"`
+	KeyPrefix       string           `mapstructure:"key_prefix"`
+	CdnURL          string           `mapstructure:"cdn_url"`
+	LocalCache      localCacheConfig `mapstructure:"local_cache"`
+}
+
+type localCacheConfig struct {
+	Enabled  bool   `mapstructure:"enabled"`
+	CacheDir string `mapstructure:"cache_dir"`
+}

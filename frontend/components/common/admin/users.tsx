@@ -1,0 +1,659 @@
+"use client"
+
+import {useEffect, useState} from "react"
+import {Button} from "@/components/ui/button"
+import {Switch} from "@/components/ui/switch"
+import {Separator} from "@/components/ui/separator"
+import {Table, TableBody, TableCell, TableHead, TableHeader, TableRow} from "@/components/ui/table"
+import {Sheet, SheetContent, SheetTitle} from "@/components/ui/sheet"
+import {Badge} from "@/components/ui/badge"
+import {Avatar, AvatarFallback, AvatarImage} from "@/components/ui/avatar"
+import {
+  ChevronDown,
+  ChevronLeft,
+  ChevronRight,
+  Eye,
+  Filter,
+  Globe,
+  Layers,
+  Loader2,
+  Mail,
+  MapPin,
+  Plus,
+  Search,
+  ShieldCheck,
+  Smartphone,
+  Trash2,
+  UserCheck,
+  UserX,
+  VenusAndMars,
+  X
+} from "lucide-react"
+import {Tooltip, TooltipContent, TooltipProvider, TooltipTrigger} from "@/components/ui/tooltip"
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle
+} from "@/components/ui/alert-dialog"
+
+import {AdminUser} from "@/lib/services"
+import {cn, formatDateTime} from "@/lib/utils"
+import {EmptyStateWithBorder} from "@/components/layout/empty"
+import {LoadingStateWithBorder} from "@/components/layout/loading"
+import {ErrorInline} from "@/components/layout/error"
+import {DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger} from "@/components/ui/dropdown-menu"
+import {useAdminUsers} from "@/contexts/admin-users-context"
+import {CreateUserModal} from "./create-user-modal"
+
+export function UsersManager() {
+  const {
+    users,
+    total,
+    loading,
+    error,
+    page,
+    pageSize,
+    searchUserId,
+    searchUsername,
+    statusFilter,
+    setPage,
+    setPageSize,
+    setSearchUserId,
+    setSearchUsername,
+    setStatusFilter,
+    fetchUsers,
+    getUserDetail,
+    updateUserStatus,
+    deleteUser
+  } = useAdminUsers()
+
+  const [selectedUser, setSelectedUser] = useState<AdminUser | null>(null)
+  const [detailOpen, setDetailOpen] = useState(false)
+  const [detailLoading, setDetailLoading] = useState(false)
+  const [deleteTarget, setDeleteTarget] = useState<AdminUser | null>(null)
+  const [deleteLoading, setDeleteLoading] = useState(false)
+  const [createModalOpen, setCreateModalOpen] = useState(false)
+
+  useEffect(() => {
+    fetchUsers()
+  }, [fetchUsers])
+
+  const handleStatusToggle = async (user: AdminUser) => {
+    await updateUserStatus(user)
+
+    if (selectedUser?.id === user.id) {
+      setSelectedUser(prev => prev ? { ...prev, is_active: !prev.is_active } : null)
+    }
+  }
+
+  const handleShowDetail = async (user: AdminUser) => {
+    setSelectedUser(user)
+    setDetailOpen(true)
+    setDetailLoading(true)
+
+    try {
+      const detail = await getUserDetail(user.id)
+      setSelectedUser(detail)
+    } catch {
+      setSelectedUser(user)
+    } finally {
+      setDetailLoading(false)
+    }
+  }
+
+  const handleDeleteUser = async () => {
+    if (!deleteTarget) return
+
+    setDeleteLoading(true)
+    try {
+      await deleteUser(deleteTarget)
+      if (selectedUser?.id === deleteTarget.id) {
+        setDetailOpen(false)
+        setSelectedUser(null)
+      }
+      setDeleteTarget(null)
+    } finally {
+      setDeleteLoading(false)
+    }
+  }
+
+  const displayValue = (value?: string) => value && value.trim() ? value : "-"
+
+  const totalPages = Math.ceil(total / pageSize)
+  const hasSearchFilter = Boolean(searchUserId || searchUsername)
+
+  const renderFilterBar = () => (
+    <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-3">
+      <div className="flex items-center gap-2 flex-wrap">
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button
+              variant="outline"
+              size="sm"
+              className={cn(
+                "h-5 border-dashed text-[10px] font-medium shadow-none focus-visible:ring-0",
+                hasSearchFilter && "bg-primary/5 border-primary/20"
+              )}
+            >
+              <Search className="size-3 mr-1" />
+              搜索
+              {hasSearchFilter && (
+                <>
+                  <Separator orientation="vertical" className="mx-1" />
+                  <Badge
+                    variant="secondary"
+                    className="text-[10px] h-3 px-1 rounded-full bg-primary text-primary-foreground"
+                  >
+                    !
+                  </Badge>
+                </>
+              )}
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent className="w-56 p-3" align="start">
+            <div className="space-y-2.5">
+              <input
+                className="w-full h-7 px-2 text-xs border border-dashed rounded-md outline-none focus:border-primary bg-background"
+                placeholder="输入用户 ID..."
+                value={searchUserId}
+                onChange={(e) => setSearchUserId(e.target.value)}
+              />
+              <input
+                className="w-full h-7 px-2 text-xs border border-dashed rounded-md outline-none focus:border-primary bg-background"
+                placeholder="输入 username..."
+                value={searchUsername}
+                onChange={(e) => setSearchUsername(e.target.value)}
+              />
+              {hasSearchFilter && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="w-full h-6 text-xs"
+                  onClick={() => {
+                    setSearchUserId("")
+                    setSearchUsername("")
+                  }}
+                >
+                  清除
+                </Button>
+              )}
+            </div>
+          </DropdownMenuContent>
+        </DropdownMenu>
+
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button
+              variant="outline"
+              size="sm"
+              className={cn(
+                "h-5 border-dashed text-[10px] font-medium shadow-none focus-visible:ring-0",
+                statusFilter !== 'all' && "bg-primary/5 border-primary/20"
+              )}
+            >
+              <Filter className="size-3" />
+              状态
+              {statusFilter !== 'all' && (
+                <>
+                  <Separator orientation="vertical" className="mx-1" />
+                  <Badge
+                    variant="secondary"
+                    className="text-[10px] h-3 px-1 rounded-full bg-primary text-primary-foreground"
+                  >
+                    1
+                  </Badge>
+                </>
+              )}
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent className="w-[120px]" align="start">
+            <DropdownMenuItem
+              onSelect={(e) => { e.preventDefault(); setStatusFilter('all') }}
+            >
+              <div className={cn(
+                "mr-2 flex size-3 items-center justify-center rounded-sm border border-primary",
+                statusFilter === 'all'
+                  ? "bg-primary text-primary-foreground"
+                  : "opacity-50"
+              )} />
+              <span className="text-xs">全部状态</span>
+            </DropdownMenuItem>
+            <DropdownMenuItem
+              onSelect={(e) => { e.preventDefault(); setStatusFilter('active') }}
+            >
+              <div className={cn(
+                "mr-2 flex size-3 items-center justify-center rounded-sm border border-primary",
+                statusFilter === 'active'
+                  ? "bg-primary text-primary-foreground"
+                  : "opacity-50"
+              )} />
+              <span className="text-xs">正常</span>
+            </DropdownMenuItem>
+            <DropdownMenuItem
+              onSelect={(e) => { e.preventDefault(); setStatusFilter('inactive') }}
+            >
+              <div className={cn(
+                "mr-2 flex size-3 items-center justify-center rounded-sm border border-primary",
+                statusFilter === 'inactive'
+                  ? "bg-primary text-primary-foreground"
+                  : "opacity-50"
+              )} />
+              <span className="text-xs">禁用</span>
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
+
+        {(hasSearchFilter || statusFilter !== 'all') && (
+          <>
+            <Separator orientation="vertical" className="h-6 hidden sm:block" />
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => {
+                setSearchUserId("")
+                setSearchUsername("")
+                setStatusFilter('all')
+              }}
+              className="h-5 px-2 lg:px-3 text-[11px] font-medium text-muted-foreground hover:text-foreground"
+            >
+              <X className="size-3" />
+              清空筛选
+            </Button>
+          </>
+        )}
+      </div>
+
+      <Separator className="lg:hidden" />
+
+      <div className="flex items-center gap-1.5 self-end lg:self-auto">
+        <span className="text-[10px] text-muted-foreground whitespace-nowrap">
+          {total} 条记录
+        </span>
+        <div className="flex items-center border border-dashed rounded-md shadow-none">
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-5.5 w-6 rounded-none rounded-l-md disabled:opacity-30"
+            onClick={() => setPage(Math.max(1, page - 1))}
+            disabled={page <= 1 || loading}
+          >
+            <ChevronLeft className="size-3" />
+          </Button>
+          <span className="text-[10px] font-mono text-muted-foreground px-2 border-x border-dashed">
+            {page}/{totalPages}
+          </span>
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-5.5 w-6 rounded-none rounded-r-md disabled:opacity-30"
+            onClick={() => setPage(Math.min(totalPages, page + 1))}
+            disabled={page >= totalPages || loading}
+          >
+            <ChevronRight className="size-3" />
+          </Button>
+        </div>
+
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button variant="outline" size="sm" className="h-6 border-dashed text-[10px] px-2 font-mono shadow-none" disabled={loading}>
+              {pageSize}条/页
+              <ChevronDown className="size-3 opacity-50" />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end">
+            {[20, 50, 100].map(size => (
+              <DropdownMenuItem
+                key={size}
+                onClick={() => setPageSize(size)}
+                className={cn("font-mono text-xs", pageSize === size && "bg-accent")}
+              >
+                {size}条/页
+              </DropdownMenuItem>
+            ))}
+          </DropdownMenuContent>
+        </DropdownMenu>
+
+        <Button
+          variant="outline"
+          size="icon"
+          className="h-6 w-6 border-dashed shadow-none"
+          onClick={() => fetchUsers(true)}
+          disabled={loading}
+          title="刷新数据"
+        >
+          <Loader2 className={cn("size-3", loading && "animate-spin")} />
+        </Button>
+      </div>
+    </div>
+  )
+
+  return (
+    <div className="py-6 space-y-4">
+      <div className="flex items-center justify-between border-b border-border pb-2">
+        <div className="flex flex-col gap-1">
+          <div className="text-2xl font-semibold">用户管理</div>
+        </div>
+        <Button variant="secondary" size="sm" className="h-7 text-xs" onClick={() => setCreateModalOpen(true)}>
+          <Plus className="size-3.5 mr-1" />
+          新增用户
+        </Button>
+      </div>
+
+      {renderFilterBar()}
+
+      {error ? (
+        <div className="p-8 border border-dashed rounded-lg">
+          <ErrorInline error={error} onRetry={() => fetchUsers(true)} className="justify-center" />
+        </div>
+      ) : loading && users.length === 0 ? (
+        <LoadingStateWithBorder icon={Layers} description="加载用户列表中..." />
+      ) : users.length === 0 ? (
+        <EmptyStateWithBorder icon={UserX} description="暂无用户数据" />
+      ) : (
+        <div className="border border-dashed shadow-none rounded-lg overflow-hidden">
+          <Table className="w-full caption-bottom text-sm min-w-full">
+            <TableHeader className="sticky top-0 z-20 bg-background">
+              <TableRow className="border-b border-dashed hover:bg-transparent">
+                <TableHead className="w-[90px] whitespace-nowrap py-2 h-8">ID</TableHead>
+                <TableHead className="w-[120px] whitespace-nowrap py-2 h-8">用户</TableHead>
+
+                <TableHead className="whitespace-nowrap min-w-[140px] py-2 h-8 pl-4">上次登陆</TableHead>
+                <TableHead className="whitespace-nowrap min-w-[140px] py-2 h-8">注册时间</TableHead>
+                <TableHead className="whitespace-nowrap min-w-[140px] py-2 h-8">上次更新</TableHead>
+                <TableHead className="sticky right-0 text-center bg-background z-10 w-[110px] py-2 h-8">操作</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {users.map((user) => (
+                <TableRow
+                  key={user.id}
+                  className="border-dashed hover:bg-muted/30 cursor-pointer group"
+                  onClick={() => handleShowDetail(user)}
+                >
+                  <TableCell className="font-mono text-[11px] text-muted-foreground py-1">{user.id}</TableCell>
+                  <TableCell className="py-1">
+                    <div className="flex items-center gap-2">
+                      <Avatar className="h-7 w-7 rounded-sm border">
+                        <AvatarImage src={user.avatar_url} />
+                        <AvatarFallback className="rounded-sm text-[10px]">
+                          {user.username.substring(0, 2).toUpperCase()}
+                        </AvatarFallback>
+                      </Avatar>
+                      <div className="flex flex-col gap-0">
+                        <div className="flex items-center gap-1.5">
+                          <span className="font-medium text-[11px] leading-tight max-w-[100px] truncate" title={user.nickname}>{user.nickname}</span>
+                          {user.is_admin && (
+                            <Badge variant="secondary" className="text-[9px] h-3.5 px-0.5 rounded-[2px] font-normal leading-none tracking-tighter">
+                              ADM
+                            </Badge>
+                          )}
+                        </div>
+                        <div className="flex items-center gap-1.5">
+                          <span className="text-[10px] text-muted-foreground font-mono leading-tight">@{user.username}</span>
+                        </div>
+                      </div>
+                    </div>
+                  </TableCell>
+
+                  <TableCell className="text-[10px] text-muted-foreground font-mono whitespace-nowrap py-1 pl-4">
+                    {formatDateTime(user.last_login_at)}
+                  </TableCell>
+                  <TableCell className="text-[10px] text-muted-foreground font-mono whitespace-nowrap py-1">
+                    {formatDateTime(user.created_at)}
+                  </TableCell>
+                  <TableCell className="text-[10px] text-muted-foreground font-mono whitespace-nowrap py-1">
+                    {formatDateTime(user.updated_at)}
+                  </TableCell>
+                  <TableCell className="sticky right-0 text-center bg-background z-10 py-1" onClick={(e) => e.stopPropagation()}>
+                    <div className="flex items-center justify-center gap-0.5">
+                      <TooltipProvider delayDuration={0}>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <div>
+                              <Switch
+                                checked={user.is_active}
+                                onCheckedChange={() => handleStatusToggle(user)}
+                                disabled={user.is_admin}
+                                className="scale-75 data-[state=checked]:bg-green-600 h-4 w-7"
+                              />
+                            </div>
+                          </TooltipTrigger>
+                          <TooltipContent side="top" className="text-xs">
+                            {user.is_admin ? '管理员账户' : user.is_active ? '禁用账户' : '启用账户'}
+                          </TooltipContent>
+                        </Tooltip>
+                      </TooltipProvider>
+
+                      <TooltipProvider delayDuration={0}>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Button variant="ghost" size="icon" className="h-6 w-6 text-muted-foreground hover:text-foreground" onClick={() => handleShowDetail(user)}>
+                              <Eye className="size-3" />
+                            </Button>
+                          </TooltipTrigger>
+                          <TooltipContent side="top" className="text-xs">
+                            查看详情
+                          </TooltipContent>
+                        </Tooltip>
+                      </TooltipProvider>
+
+                      {!user.is_admin && (
+                        <TooltipProvider delayDuration={0}>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-6 w-6 text-muted-foreground hover:text-destructive"
+                                onClick={() => setDeleteTarget(user)}
+                              >
+                                <Trash2 className="size-3" />
+                              </Button>
+                            </TooltipTrigger>
+                            <TooltipContent side="top" className="text-xs">
+                              删除用户
+                            </TooltipContent>
+                          </Tooltip>
+                        </TooltipProvider>
+                      )}
+                    </div>
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </div>
+      )}
+
+      <Sheet open={detailOpen} onOpenChange={setDetailOpen}>
+        <SheetContent className="sm:max-w-[400px] w-full p-0 flex flex-col gap-0">
+          <SheetTitle className="px-5 py-3">用户档案</SheetTitle>
+
+          {selectedUser && (
+            <>
+              <div className="flex-1 overflow-y-auto scrollbar-thin scrollbar-thumb-border scrollbar-track-transparent">
+                <div className="flex flex-col pb-6">
+                  <div className="px-5 py-6 border-b border-border/50">
+                    <div className="flex flex-col items-center text-center gap-3">
+                      <Avatar className="h-20 w-20 rounded-full border-4 border-background ring-1 ring-border/20">
+                        <AvatarImage src={selectedUser.avatar_url} />
+                        <AvatarFallback className="rounded-full text-xl font-medium bg-secondary text-secondary-foreground">
+                          {selectedUser.username.substring(0, 2).toUpperCase()}
+                        </AvatarFallback>
+                      </Avatar>
+
+                      <div className="space-y-1.5">
+                        <h3 className="text-lg font-bold tracking-tight">{selectedUser.nickname}</h3>
+                        <div className="flex items-center justify-center gap-2">
+                          <code className="px-1.5 py-0.5 rounded-md bg-muted text-[10px] font-mono text-muted-foreground">@{selectedUser.username}</code>
+                          <Badge variant="secondary" className="h-4.5 px-1.5 text-[9px] uppercase font-medium">
+                            UID: {selectedUser.id}
+                          </Badge>
+                          {selectedUser.is_admin && (
+                            <Badge className="h-4.5 px-1.5 text-[9px] uppercase font-medium bg-primary text-primary-foreground">
+                              Admin
+                            </Badge>
+                          )}
+                        </div>
+                      </div>
+
+                      {detailLoading && (
+                        <div className="flex items-center gap-1 text-[10px] text-muted-foreground">
+                          <Loader2 className="size-3 animate-spin" />
+                          正在刷新详情
+                        </div>
+                      )}
+
+                      <div className="gap-4 w-full max-w-[240px] mt-1 pt-4 border-t border-border/50">
+                        <div className="flex flex-col gap-0.5">
+                          <span className="text-[9px] uppercase tracking-widest text-muted-foreground font-medium">注册时间</span>
+                          <span className="font-mono text-xs font-semibold">{formatDateTime(selectedUser.created_at).split(' ')[0]}</span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="p-6 space-y-6">
+                    <div className="space-y-4">
+                      <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider px-1">个人资料</h4>
+                      <div className="rounded-lg border divide-y bg-background/50">
+                        <div className="flex items-center justify-between gap-4 p-3.5 text-sm">
+                          <span className="flex items-center gap-2 text-[10px] text-muted-foreground">
+                            <Mail className="size-3" />
+                            邮箱
+                          </span>
+                          <span className="min-w-0 truncate text-right text-[10px]">{displayValue(selectedUser.email)}</span>
+                        </div>
+                        <div className="flex items-center justify-between gap-4 p-3.5 text-sm">
+                          <span className="flex items-center gap-2 text-[10px] text-muted-foreground">
+                            <Smartphone className="size-3" />
+                            手机
+                          </span>
+                          <span className="min-w-0 truncate text-right text-[10px]">{displayValue(selectedUser.phone)}</span>
+                        </div>
+                        <div className="flex items-center justify-between gap-4 p-3.5 text-sm">
+                          <span className="flex items-center gap-2 text-[10px] text-muted-foreground">
+                            <VenusAndMars className="size-3" />
+                            性别
+                          </span>
+                          <span className="min-w-0 truncate text-right text-[10px]">{displayValue(selectedUser.gender)}</span>
+                        </div>
+                        <div className="flex items-center justify-between gap-4 p-3.5 text-sm">
+                          <span className="flex items-center gap-2 text-[10px] text-muted-foreground">
+                            <MapPin className="size-3" />
+                            所在地
+                          </span>
+                          <span className="min-w-0 truncate text-right text-[10px]">{displayValue(selectedUser.location)}</span>
+                        </div>
+                        <div className="flex items-center justify-between gap-4 p-3.5 text-sm">
+                          <span className="flex items-center gap-2 text-[10px] text-muted-foreground">
+                            <Globe className="size-3" />
+                            网站
+                          </span>
+                          <span className="min-w-0 truncate text-right text-[10px]">{displayValue(selectedUser.website)}</span>
+                        </div>
+                        <div className="flex flex-col gap-2 p-3.5 text-sm">
+                          <span className="text-[10px] text-muted-foreground">简介</span>
+                          <span className="break-words text-[10px] leading-5">{displayValue(selectedUser.bio)}</span>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="space-y-4">
+                      <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider px-1">系统记录</h4>
+                      <div className="rounded-lg border divide-y bg-background/50">
+                        <div className="flex items-center justify-between p-3.5 text-sm">
+                          <span className="text-[10px]">账户状态</span>
+                          <Badge variant={selectedUser.is_active ? "secondary" : "outline"} className="text-[10px]">
+                            {selectedUser.is_active ? "正常" : "禁用"}
+                          </Badge>
+                        </div>
+                        <div className="flex items-center justify-between p-3.5 text-sm">
+                          <span className="text-[10px]">管理员</span>
+                          <span className="font-mono text-[10px]">{selectedUser.is_admin ? "是" : "否"}</span>
+                        </div>
+                        <div className="flex items-center justify-between p-3.5 text-sm">
+                          <span className="text-[10px]">最后登录</span>
+                          <span className="font-mono text-[10px]">{formatDateTime(selectedUser.last_login_at)}</span>
+                        </div>
+                        <div className="flex items-center justify-between p-3.5 text-sm">
+                          <span className="text-[10px]">注册时间</span>
+                          <span className="font-mono text-[10px]">{formatDateTime(selectedUser.created_at)}</span>
+                        </div>
+                        <div className="flex items-center justify-between p-3.5 text-sm">
+                          <span className="text-[10px]">最后更新</span>
+                          <span className="font-mono text-[10px]">{formatDateTime(selectedUser.updated_at)}</span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                </div>
+              </div>
+
+              {!selectedUser.is_admin && (
+                <div className="p-4 border-t bg-background/80 backdrop-blur-md shrink-0 flex flex-col gap-2">
+                  <Button
+                    variant={selectedUser.is_active ? "destructive" : "default"}
+                    className={cn(
+                      "w-full h-9 text-xs font-medium transition-all active:scale-[0.98]",
+                      selectedUser.is_active
+                        ? "bg-red-500 hover:bg-red-600 text-white"
+                        : "bg-primary text-primary-foreground hover:bg-primary/90"
+                    )}
+                    onClick={() => handleStatusToggle(selectedUser)}
+                  >
+                    {selectedUser.is_active ? (
+                      <>
+                        <ShieldCheck className="size-3 mr-1" />
+                        封禁账户
+                      </>
+                    ) : (
+                      <>
+                        <UserCheck className="size-3 mr-1" />
+                        解除封禁
+                      </>
+                    )}
+                  </Button>
+                  <Button
+                    variant="outline"
+                    className="w-full h-9 text-xs font-medium"
+                    onClick={() => setDeleteTarget(selectedUser)}
+                  >
+                    <Trash2 className="size-3 mr-1" />
+                    删除用户
+                  </Button>
+                </div>
+              )}
+            </>
+          )}
+        </SheetContent>
+      </Sheet>
+
+      <AlertDialog open={!!deleteTarget} onOpenChange={(open) => !open && !deleteLoading && setDeleteTarget(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>确认删除用户</AlertDialogTitle>
+            <AlertDialogDescription>
+              确定要删除用户 {deleteTarget?.nickname || deleteTarget?.username} 吗？该操作会移除用户账号，删除后无法撤销。
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={deleteLoading}>取消</AlertDialogCancel>
+            <AlertDialogAction onClick={handleDeleteUser} disabled={deleteLoading}>
+              {deleteLoading && <Loader2 className="size-3 animate-spin" />}
+              确认删除
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <CreateUserModal isOpen={createModalOpen} onClose={() => setCreateModalOpen(false)} />
+    </div>
+  )
+}

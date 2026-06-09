@@ -1,0 +1,246 @@
+/*
+Copyright 2026 Arctel.net
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+*/
+
+package template
+
+import (
+	"errors"
+	"net/http"
+
+	"github.com/Rain-kl/Wavelet/internal/db"
+	"github.com/Rain-kl/Wavelet/internal/model"
+	"github.com/Rain-kl/Wavelet/internal/util"
+	"github.com/gin-gonic/gin"
+	"gorm.io/gorm"
+)
+
+// CreateTemplateRequest 创建模板请求
+type CreateTemplateRequest struct {
+	Key         string `json:"key" binding:"required,max=80"`
+	Name        string `json:"name" binding:"required,max=100"`
+	Type        string `json:"type" binding:"required,max=20"`
+	Subject     string `json:"subject" binding:"max=255"`
+	Content     string `json:"content" binding:"required"`
+	Description string `json:"description" binding:"max=255"`
+}
+
+// UpdateTemplateRequest 更新模板请求
+type UpdateTemplateRequest struct {
+	Name        string `json:"name" binding:"required,max=100"`
+	Type        string `json:"type" binding:"required,max=20"`
+	Subject     string `json:"subject" binding:"max=255"`
+	Content     string `json:"content" binding:"required"`
+	Description string `json:"description" binding:"max=255"`
+}
+
+// CreateTemplate 创建模板
+// @Summary 创建模板
+// @Description 创建一条新的自定义通知模板，模板标识符（Key）不可重复，需要管理员权限
+// @Tags admin
+// @Accept json
+// @Produce json
+// @Security SessionCookie
+// @Param request body template.CreateTemplateRequest true "创建请求参数"
+// @Success 200 {object} util.ResponseAny{data=string} "创建成功"
+// @Failure 400 {object} util.ResponseAny "参数错误或模板标识符已存在"
+// @Failure 401 {object} util.ResponseAny "未登录"
+// @Failure 403 {object} util.ResponseAny "无管理员权限"
+// @Failure 500 {object} util.ResponseAny "内部错误"
+// @Router /api/v1/admin/templates [post]
+func CreateTemplate(c *gin.Context) {
+	var req CreateTemplateRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, util.Err(err.Error()))
+		return
+	}
+
+	// 检查模板 Key 是否已存在
+	var existing model.Template
+	if err := db.DB(c.Request.Context()).Where("key = ?", req.Key).First(&existing).Error; err == nil {
+		c.JSON(http.StatusBadRequest, util.Err(TemplateKeyExists))
+		return
+	} else if !errors.Is(err, gorm.ErrRecordNotFound) {
+		c.JSON(http.StatusInternalServerError, util.Err(err.Error()))
+		return
+	}
+
+	tmpl := model.Template{
+		Key:         req.Key,
+		Name:        req.Name,
+		Type:        req.Type,
+		Subject:     req.Subject,
+		Content:     req.Content,
+		Description: req.Description,
+		IsSystem:    false,
+	}
+
+	if err := tmpl.Validate(); err != nil {
+		c.JSON(http.StatusBadRequest, util.Err(err.Error()))
+		return
+	}
+
+	if err := db.DB(c.Request.Context()).Create(&tmpl).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, util.Err(err.Error()))
+		return
+	}
+
+	c.JSON(http.StatusOK, util.OK(tmpl))
+}
+
+// ListTemplates 获取模板列表
+// @Summary 获取模板列表
+// @Description 返回所有通知模板列表，需要管理员权限
+// @Tags admin
+// @Produce json
+// @Security SessionCookie
+// @Success 200 {object} util.ResponseAny{data=[]model.Template} "模板列表"
+// @Failure 401 {object} util.ResponseAny "未登录"
+// @Failure 403 {object} util.ResponseAny "无管理员权限"
+// @Failure 500 {object} util.ResponseAny "内部错误"
+// @Router /api/v1/admin/templates [get]
+func ListTemplates(c *gin.Context) {
+	var templates []model.Template
+	if err := db.DB(c.Request.Context()).Order("is_system DESC, created_at DESC").Find(&templates).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, util.Err(err.Error()))
+		return
+	}
+
+	c.JSON(http.StatusOK, util.OK(templates))
+}
+
+// GetTemplate 获取单个模板
+// @Summary 获取单个模板
+// @Description 根据模板标识符获取对应的模板详情，需要管理员权限
+// @Tags admin
+// @Produce json
+// @Security SessionCookie
+// @Param key path string true "模板标识符"
+// @Success 200 {object} util.ResponseAny{data=model.Template} "模板详情"
+// @Failure 401 {object} util.ResponseAny "未登录"
+// @Failure 403 {object} util.ResponseAny "无管理员权限"
+// @Failure 404 {object} util.ResponseAny "模板不存在"
+// @Failure 500 {object} util.ResponseAny "内部错误"
+// @Router /api/v1/admin/templates/{key} [get]
+func GetTemplate(c *gin.Context) {
+	var tmpl model.Template
+	if err := db.DB(c.Request.Context()).Where("key = ?", c.Param("key")).First(&tmpl).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			c.JSON(http.StatusNotFound, util.Err(TemplateNotFound))
+		} else {
+			c.JSON(http.StatusInternalServerError, util.Err(err.Error()))
+		}
+		return
+	}
+
+	c.JSON(http.StatusOK, util.OK(tmpl))
+}
+
+// UpdateTemplate 更新模板
+// @Summary 更新模板
+// @Description 根据模板标识符更新对应的模板内容，需要管理员权限
+// @Tags admin
+// @Accept json
+// @Produce json
+// @Security SessionCookie
+// @Param key path string true "模板标识符"
+// @Param request body template.UpdateTemplateRequest true "更新请求参数"
+// @Success 200 {object} util.ResponseAny{data=model.Template} "更新成功"
+// @Failure 400 {object} util.ResponseAny "参数错误"
+// @Failure 401 {object} util.ResponseAny "未登录"
+// @Failure 403 {object} util.ResponseAny "无管理员权限"
+// @Failure 404 {object} util.ResponseAny "模板不存在"
+// @Failure 500 {object} util.ResponseAny "内部错误"
+// @Router /api/v1/admin/templates/{key} [put]
+func UpdateTemplate(c *gin.Context) {
+	var req UpdateTemplateRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, util.Err(err.Error()))
+		return
+	}
+
+	key := c.Param("key")
+
+	// 检查模板是否存在
+	var tmpl model.Template
+	if err := db.DB(c.Request.Context()).Where("key = ?", key).First(&tmpl).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			c.JSON(http.StatusNotFound, util.Err(TemplateNotFound))
+		} else {
+			c.JSON(http.StatusInternalServerError, util.Err(err.Error()))
+		}
+		return
+	}
+
+	tmpl.Name = req.Name
+	tmpl.Type = req.Type
+	tmpl.Subject = req.Subject
+	tmpl.Content = req.Content
+	tmpl.Description = req.Description
+
+	if err := tmpl.Validate(); err != nil {
+		c.JSON(http.StatusBadRequest, util.Err(err.Error()))
+		return
+	}
+
+	if err := db.DB(c.Request.Context()).Save(&tmpl).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, util.Err(err.Error()))
+		return
+	}
+
+	c.JSON(http.StatusOK, util.OK(tmpl))
+}
+
+// DeleteTemplate 删除模板
+// @Summary 删除模板
+// @Description 根据模板标识符删除对应模板，系统预置模板不可删除，需要管理员权限
+// @Tags admin
+// @Produce json
+// @Security SessionCookie
+// @Param key path string true "模板标识符"
+// @Success 200 {object} util.ResponseAny{data=string} "删除成功"
+// @Failure 400 {object} util.ResponseAny "不可删除系统模板"
+// @Failure 401 {object} util.ResponseAny "未登录"
+// @Failure 403 {object} util.ResponseAny "无管理员权限"
+// @Failure 404 {object} util.ResponseAny "模板不存在"
+// @Failure 500 {object} util.ResponseAny "内部错误"
+// @Router /api/v1/admin/templates/{key} [delete]
+func DeleteTemplate(c *gin.Context) {
+	key := c.Param("key")
+
+	// 检查模板是否存在
+	var tmpl model.Template
+	if err := db.DB(c.Request.Context()).Where("key = ?", key).First(&tmpl).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			c.JSON(http.StatusNotFound, util.Err(TemplateNotFound))
+		} else {
+			c.JSON(http.StatusInternalServerError, util.Err(err.Error()))
+		}
+		return
+	}
+
+	// 限制系统模板删除
+	if tmpl.IsSystem {
+		c.JSON(http.StatusBadRequest, util.Err(SystemTemplateCannotDelete))
+		return
+	}
+
+	if err := db.DB(c.Request.Context()).Delete(&tmpl).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, util.Err(err.Error()))
+		return
+	}
+
+	c.JSON(http.StatusOK, util.OKNil())
+}

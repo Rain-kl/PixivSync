@@ -1,0 +1,52 @@
+version: "2"
+
+run:
+  timeout: 5m
+  tests: false
+
+linters:
+  default: none
+  enable:
+    # 基础检查
+    - govet
+    - staticcheck
+    - errcheck
+    - ineffassign
+    - unused
+
+    # 代码坏味道
+    - dupl          # 重复代码
+    - mnd           # 魔法数字
+    - gocyclo       # 圈复杂度
+    - cyclop        # 包/函数复杂度
+    - nestif        # if 嵌套太深
+    - maintidx      # 维护性指数
+    - revive        # 风格/命名/坏味道
+    - gocritic      # 各类代码问题
+
+  settings:
+    dupl:
+      threshold: 150
+
+    gocyclo:
+      min-complexity: 20
+
+    cyclop:
+      max-complexity: 15
+      package-average: 10
+
+    funlen:
+      lines: 150
+      statements: 80
+
+    nestif:
+      min-complexity: 5
+
+    mnd:
+      checks:
+        - argument
+        - case
+        - condition
+        - operation
+        - return
+        - assign

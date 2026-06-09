@@ -1,0 +1,365 @@
+/*
+Copyright 2026 Arctel.net
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+*/
+
+package user
+
+import (
+	"context"
+	"crypto/rand"
+	"encoding/json"
+	"errors"
+	"fmt"
+	"math/big"
+	"net/http"
+	"strings"
+
+	"github.com/gin-contrib/sessions"
+
+	"github.com/Rain-kl/Wavelet/internal/apps/oauth"
+	"github.com/Rain-kl/Wavelet/internal/db"
+	"github.com/Rain-kl/Wavelet/internal/model"
+	"github.com/Rain-kl/Wavelet/internal/task"
+	"github.com/Rain-kl/Wavelet/internal/util"
+	"github.com/gin-gonic/gin"
+)
+
+type sendEmailCodeRequest struct {
+	Email string `json:"email" binding:"required,email"`
+	Scene string `json:"scene" binding:"required"`
+}
+
+func isEmailLoginVerificationEnabled() bool {
+	enabled, err := model.GetBoolByKey(context.Background(), model.ConfigKeyEmailLoginVerificationEnabled)
+	if err != nil {
+		return false
+	}
+	return enabled
+}
+
+func isEmailRegisterVerificationEnabled() bool {
+	enabled, err := model.GetBoolByKey(context.Background(), model.ConfigKeyEmailRegisterVerificationEnabled)
+	if err != nil {
+		return false
+	}
+	return enabled
+}
+
+func isSMTPConfigured(ctx context.Context) bool {
+	var sc model.SystemConfig
+	var host, port, username string
+
+	if err := sc.GetByKey(ctx, model.ConfigKeySMTPHost); err == nil {
+		host = sc.Value
+	}
+	if err := sc.GetByKey(ctx, model.ConfigKeySMTPPort); err == nil {
+		port = sc.Value
+	}
+	if err := sc.GetByKey(ctx, model.ConfigKeySMTPUsername); err == nil {
+		username = sc.Value
+	}
+
+	return host != "" && port != "" && username != ""
+}
+
+func generateVerificationCode() (string, error) {
+	n, err := rand.Int(rand.Reader, big.NewInt(verificationCodeRange))
+	if err != nil {
+		return "", err
+	}
+	return fmt.Sprintf("%06d", n.Int64()+verificationCodeOffset), nil
+}
+
+func getEmailCodeKey(scene, email string) string {
+	return fmt.Sprintf("email_code:%s:%s", scene, email)
+}
+
+func getEmailCooldownKey(scene, email string) string {
+	return fmt.Sprintf("email_code:cooldown:%s:%s", scene, email)
+}
+
+func sendEmailVerificationCode(ctx context.Context, email, scene, templateName string) error {
+	if !isSMTPConfigured(ctx) {
+		return errors.New(errSMTPConfigIncomplete)
+	}
+
+	code, err := generateVerificationCode()
+	if err != nil {
+		return errors.New(errGenerateEmailCodeFailed)
+	}
+	codeKey := getEmailCodeKey(scene, email)
+	cooldownKey := getEmailCooldownKey(scene, email)
+
+	emailSubject, emailBody, err := model.RenderTemplate(
+		ctx,
+		templateName,
+		map[string]any{"Code": code},
+	)
+	if err != nil {
+		return fmt.Errorf(errRenderEmailTemplateFailed, err)
+	}
+
+	if err := db.SetJSON(ctx, codeKey, code, emailCodeExpiry); err != nil {
+		return errors.New(errGenerateEmailCodeFailed)
+	}
+	_ = db.SetJSON(ctx, cooldownKey, "1", emailCodeCooldown)
+
+	payload := SendEmailPayload{
+		To:      email,
+		Subject: emailSubject,
+		Body:    emailBody,
+	}
+	payloadBytes, _ := json.Marshal(payload)
+	_, err = task.DispatchTask(ctx, task.TaskTypeSendEmail, payloadBytes, "system")
+	if err != nil {
+		return errors.New(errDispatchEmailTaskFailed)
+	}
+	return nil
+}
+
+func verifyEmailCode(ctx context.Context, email, scene, code string) bool {
+	codeKey := getEmailCodeKey(scene, email)
+	var storedCode string
+	if err := db.GetJSON(ctx, codeKey, &storedCode); err != nil {
+		return false
+	}
+	if storedCode != code {
+		return false
+	}
+	_ = db.Redis.Del(ctx, db.PrefixedKey(codeKey)).Err()
+	return true
+}
+
+func handleLoginEmailVerification(ctx context.Context, c *gin.Context, req *loginRequest, user *model.User) error {
+	if user.Email == "" {
+		c.JSON(http.StatusOK, util.Err(errLoginEmailMissing))
+		return errors.New("handled")
+	}
+
+	if req.Code == "" {
+		cooldownKey := getEmailCooldownKey("login", user.Email)
+		var temp string
+		err := db.GetJSON(ctx, cooldownKey, &temp)
+		if err != nil {
+			if err := sendEmailVerificationCode(ctx, user.Email, "login", "login_email"); err != nil {
+				c.JSON(http.StatusOK, util.Err(err.Error()))
+				return errors.New("handled")
+			}
+		}
+
+		maskedEmail := util.MaskEmail(user.Email)
+		c.JSON(http.StatusOK, util.Err(errNeedEmailCodePrefix+maskedEmail))
+		return errors.New("handled")
+	}
+
+	if !verifyEmailCode(ctx, user.Email, "login", req.Code) {
+		c.JSON(http.StatusOK, util.Err(errEmailCodeInvalidOrExpired))
+		return errors.New("handled")
+	}
+	return nil
+}
+
+// SendEmailCode 发送邮箱验证码
+// @Summary 发送邮箱验证码
+// @Description 向指定邮箱发送验证码（用于注册场景）
+// @Tags user
+// @Accept json
+// @Produce json
+// @Param request body user.sendEmailCodeRequest true "发送验证码请求参数"
+// @Success 200 {object} util.ResponseAny "发送成功"
+// @Failure 400 {object} util.ResponseAny "参数错误"
+// @Router /api/v1/user/send-email-code [post]
+func SendEmailCode(c *gin.Context) {
+	var req sendEmailCodeRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, util.Err(err.Error()))
+		return
+	}
+
+	req.Email = strings.TrimSpace(req.Email)
+	if req.Email == "" {
+		c.JSON(http.StatusOK, util.Err(errEmailRequired))
+		return
+	}
+
+	if req.Scene != "register" {
+		c.JSON(http.StatusOK, util.Err(errUnsupportedEmailScene))
+		return
+	}
+
+	ctx := c.Request.Context()
+
+	var count int64
+	if err := db.DB(ctx).Model(&model.User{}).Where("email = ?", req.Email).Count(&count).Error; err != nil {
+		c.JSON(http.StatusOK, util.Err(err.Error()))
+		return
+	}
+	if count > 0 {
+		c.JSON(http.StatusOK, util.Err(errEmailAlreadyRegistered))
+		return
+	}
+
+	cooldownKey := getEmailCooldownKey("register", req.Email)
+	var temp string
+	err := db.GetJSON(ctx, cooldownKey, &temp)
+	if err == nil {
+		c.JSON(http.StatusOK, util.Err(errEmailCodeCooldown))
+		return
+	}
+
+	if err := sendEmailVerificationCode(ctx, req.Email, "register", "register_email"); err != nil {
+		c.JSON(http.StatusOK, util.Err(err.Error()))
+		return
+	}
+
+	c.JSON(http.StatusOK, util.OKNil())
+}
+
+func validateRegisterEmailVerification(ctx context.Context, req *registerRequest) error {
+	if !isEmailRegisterVerificationEnabled() {
+		return nil
+	}
+	if req.Email == "" || req.Code == "" {
+		return errors.New(errEmailOrCodeRequired)
+	}
+	if !verifyEmailCode(ctx, req.Email, "register", req.Code) {
+		return errors.New(errEmailCodeInvalidOrExpired)
+	}
+	return nil
+}
+
+// completePendingOAuthBinding 完成登录后的 OAuth 待绑定绑定流程
+func completePendingOAuthBinding(session sessions.Session, user *model.User) {
+	pendingSourceID := session.Get(oauth.PendingOAuthSourceIDKey)
+	pendingExternalID := session.Get(oauth.PendingOAuthExternalIDKey)
+	pendingExternalUsername := session.Get(oauth.PendingOAuthExternalUsernameKey)
+	pendingEmail := session.Get(oauth.PendingOAuthEmailKey)
+
+	if pendingSourceID == nil || pendingExternalID == nil {
+		return
+	}
+
+	var sourceID uint64
+	switch v := pendingSourceID.(type) {
+	case uint64:
+		sourceID = v
+	case int:
+		sourceID = uint64(v)
+	case float64:
+		sourceID = uint64(v)
+	}
+	externalID, _ := pendingExternalID.(string)
+	externalUsername, _ := pendingExternalUsername.(string)
+	email, _ := pendingEmail.(string)
+
+	if sourceID != 0 && externalID != "" {
+		_ = model.BindExternalAccount(&model.ExternalAccount{
+			AuthSourceID:     sourceID,
+			UserID:           user.ID,
+			ExternalID:       externalID,
+			ExternalUsername: externalUsername,
+			Email:            email,
+		})
+	}
+
+	session.Delete(oauth.PendingOAuthSourceIDKey)
+	session.Delete(oauth.PendingOAuthExternalIDKey)
+	session.Delete(oauth.PendingOAuthExternalUsernameKey)
+	session.Delete(oauth.PendingOAuthEmailKey)
+	_ = session.Save()
+}
+
+type updateProfileRequest struct {
+	Nickname  string `json:"nickname"`
+	Email     string `json:"email"`
+	AvatarURL string `json:"avatar_url"`
+	Bio       string `json:"bio"`
+	Phone     string `json:"phone"`
+	Gender    string `json:"gender"`
+	Website   string `json:"website"`
+	Location  string `json:"location"`
+}
+
+// UpdateProfile 修改当前登录用户的个人资料
+// @Summary 修改当前登录用户的个人资料
+// @Description 修改当前登录用户的昵称、邮箱、头像、简介、电话、性别、个人网站和所在地。
+// @Tags user
+// @Accept json
+// @Produce json
+// @Param request body user.updateProfileRequest true "更新请求参数"
+// @Success 200 {object} util.ResponseAny{data=oauth.BasicUserInfo} "修改成功，返回更新后的用户信息"
+// @Failure 400 {object} util.ResponseAny "邮箱已被占用或参数错误"
+// @Failure 401 {object} util.ResponseAny "未登录"
+// @Router /api/v1/user/profile [put]
+func UpdateProfile(c *gin.Context) {
+	var req updateProfileRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, util.Err(err.Error()))
+		return
+	}
+
+	userObj, _ := util.GetFromContext[*model.User](c, oauth.UserObjKey)
+	if userObj == nil {
+		c.JSON(http.StatusUnauthorized, util.Err(errLoginRequired))
+		return
+	}
+
+	ctx := c.Request.Context()
+	var dbUser model.User
+	if err := db.DB(ctx).Where("id = ?", userObj.ID).First(&dbUser).Error; err != nil {
+		c.JSON(http.StatusOK, util.Err(errUserNotFound))
+		return
+	}
+
+	req.Email = strings.TrimSpace(req.Email)
+	if req.Email != "" && req.Email != dbUser.Email {
+		if !strings.Contains(req.Email, "@") || !strings.Contains(req.Email, ".") {
+			c.JSON(http.StatusOK, util.Err(errEmailFormatInvalid))
+			return
+		}
+
+		var count int64
+		if err := db.DB(ctx).Model(&model.User{}).Where("email = ? AND id != ?", req.Email, dbUser.ID).Count(&count).Error; err != nil {
+			c.JSON(http.StatusOK, util.Err(err.Error()))
+			return
+		}
+		if count > 0 {
+			c.JSON(http.StatusOK, util.Err(errEmailAlreadyBound))
+			return
+		}
+	}
+
+	dbUser.Nickname = strings.TrimSpace(req.Nickname)
+	if dbUser.Nickname == "" {
+		dbUser.Nickname = dbUser.Username
+	}
+	dbUser.Email = req.Email
+	dbUser.AvatarURL = req.AvatarURL
+	dbUser.Bio = req.Bio
+	dbUser.Phone = strings.TrimSpace(req.Phone)
+	dbUser.Gender = strings.TrimSpace(req.Gender)
+	dbUser.Website = strings.TrimSpace(req.Website)
+	dbUser.Location = strings.TrimSpace(req.Location)
+
+	if err := db.DB(ctx).Save(&dbUser).Error; err != nil {
+		c.JSON(http.StatusOK, util.Err(err.Error()))
+		return
+	}
+
+	session := sessions.Default(c)
+	needChange := session.Get("need_change_password") == true
+
+	c.JSON(http.StatusOK, util.OK(oauth.BuildBasicUserInfo(&dbUser, needChange)))
+}

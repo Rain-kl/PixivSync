@@ -1,0 +1,54 @@
+# syntax=docker/dockerfile:1.7
+
+ARG NODE_VERSION=22
+
+FROM node:${NODE_VERSION}-alpine AS base
+
+ENV PNPM_HOME="/pnpm"
+ENV PATH="$PNPM_HOME:$PATH"
+
+RUN corepack enable && corepack prepare pnpm@10.10.0 --activate
+
+FROM base AS builder
+
+ENV NODE_ENV=production
+ENV NEXT_PUBLIC_WAVELET_BACKEND_URL=https://build-placeholder.invalid
+ENV WAVELET_SESSION_COOKIE_NAME=__WAVELET_SESSION_COOKIE_NAME__
+ENV WAVELET_RATE_LIMIT_ENABLED=__WAVELET_RATE_LIMIT_ENABLED__
+ENV WAVELET_BACKEND_URL=https://build-placeholder-2.invalid
+
+ARG VERSION=""
+ARG BUILD_DATE=""
+
+WORKDIR /app
+
+COPY frontend/package.json frontend/pnpm-lock.yaml ./
+RUN pnpm install --frozen-lockfile
+
+COPY frontend/ ./
+
+RUN if [ -n "$VERSION" ] || [ -n "$BUILD_DATE" ]; then \
+      VERSION="$VERSION" BUILD_DATE="$BUILD_DATE" node -e "const fs = require('fs'); const pkg = require('./package.json'); const version = process.env.VERSION; const buildDate = process.env.BUILD_DATE; if (version) pkg.version = version; if (buildDate) pkg.buildDate = buildDate; fs.writeFileSync('./package.json', JSON.stringify(pkg, null, 2) + '\\n')"; \
+    fi
+
+RUN pnpm build
+
+RUN grep -rl \
+      -e "https://build-placeholder.invalid" \
+      -e "https://build-placeholder-2.invalid" \
+      -e "__WAVELET_SESSION_COOKIE_NAME__" \
+      -e "__WAVELET_RATE_LIMIT_ENABLED__" \
+      /app/.next > /app/.replace.files
+
+FROM base AS runner
+
+ENV NODE_ENV=production
+
+WORKDIR /app
+
+COPY --from=builder /app ./
+
+EXPOSE 3010
+
+ENTRYPOINT ["./entrypoint.sh"]
+CMD ["pnpm", "start"]

@@ -1,0 +1,130 @@
+# wavelet — Full-Stack Boilerplate Config
+# Copy this file to config.yaml and fill in your values.
+# Fields marked with <...> are required; others have sensible defaults.
+
+# ─── Application ────────────────────────────────────────────────────────────────
+app:
+  app_name: "wavelet"
+  env: "development"          # development | testing | production
+  addr: ":8000"
+  node_id: 1                  # Snowflake node ID (0-1023). Must be unique per instance.
+  graceful_shutdown_timeout: 30
+  session_cookie_name: "wavelet_session_id"  # Change to something unique before deploy
+  session_secret: "<uniq-random-string>"         # Cannot be changed after first start
+  session_domain: ""                             # e.g. ".yourdomain.com"
+  session_age: 86400                             # Session lifetime in seconds (default: 24h)
+  session_secure: false
+  session_http_only: false
+  api_prefix: "/api"
+
+# ─── PostgreSQL ─────────────────────────────────────────────────────────────────
+# Supports Standalone and Primary-Replica (read/write split) modes.
+database:
+  enabled: true
+  sqlite_path: "wavelet.db"        # PostgreSQL 禁用时使用此 SQLite 文件路径
+  host: "127.0.0.1"
+  port: 5432
+  username: "postgres"
+  password: "postgres"
+  database: "wavelet"
+  max_idle_conn: 16
+  max_open_conn: 128
+  conn_max_lifetime: 1800
+  conn_max_idle_time: 600
+  log_level: "info"            # error | warn | info | debug | silent
+  ssl_mode: "disable"
+  time_zone: "UTC"
+  application_name: "wavelet-server"
+  prefer_simple_protocol: false
+  search_path: "public"
+  statement_cache_capacity: 256
+  default_query_exec_mode: "cache_statement"
+  slow_threshold: 200ms
+  # Optional read replicas:
+  # replicas:
+  #   - host: "replica1.db.internal"
+  #     port: 5432
+  #   - host: "replica2.db.internal"
+  #     port: 5432
+
+# ─── ClickHouse (optional) ──────────────────────────────────────────────────────
+clickhouse:
+  enabled: false
+  hosts:
+    - "127.0.0.1:9000"
+  username: "default"
+  password: ""
+  database: "wavelet"
+  max_idle_conn: 10
+  max_open_conn: 100
+  conn_max_lifetime: 3600
+  dial_timeout: 5
+  block_buffer_size: 10
+
+# ─── Redis ──────────────────────────────────────────────────────────────────────
+# Supports Standalone, Sentinel (HA), and Cluster modes.
+redis:
+  enabled: true
+  addrs:
+    - "127.0.0.1:6379"
+  username: ""
+  password: ""
+  db: 0                        # Ignored in Cluster mode
+  cluster_mode: false          # Set true to enable Cluster mode
+  master_name: ""              # Set non-empty to enable Sentinel mode
+  key_prefix: "wavelet:"
+  pool_size: 100
+  min_idle_conn: 10
+  dial_timeout: 5
+  read_timeout: 3
+  write_timeout: 3
+  max_retries: 3
+  pool_timeout: 4
+  conn_max_idle_time: 300
+
+# ─── Logging ────────────────────────────────────────────────────────────────────
+log:
+  level: "info"                # debug | info | warn | error | fatal | panic
+  format: "json"               # text | json
+  output: "stdout"             # stdout | file
+  file_path: "./logs/app.log"
+  max_size: 100                # MB per log file
+  max_age: 30                  # Days to retain old log files
+  max_backups: 10
+  compress: true
+
+# ─── Task Scheduler (Cron) ──────────────────────────────────────────────────────
+scheduler:
+  cleanup_unused_uploads_task_cron: "0 */2 * * *"   # Clean up orphaned upload records
+
+# ─── Async Task Worker ──────────────────────────────────────────────────────────
+worker:
+  concurrency: 20
+  strict_priority: false
+  queues:
+    - name: webhook
+      priority: 10
+    - name: whitelist_only
+      priority: 5
+    - name: default
+      priority: 3
+
+# ─── OpenTelemetry Tracing ──────────────────────────────────────────────────────
+otel:
+  sampling_rate: 0.0           # Trace sampling rate (0.0 – 1.0)
+
+# ─── S3-Compatible File Storage ─────────────────────────────────────────────────
+# Compatible with AWS S3, MinIO, Cloudflare R2, Tencent COS, etc.
+s3:
+  enabled: false
+  endpoint: "https://<account-id>.r2.cloudflarestorage.com"
+  region: "auto"
+  bucket: "<bucket-name>"
+  access_key_id: "<S3_ACCESS_KEY_ID>"
+  secret_access_key: "<S3_SECRET_ACCESS_KEY>"
+  path_style: false            # Set true for self-hosted S3 (e.g. MinIO)
+  key_prefix: ""               # Optional prefix for all object keys, e.g. "uploads/"
+  cdn_url: ""                  # CDN base URL (e.g. https://cdn.example.com); falls back to S3 if empty
+  local_cache:
+    enabled: false
+    cache_dir: "./s3_cache"

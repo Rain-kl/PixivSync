@@ -1,0 +1,114 @@
+# syntax=docker/dockerfile:1.7
+# Cross-platform build workflow — produces up to 6 static binaries under ./bin/
+# Each binary embeds the compiled frontend and is stamped with VERSION.
+#
+# Build args:
+#   VERSION     — version string injected at link time (default: dev)
+#   TARGET_OS   — restrict to one OS:   linux | darwin | windows  (default: all)
+#   TARGET_ARCH — restrict to one arch: amd64 | arm64             (default: all)
+#
+# Usage:
+#   docker build -f docker/Dockerfile.cross --output ./bin .
+#   docker build -f docker/Dockerfile.cross \
+#     --build-arg VERSION=v1.2.3 --output ./bin .
+#   docker build -f docker/Dockerfile.cross \
+#     --build-arg TARGET_OS=linux --build-arg TARGET_ARCH=arm64 \
+#     --output ./bin .
+#
+# Or via Makefile:
+#   make cross-build
+#   make cross-build VERSION=v1.2.3
+#   make cross-build GOOS=linux GOARCH=arm64
+#   make cross-build GOOS=darwin
+
+ARG GO_VERSION=1.25
+ARG NODE_VERSION=22
+ARG ALPINE_VERSION=3.23
+
+# ── Stage 1: Build frontend (static export for embedding) ────────────────────
+FROM node:${NODE_VERSION}-alpine AS frontend-builder
+
+ARG VERSION=dev
+
+ENV PNPM_HOME="/pnpm"
+ENV PATH="$PNPM_HOME:$PATH"
+ENV NODE_ENV=production
+ENV NEXT_STANDALONE_EXPORT=true
+
+RUN corepack enable && corepack prepare pnpm@10.10.0 --activate
+
+WORKDIR /workspace/frontend
+
+# Cache dependency layer
+COPY frontend/package.json frontend/pnpm-lock.yaml ./
+RUN pnpm install --frozen-lockfile
+
+COPY frontend/ ./
+
+# Stamp version into package.json when VERSION is not "dev"
+RUN if [ "$VERSION" != "dev" ]; then \
+      node -e " \
+        const fs = require('fs'); \
+        const pkg = require('./package.json'); \
+        pkg.version = process.env.VERSION.replace(/^v/, ''); \
+        fs.writeFileSync('./package.json', JSON.stringify(pkg, null, 2) + '\n'); \
+      "; \
+    fi
+
+RUN pnpm build:embed
+
+# ── Stage 2: Cross-compile Go backend ──────────────────────────────────────
+FROM golang:${GO_VERSION}-alpine${ALPINE_VERSION} AS builder
+
+ARG VERSION=dev
+# Empty string means "build all"; set to a specific value to filter.
+ARG TARGET_OS=
+ARG TARGET_ARCH=
+
+# git  — needed by go mod download for VCS-stamped modules
+# ca-certificates — needed for HTTPS during module download
+RUN apk add --no-cache ca-certificates git
+
+WORKDIR /workspace
+
+# Cache dependency layer
+COPY go.mod go.sum ./
+RUN go mod download
+
+COPY . .
+
+# Overlay the compiled frontend into the embed path
+COPY --from=frontend-builder /workspace/frontend/out ./internal/router/dist
+
+# Build matrix: GOOS × GOARCH
+# CGO_ENABLED=0 — fully static, no libc dependency, required for cross-compilation.
+# -trimpath    — strip local filesystem paths from the binary.
+# -s -w        — omit symbol table and DWARF debug info (smaller output).
+# -X           — stamp version string at link time.
+# TARGET_OS / TARGET_ARCH — when non-empty, skip non-matching combinations.
+RUN set -e; \
+    mkdir -p /out; \
+    FILTER_OS="${TARGET_OS}"; \
+    FILTER_ARCH="${TARGET_ARCH}"; \
+    for GOOS in linux darwin windows; do \
+      [ -n "$FILTER_OS" ] && [ "$GOOS" != "$FILTER_OS" ] && continue; \
+      for GOARCH in amd64 arm64; do \
+        [ -n "$FILTER_ARCH" ] && [ "$GOARCH" != "$FILTER_ARCH" ] && continue; \
+        EXT=""; \
+        [ "$GOOS" = "windows" ] && EXT=".exe"; \
+        OUTPUT="/out/wavelet_${GOOS}_${GOARCH}${EXT}"; \
+        echo "==> Building ${OUTPUT} (version=${VERSION})..."; \
+        CGO_ENABLED=0 GOOS=${GOOS} GOARCH=${GOARCH} \
+          go build \
+            -tags embed_frontend \
+            -trimpath \
+            -ldflags="-s -w -X github.com/Rain-kl/Wavelet/internal/cmd.Version=${VERSION}" \
+            -o "${OUTPUT}" \
+            ./main.go; \
+      done; \
+    done
+
+# ── Export stage ─────────────────────────────────────────────────────────────
+# `docker build --output ./bin .` copies everything from /out to the host.
+FROM scratch AS export
+COPY --from=builder /out/ /
