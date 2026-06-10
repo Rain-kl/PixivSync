@@ -7,6 +7,7 @@ import {TaskManager} from "@/components/common/admin/task-manager"
 import {TaskSchedulesManager} from "@/components/common/admin/task-schedules"
 import {TaskExecutionsManager} from "@/components/common/admin/task-executions"
 import {Spinner} from "@/components/ui/spinner"
+import {Activity} from "lucide-react"
 
 function TasksPageContent() {
   const searchParams = useSearchParams()
@@ -16,11 +17,18 @@ function TasksPageContent() {
   const handleTabChange = (value: string) => {
     router.push(`/admin/tasks?tab=${value}`)
   }
-
   return (
     <div className="py-6 space-y-6">
-      <div className="flex flex-col gap-1 pb-2">
-        <h1 className="text-2xl font-bold tracking-tight">任务管理</h1>
+      <div className="flex items-center gap-3 pb-2">
+        <div className="p-2 bg-primary/10 rounded-lg text-primary">
+          <Activity className="size-5" />
+        </div>
+        <div>
+          <h1 className="text-2xl font-bold tracking-tight">任务管理</h1>
+          <p className="text-xs text-muted-foreground mt-0.5">
+            下发异步镜像与同步导出任务，管理后台执行计划及调度日志。
+          </p>
+        </div>
       </div>
 
       <Tabs value={activeTab} onValueChange={handleTabChange} className="w-full">

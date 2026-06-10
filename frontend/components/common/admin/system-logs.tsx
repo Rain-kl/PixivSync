@@ -27,18 +27,15 @@ export function SystemLogs() {
   return (
     <div className="flex flex-col h-full space-y-4 py-6">
       {/* Header */}
-      <div className="flex items-center justify-between pb-4 border-b border-border/50 shrink-0">
-        <div className="flex items-center gap-2">
-          <Terminal className="size-5 text-muted-foreground" />
-          <div>
-            <h1 className="text-2xl font-semibold tracking-tight">系统日志</h1>
-          </div>
+      <div className="flex items-center gap-2">
+        <Terminal className="size-5 text-muted-foreground" />
+        <div>
+          <h1 className="text-2xl font-semibold tracking-tight">系统日志</h1>
         </div>
       </div>
-
       {/* Tabs Layout */}
       <Tabs defaultValue="analytics" className="w-full flex-grow flex flex-col gap-2">
-        <TabsList variant={'line'} className="mb-2 w-full sm:w-auto">
+        <TabsList variant="line">
           <TabsTrigger value="analytics" className="flex items-center gap-1.5 px-4">
             <BarChart3 className="size-3.5" />
             访问分析
