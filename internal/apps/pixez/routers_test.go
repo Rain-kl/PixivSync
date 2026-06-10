@@ -419,8 +419,8 @@ func seedPixezManagementData(t *testing.T) {
 	executions := []model.TaskExecution{
 		{
 			TaskID:      "pixez_running",
-			TaskType:    "pixez_mirror_illust",
-			TaskName:    "PixEz 镜像插画",
+			TaskType:    "pixez_mirror",
+			TaskName:    "PixEz 镜像资源",
 			Status:      model.TaskExecutionStatusRunning,
 			TriggeredBy: "manual",
 			StartedAt:   &now,
@@ -429,8 +429,8 @@ func seedPixezManagementData(t *testing.T) {
 		},
 		{
 			TaskID:      "pixez_pending",
-			TaskType:    "pixez_export_bookmark_illusts",
-			TaskName:    "PixEz 导出插画收藏",
+			TaskType:    "pixez_export_bookmarks",
+			TaskName:    "PixEz 导出收藏",
 			Status:      model.TaskExecutionStatusPending,
 			TriggeredBy: "manual",
 			CreatedAt:   now,

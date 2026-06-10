@@ -9,10 +9,8 @@ package task
 const (
 	CleanupUnusedUploadsTask = "upload:cleanup_unused"
 	SendEmailTask            = "mail:send"
-	PixezMirrorIllustTask    = "pixez:mirror_illust"
-	PixezMirrorNovelTask     = "pixez:mirror_novel"
-	PixezExportIllustTask    = "pixez:export_bookmark_illusts"
-	PixezExportNovelTask     = "pixez:export_bookmark_novels"
+	PixezMirrorTask          = "pixez:mirror"
+	PixezExportBookmarksTask = "pixez:export_bookmarks"
 	PixezAutoMirrorTask      = "pixez:auto_enqueue_bookmark_mirrors"
 	PixezImportLegacyTask    = "pixez:import_legacy_server"
 )
@@ -26,10 +24,8 @@ const (
 const (
 	TaskTypeCleanupUploads                  = "cleanup_unused_uploads"
 	TaskTypeSendEmail                       = "send_email"
-	TaskTypePixezMirrorIllust               = "pixez_mirror_illust"
-	TaskTypePixezMirrorNovel                = "pixez_mirror_novel"
-	TaskTypePixezExportIllustBookmarks      = "pixez_export_bookmark_illusts"
-	TaskTypePixezExportNovelBookmarks       = "pixez_export_bookmark_novels"
+	TaskTypePixezMirror                     = "pixez_mirror"
+	TaskTypePixezExportBookmarks            = "pixez_export_bookmarks"
 	TaskTypePixezAutoEnqueueBookmarkMirrors = "pixez_auto_enqueue_bookmark_mirrors"
 	TaskTypePixezImportLegacyServer         = "pixez_import_legacy_server"
 )
@@ -113,54 +109,30 @@ var DispatchableTasks = []TaskMeta{
 		},
 	},
 	{
-		Type:         TaskTypePixezMirrorIllust,
-		AsynqTask:    PixezMirrorIllustTask,
-		Name:         "PixEz 镜像插画",
-		Description:  "抓取 Pixiv 插画详情并把原图写入 Wavelet Upload 存储",
+		Type:         TaskTypePixezMirror,
+		AsynqTask:    PixezMirrorTask,
+		Name:         "PixEz 镜像资源",
+		Description:  "抓取 Pixiv 插画或小说详情并保存镜像记录",
 		SupportsTime: false,
 		MaxRetry:     defaultMaxRetry,
 		Queue:        QueueDefault,
 		Retryable:    true,
 		Params: []TaskParam{
-			{Name: "illust_id", Label: "插画 ID", Type: "number", Required: true, Placeholder: "123456", Description: "Pixiv 插画 ID"},
+			{Name: "target_type", Label: "目标类型", Type: "number", Required: true, Placeholder: "0 或 1", Description: "0 表示插画，1 表示小说"},
+			{Name: "target_id", Label: "资源 ID", Type: "number", Required: true, Placeholder: "123456", Description: "Pixiv 插画或小说 ID"},
 		},
 	},
 	{
-		Type:         TaskTypePixezMirrorNovel,
-		AsynqTask:    PixezMirrorNovelTask,
-		Name:         "PixEz 镜像小说",
-		Description:  "抓取 Pixiv 小说详情和正文并保存为镜像 read-model",
+		Type:         TaskTypePixezExportBookmarks,
+		AsynqTask:    PixezExportBookmarksTask,
+		Name:         "PixEz 导出收藏",
+		Description:  "导出已同步 Pixiv 账号的插画或小说收藏并增量维护 removed 状态",
 		SupportsTime: false,
 		MaxRetry:     defaultMaxRetry,
 		Queue:        QueueDefault,
 		Retryable:    true,
 		Params: []TaskParam{
-			{Name: "novel_id", Label: "小说 ID", Type: "number", Required: true, Placeholder: "123456", Description: "Pixiv 小说 ID"},
-		},
-	},
-	{
-		Type:         TaskTypePixezExportIllustBookmarks,
-		AsynqTask:    PixezExportIllustTask,
-		Name:         "PixEz 导出插画收藏",
-		Description:  "导出已同步 Pixiv 账号的插画收藏并增量维护 removed 状态",
-		SupportsTime: false,
-		MaxRetry:     defaultMaxRetry,
-		Queue:        QueueDefault,
-		Retryable:    true,
-		Params: []TaskParam{
-			{Name: "pixiv_user_id", Label: "Pixiv 用户 ID", Type: "string", Required: false, Placeholder: "留空表示全部账号", Description: "只导出指定 Pixiv 用户时填写"},
-		},
-	},
-	{
-		Type:         TaskTypePixezExportNovelBookmarks,
-		AsynqTask:    PixezExportNovelTask,
-		Name:         "PixEz 导出小说收藏",
-		Description:  "导出已同步 Pixiv 账号的小说收藏并增量维护 removed 状态",
-		SupportsTime: false,
-		MaxRetry:     defaultMaxRetry,
-		Queue:        QueueDefault,
-		Retryable:    true,
-		Params: []TaskParam{
+			{Name: "target_type", Label: "目标类型", Type: "number", Required: false, Placeholder: "0 或 1，留空表示全部", Description: "0 表示插画，1 表示小说，留空表示全部"},
 			{Name: "pixiv_user_id", Label: "Pixiv 用户 ID", Type: "string", Required: false, Placeholder: "留空表示全部账号", Description: "只导出指定 Pixiv 用户时填写"},
 		},
 	},
@@ -174,7 +146,7 @@ var DispatchableTasks = []TaskMeta{
 		Queue:        QueueDefault,
 		Retryable:    true,
 		Params: []TaskParam{
-			{Name: "target_type", Label: "目标类型", Type: "string", Required: false, Placeholder: "illust 或 novel，留空表示全部", Description: "限制扫描插画或小说收藏"},
+			{Name: "target_type", Label: "目标类型", Type: "number", Required: false, Placeholder: "0 或 1，留空表示全部", Description: "0 表示插画，1 表示小说，留空表示全部"},
 			{Name: "limit", Label: "数量上限", Type: "number", Required: false, Placeholder: "50", Description: "本次最多入队数量"},
 		},
 	},

@@ -16,10 +16,8 @@ import (
 func Register() {
 	task.RegisterHandler(task.CleanupUnusedUploadsTask, &upload.CleanupUnusedUploadsHandler{})
 	task.RegisterHandler(task.SendEmailTask, &user.SendEmailHandler{})
-	task.RegisterHandler(task.PixezMirrorIllustTask, &pixez.MirrorIllustTaskHandler{})
-	task.RegisterHandler(task.PixezMirrorNovelTask, &pixez.MirrorNovelTaskHandler{})
-	task.RegisterHandler(task.PixezExportIllustTask, &pixez.ExportIllustBookmarksTaskHandler{})
-	task.RegisterHandler(task.PixezExportNovelTask, &pixez.ExportNovelBookmarksTaskHandler{})
+	task.RegisterHandler(task.PixezMirrorTask, &pixez.MirrorTaskHandler{})
+	task.RegisterHandler(task.PixezExportBookmarksTask, &pixez.ExportBookmarksTaskHandler{})
 	task.RegisterHandler(task.PixezAutoMirrorTask, &pixez.AutoEnqueueBookmarkMirrorsTaskHandler{})
 	task.RegisterHandler(task.PixezImportLegacyTask, &pixez.ImportLegacyServerTaskHandler{})
 }

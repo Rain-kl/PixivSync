@@ -32,8 +32,6 @@ type batchNovelMirrorRequest struct {
 	NovelIDs []int64 `json:"novel_ids"`
 }
 
-const maxBatchMirrorIDs = 500
-
 // MirrorIllust dispatches an illustration mirror task.
 func MirrorIllust(c *gin.Context) {
 	illustID, ok := parsePositiveIDParam(c, "illust_id")
@@ -387,8 +385,8 @@ func dispatchIllustMirrorIfNeeded(c *gin.Context, illustID int64) (model.PixezMi
 	if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
 		return record, err
 	}
-	payload, _ := json.Marshal(mirrorIllustPayload{IllustID: illustID})
-	taskID, err := task.DispatchTask(c.Request.Context(), task.TaskTypePixezMirrorIllust, payload, "api")
+	payload, _ := json.Marshal(mirrorPayload{TargetType: TargetTypeIllust, TargetID: illustID})
+	taskID, err := task.DispatchTask(c.Request.Context(), task.TaskTypePixezMirror, payload, "api")
 	if err != nil {
 		return record, err
 	}
@@ -404,8 +402,8 @@ func dispatchNovelMirrorIfNeeded(c *gin.Context, novelID int64) (model.PixezMirr
 	if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
 		return record, err
 	}
-	payload, _ := json.Marshal(mirrorNovelPayload{NovelID: novelID})
-	taskID, err := task.DispatchTask(c.Request.Context(), task.TaskTypePixezMirrorNovel, payload, "api")
+	payload, _ := json.Marshal(mirrorPayload{TargetType: TargetTypeNovel, TargetID: novelID})
+	taskID, err := task.DispatchTask(c.Request.Context(), task.TaskTypePixezMirror, payload, "api")
 	if err != nil {
 		return record, err
 	}

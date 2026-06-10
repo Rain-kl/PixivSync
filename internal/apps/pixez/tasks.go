@@ -17,21 +17,19 @@ import (
 	"github.com/Rain-kl/Wavelet/internal/task"
 )
 
-type mirrorIllustPayload struct {
-	IllustID int64 `json:"illust_id"`
+type mirrorPayload struct {
+	TargetType int   `json:"target_type"`
+	TargetID   int64 `json:"target_id"`
 }
 
-type mirrorNovelPayload struct {
-	NovelID int64 `json:"novel_id"`
-}
-
-type bookmarkExportPayload struct {
+type exportBookmarksPayload struct {
+	TargetType  *int   `json:"target_type,omitempty"`
 	PixivUserID string `json:"pixiv_user_id,omitempty"`
 }
 
 type autoMirrorPayload struct {
-	TargetType string `json:"target_type,omitempty"`
-	Limit      int    `json:"limit,omitempty"`
+	TargetType *int `json:"target_type,omitempty"`
+	Limit      int  `json:"limit,omitempty"`
 }
 
 type bookmarkMirrorCandidate struct {
@@ -41,66 +39,43 @@ type bookmarkMirrorCandidate struct {
 	MirrorRetryCount int
 }
 
-const (
-	defaultAutoMirrorLimit = 50
-	maxAutoMirrorLimit     = 500
-)
+// MirrorTaskHandler mirrors one Pixiv illustration or novel.
+type MirrorTaskHandler struct{}
 
-// MirrorIllustTaskHandler mirrors one Pixiv illustration.
-type MirrorIllustTaskHandler struct{}
-
-// ValidatePayload validates illustration mirror payloads.
-func (h *MirrorIllustTaskHandler) ValidatePayload(payload []byte) ([]byte, error) {
-	var req mirrorIllustPayload
+// ValidatePayload validates mirror payloads.
+func (h *MirrorTaskHandler) ValidatePayload(payload []byte) ([]byte, error) {
+	var req mirrorPayload
 	if err := json.Unmarshal(payload, &req); err != nil {
 		return nil, fmt.Errorf("invalid JSON payload: %w", err)
 	}
-	if req.IllustID <= 0 {
-		return nil, errors.New("illust_id is required")
+	if req.TargetType != TargetTypeIllust && req.TargetType != TargetTypeNovel {
+		return nil, errors.New("target_type must be 0 (illust) or 1 (novel)")
+	}
+	if req.TargetID <= 0 {
+		return nil, errors.New("target_id is required")
 	}
 	return json.Marshal(req)
 }
 
-// Execute runs the illustration mirror task.
-func (h *MirrorIllustTaskHandler) Execute(ctx context.Context, payload []byte) (*task.TaskResult, error) {
-	var req mirrorIllustPayload
+// Execute runs the mirror task.
+func (h *MirrorTaskHandler) Execute(ctx context.Context, payload []byte) (*task.TaskResult, error) {
+	var req mirrorPayload
 	if err := json.Unmarshal(payload, &req); err != nil {
-		return nil, fmt.Errorf("parse illust mirror payload: %w", err)
+		return nil, fmt.Errorf("parse mirror payload: %w", err)
 	}
-	return executeMirrorTask(ctx, "插画", "illust", req.IllustID, func(taskID string) error {
-		_, err := pixezsvc.EnsureMirrorIllustQueued(ctx, req.IllustID, taskID)
+	if req.TargetType == TargetTypeIllust {
+		return executeMirrorTask(ctx, "插画", "illust", req.TargetID, func(taskID string) error {
+			_, err := pixezsvc.EnsureMirrorIllustQueued(ctx, req.TargetID, taskID)
+			return err
+		}, func(taskID string) error {
+			return pixezsvc.ProcessMirrorIllust(ctx, pixezsvc.DefaultClient, taskID, req.TargetID)
+		})
+	}
+	return executeMirrorTask(ctx, "小说", "novel", req.TargetID, func(taskID string) error {
+		_, err := pixezsvc.EnsureMirrorNovelQueued(ctx, req.TargetID, taskID)
 		return err
 	}, func(taskID string) error {
-		return pixezsvc.ProcessMirrorIllust(ctx, pixezsvc.DefaultClient, taskID, req.IllustID)
-	})
-}
-
-// MirrorNovelTaskHandler mirrors one Pixiv novel.
-type MirrorNovelTaskHandler struct{}
-
-// ValidatePayload validates novel mirror payloads.
-func (h *MirrorNovelTaskHandler) ValidatePayload(payload []byte) ([]byte, error) {
-	var req mirrorNovelPayload
-	if err := json.Unmarshal(payload, &req); err != nil {
-		return nil, fmt.Errorf("invalid JSON payload: %w", err)
-	}
-	if req.NovelID <= 0 {
-		return nil, errors.New("novel_id is required")
-	}
-	return json.Marshal(req)
-}
-
-// Execute runs the novel mirror task.
-func (h *MirrorNovelTaskHandler) Execute(ctx context.Context, payload []byte) (*task.TaskResult, error) {
-	var req mirrorNovelPayload
-	if err := json.Unmarshal(payload, &req); err != nil {
-		return nil, fmt.Errorf("parse novel mirror payload: %w", err)
-	}
-	return executeMirrorTask(ctx, "小说", "novel", req.NovelID, func(taskID string) error {
-		_, err := pixezsvc.EnsureMirrorNovelQueued(ctx, req.NovelID, taskID)
-		return err
-	}, func(taskID string) error {
-		return pixezsvc.ProcessMirrorNovel(ctx, pixezsvc.DefaultClient, taskID, req.NovelID)
+		return pixezsvc.ProcessMirrorNovel(ctx, pixezsvc.DefaultClient, taskID, req.TargetID)
 	})
 }
 
@@ -126,44 +101,64 @@ func executeMirrorTask(
 	return &task.TaskResult{Message: msg}, nil
 }
 
-// ExportIllustBookmarksTaskHandler exports Pixiv illustration bookmarks.
-type ExportIllustBookmarksTaskHandler struct{}
+// ExportBookmarksTaskHandler exports Pixiv bookmarks (illustrations or novels).
+type ExportBookmarksTaskHandler struct{}
 
-// ValidatePayload validates optional export filters.
-func (h *ExportIllustBookmarksTaskHandler) ValidatePayload(payload []byte) ([]byte, error) {
-	return validateBookmarkExportPayload(payload)
+// ValidatePayload validates export bookmarks payloads.
+func (h *ExportBookmarksTaskHandler) ValidatePayload(payload []byte) ([]byte, error) {
+	var req exportBookmarksPayload
+	if len(payload) == 0 {
+		return json.Marshal(exportBookmarksPayload{})
+	}
+	if err := json.Unmarshal(payload, &req); err != nil {
+		return nil, fmt.Errorf("invalid JSON payload: %w", err)
+	}
+	if req.TargetType != nil {
+		if *req.TargetType != TargetTypeIllust && *req.TargetType != TargetTypeNovel {
+			return nil, errors.New("target_type must be 0 (illust) or 1 (novel)")
+		}
+	}
+	req.PixivUserID = strings.TrimSpace(req.PixivUserID)
+	return json.Marshal(req)
 }
 
-// Execute runs illustration bookmark export.
-func (h *ExportIllustBookmarksTaskHandler) Execute(ctx context.Context, payload []byte) (*task.TaskResult, error) {
-	return executeExportBookmarksTask(ctx, payload, "插画", pixezsvc.ExportIllustBookmarks)
-}
+// Execute runs the bookmarks export task.
+func (h *ExportBookmarksTaskHandler) Execute(ctx context.Context, payload []byte) (*task.TaskResult, error) {
+	var req exportBookmarksPayload
+	if len(payload) > 0 {
+		if err := json.Unmarshal(payload, &req); err != nil {
+			return nil, fmt.Errorf("parse export bookmarks payload: %w", err)
+		}
+	}
 
-// ExportNovelBookmarksTaskHandler exports Pixiv novel bookmarks.
-type ExportNovelBookmarksTaskHandler struct{}
+	if req.TargetType == nil {
+		task.AppendLog(ctx, "未指定目标类型，同时导出插画和小说收藏")
+		illustResult, err := executeExportBookmarksTask(ctx, req.PixivUserID, "插画", pixezsvc.ExportIllustBookmarks)
+		if err != nil {
+			return nil, err
+		}
+		novelResult, err := executeExportBookmarksTask(ctx, req.PixivUserID, "小说", pixezsvc.ExportNovelBookmarks)
+		if err != nil {
+			return nil, err
+		}
+		msg := fmt.Sprintf("%s; %s", illustResult.Message, novelResult.Message)
+		return &task.TaskResult{Message: msg}, nil
+	}
 
-// ValidatePayload validates optional export filters.
-func (h *ExportNovelBookmarksTaskHandler) ValidatePayload(payload []byte) ([]byte, error) {
-	return validateBookmarkExportPayload(payload)
-}
-
-// Execute runs novel bookmark export.
-func (h *ExportNovelBookmarksTaskHandler) Execute(ctx context.Context, payload []byte) (*task.TaskResult, error) {
-	return executeExportBookmarksTask(ctx, payload, "小说", pixezsvc.ExportNovelBookmarks)
+	if *req.TargetType == TargetTypeIllust {
+		return executeExportBookmarksTask(ctx, req.PixivUserID, "插画", pixezsvc.ExportIllustBookmarks)
+	}
+	return executeExportBookmarksTask(ctx, req.PixivUserID, "小说", pixezsvc.ExportNovelBookmarks)
 }
 
 func executeExportBookmarksTask(
 	ctx context.Context,
-	payload []byte,
+	pixivUserID string,
 	label string,
 	exportFn func(context.Context, *pixezsvc.Client, string) (pixezsvc.ExportSummary, error),
 ) (*task.TaskResult, error) {
-	req, err := parseBookmarkExportPayload(payload)
-	if err != nil {
-		return nil, err
-	}
-	task.AppendLog(ctx, "开始导出 PixEz %s收藏 pixiv_user_id=%s", label, emptyAsAll(req.PixivUserID))
-	summary, err := exportFn(ctx, pixezsvc.DefaultClient, req.PixivUserID)
+	task.AppendLog(ctx, "开始导出 PixEz %s收藏 pixiv_user_id=%s", label, emptyAsAll(pixivUserID))
+	summary, err := exportFn(ctx, pixezsvc.DefaultClient, pixivUserID)
 	if err != nil {
 		task.AppendLog(ctx, "%s收藏导出失败: %v", label, err)
 		return nil, err
@@ -186,9 +181,10 @@ func (h *AutoEnqueueBookmarkMirrorsTaskHandler) ValidatePayload(payload []byte) 
 	if err := json.Unmarshal(payload, &req); err != nil {
 		return nil, fmt.Errorf("invalid JSON payload: %w", err)
 	}
-	req.TargetType = strings.TrimSpace(req.TargetType)
-	if req.TargetType != "" && req.TargetType != model.PixezMirrorTargetIllust && req.TargetType != model.PixezMirrorTargetNovel {
-		return nil, errors.New("target_type must be illust or novel")
+	if req.TargetType != nil {
+		if *req.TargetType != TargetTypeIllust && *req.TargetType != TargetTypeNovel {
+			return nil, errors.New("target_type must be 0 (illust) or 1 (novel)")
+		}
 	}
 	if req.Limit <= 0 {
 		req.Limit = defaultAutoMirrorLimit
@@ -211,17 +207,25 @@ func (h *AutoEnqueueBookmarkMirrorsTaskHandler) Execute(ctx context.Context, pay
 		req.Limit = defaultAutoMirrorLimit
 	}
 
-	task.AppendLog(ctx, "开始自动入队收藏镜像任务，参数: target_type=%s, limit=%d", emptyAsAll(req.TargetType), req.Limit)
+	targetTypeStr := "<all>"
+	if req.TargetType != nil {
+		if *req.TargetType == TargetTypeIllust {
+			targetTypeStr = "illust"
+		} else {
+			targetTypeStr = "novel"
+		}
+	}
+	task.AppendLog(ctx, "开始自动入队收藏镜像任务，参数: target_type=%s, limit=%d", targetTypeStr, req.Limit)
 
 	enqueued := 0
-	if req.TargetType == "" || req.TargetType == model.PixezMirrorTargetIllust {
+	if req.TargetType == nil || *req.TargetType == TargetTypeIllust {
 		n, err := enqueueIllustBookmarkMirrors(ctx, req.Limit-enqueued)
 		enqueued += n
 		if err != nil {
 			return nil, err
 		}
 	}
-	if enqueued < req.Limit && (req.TargetType == "" || req.TargetType == model.PixezMirrorTargetNovel) {
+	if enqueued < req.Limit && (req.TargetType == nil || *req.TargetType == TargetTypeNovel) {
 		n, err := enqueueNovelBookmarkMirrors(ctx, req.Limit-enqueued)
 		enqueued += n
 		if err != nil {
@@ -281,25 +285,7 @@ func (h *ImportLegacyServerTaskHandler) Execute(ctx context.Context, payload []b
 	return &task.TaskResult{Message: msg, Detail: string(detail)}, nil
 }
 
-func validateBookmarkExportPayload(payload []byte) ([]byte, error) {
-	req, err := parseBookmarkExportPayload(payload)
-	if err != nil {
-		return nil, err
-	}
-	return json.Marshal(req)
-}
-
-func parseBookmarkExportPayload(payload []byte) (bookmarkExportPayload, error) {
-	if len(payload) == 0 {
-		return bookmarkExportPayload{}, nil
-	}
-	var req bookmarkExportPayload
-	if err := json.Unmarshal(payload, &req); err != nil {
-		return req, fmt.Errorf("invalid JSON payload: %w", err)
-	}
-	req.PixivUserID = strings.TrimSpace(req.PixivUserID)
-	return req, nil
-}
+// validateBookmarkExportPayload and parseBookmarkExportPayload removed as they are integrated into ExportBookmarksTaskHandler
 
 func emptyAsAll(value string) string {
 	if value == "" {
@@ -309,8 +295,8 @@ func emptyAsAll(value string) string {
 }
 
 func enqueueIllustBookmarkMirrors(ctx context.Context, limit int) (int, error) {
-	return enqueueBookmarkMirrors(ctx, limit, "bookmark_illusts", "illust_id", &model.PixezBookmarkIllust{}, task.TaskTypePixezMirrorIllust, func(targetID int64) []byte {
-		payload, _ := json.Marshal(mirrorIllustPayload{IllustID: targetID})
+	return enqueueBookmarkMirrors(ctx, limit, "bookmark_illusts", "illust_id", &model.PixezBookmarkIllust{}, task.TaskTypePixezMirror, func(targetID int64) []byte {
+		payload, _ := json.Marshal(mirrorPayload{TargetType: TargetTypeIllust, TargetID: targetID})
 		return payload
 	}, func(targetID int64, taskID string) error {
 		_, err := pixezsvc.EnsureMirrorIllustQueued(ctx, targetID, taskID)
@@ -319,8 +305,8 @@ func enqueueIllustBookmarkMirrors(ctx context.Context, limit int) (int, error) {
 }
 
 func enqueueNovelBookmarkMirrors(ctx context.Context, limit int) (int, error) {
-	return enqueueBookmarkMirrors(ctx, limit, "bookmark_novels", "novel_id", &model.PixezBookmarkNovel{}, task.TaskTypePixezMirrorNovel, func(targetID int64) []byte {
-		payload, _ := json.Marshal(mirrorNovelPayload{NovelID: targetID})
+	return enqueueBookmarkMirrors(ctx, limit, "bookmark_novels", "novel_id", &model.PixezBookmarkNovel{}, task.TaskTypePixezMirror, func(targetID int64) []byte {
+		payload, _ := json.Marshal(mirrorPayload{TargetType: TargetTypeNovel, TargetID: targetID})
 		return payload
 	}, func(targetID int64, taskID string) error {
 		_, err := pixezsvc.EnsureMirrorNovelQueued(ctx, targetID, taskID)

@@ -41,10 +41,8 @@ func StartWorker() error {
 	// 框架内部自动分发到对应的 TaskHandler 实现
 	mux.HandleFunc(task.CleanupUnusedUploadsTask, task.ProcessTask)
 	mux.HandleFunc(task.SendEmailTask, task.ProcessTask)
-	mux.HandleFunc(task.PixezMirrorIllustTask, task.ProcessTask)
-	mux.HandleFunc(task.PixezMirrorNovelTask, task.ProcessTask)
-	mux.HandleFunc(task.PixezExportIllustTask, task.ProcessTask)
-	mux.HandleFunc(task.PixezExportNovelTask, task.ProcessTask)
+	mux.HandleFunc(task.PixezMirrorTask, task.ProcessTask)
+	mux.HandleFunc(task.PixezExportBookmarksTask, task.ProcessTask)
 	mux.HandleFunc(task.PixezAutoMirrorTask, task.ProcessTask)
 	mux.HandleFunc(task.PixezImportLegacyTask, task.ProcessTask)
 

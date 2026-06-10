@@ -404,6 +404,26 @@ definitions:
           $ref: '#/definitions/model.PixezTagHistory'
         type: array
     type: object
+  model.Schedule:
+    properties:
+      created_at:
+        type: string
+      cron:
+        type: string
+      id:
+        example: "0"
+        type: string
+      is_active:
+        type: boolean
+      name:
+        type: string
+      payload:
+        type: string
+      task_type:
+        type: string
+      updated_at:
+        type: string
+    type: object
   model.SystemConfig:
     properties:
       created_at:
@@ -794,6 +814,24 @@ definitions:
     required:
     - value
     type: object
+  task.CreateScheduleRequest:
+    properties:
+      cron:
+        type: string
+      is_active:
+        type: boolean
+      name:
+        type: string
+      payload:
+        type: string
+      task_type:
+        type: string
+    required:
+    - cron
+    - is_active
+    - name
+    - task_type
+    type: object
   task.DispatchTaskRequest:
     properties:
       end_time:
@@ -853,6 +891,24 @@ definitions:
       Type:
         description: 类型：string, text, number
         type: string
+    type: object
+  task.UpdateScheduleRequest:
+    properties:
+      cron:
+        type: string
+      is_active:
+        type: boolean
+      name:
+        type: string
+      payload:
+        type: string
+      task_type:
+        type: string
+    required:
+    - cron
+    - is_active
+    - name
+    - task_type
     type: object
   template.CreateTemplateRequest:
     properties:
@@ -2472,6 +2528,175 @@ paths:
       security:
       - SessionCookie: []
       summary: 重试失败任务
+      tags:
+      - admin
+  /api/v1/admin/tasks/schedules:
+    get:
+      description: 返回系统所有的定时任务配置列表，包括名称、关联的异步任务类型、Cron 表达式和启用状态，需要管理员权限
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: 定时任务列表
+          schema:
+            allOf:
+            - $ref: '#/definitions/util.ResponseAny'
+            - properties:
+                data:
+                  items:
+                    $ref: '#/definitions/model.Schedule'
+                  type: array
+              type: object
+        "401":
+          description: 未登录
+          schema:
+            $ref: '#/definitions/util.ResponseAny'
+        "403":
+          description: 无管理员权限
+          schema:
+            $ref: '#/definitions/util.ResponseAny'
+      security:
+      - SessionCookie: []
+      summary: 获取定时任务列表
+      tags:
+      - admin
+    post:
+      consumes:
+      - application/json
+      description: 新增一个动态定时任务配置，关联已有的异步任务，配置 Cron 表达式和执行参数，并触发调度器热加载，需要管理员权限
+      parameters:
+      - description: 创建定时任务请求参数
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/task.CreateScheduleRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: 创建成功的定时任务信息
+          schema:
+            allOf:
+            - $ref: '#/definitions/util.ResponseAny'
+            - properties:
+                data:
+                  $ref: '#/definitions/model.Schedule'
+              type: object
+        "400":
+          description: Cron 表达式无效、异步任务类型不存在或参数错误
+          schema:
+            $ref: '#/definitions/util.ResponseAny'
+        "401":
+          description: 未登录
+          schema:
+            $ref: '#/definitions/util.ResponseAny'
+        "403":
+          description: 无管理员权限
+          schema:
+            $ref: '#/definitions/util.ResponseAny'
+        "500":
+          description: 保存定时任务失败
+          schema:
+            $ref: '#/definitions/util.ResponseAny'
+      security:
+      - SessionCookie: []
+      summary: 创建定时任务
+      tags:
+      - admin
+  /api/v1/admin/tasks/schedules/{id}:
+    delete:
+      description: 删除指定的定时任务配置，并触发调度器热加载，需要管理员权限
+      parameters:
+      - description: 定时任务 ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: 删除结果
+          schema:
+            allOf:
+            - $ref: '#/definitions/util.ResponseAny'
+            - properties:
+                data:
+                  type: string
+              type: object
+        "400":
+          description: 参数错误
+          schema:
+            $ref: '#/definitions/util.ResponseAny'
+        "401":
+          description: 未登录
+          schema:
+            $ref: '#/definitions/util.ResponseAny'
+        "403":
+          description: 无管理员权限
+          schema:
+            $ref: '#/definitions/util.ResponseAny'
+        "500":
+          description: 删除定时任务失败
+          schema:
+            $ref: '#/definitions/util.ResponseAny'
+      security:
+      - SessionCookie: []
+      summary: 删除定时任务
+      tags:
+      - admin
+    put:
+      consumes:
+      - application/json
+      description: 修改一个定时任务的配置（名称、Cron 表达式、异步任务参数和是否启用等），并触发调度器热加载，需要管理员权限
+      parameters:
+      - description: 定时任务 ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: 修改定时任务请求参数
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/task.UpdateScheduleRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: 修改后的定时任务信息
+          schema:
+            allOf:
+            - $ref: '#/definitions/util.ResponseAny'
+            - properties:
+                data:
+                  $ref: '#/definitions/model.Schedule'
+              type: object
+        "400":
+          description: Cron 表达式无效、参数错误
+          schema:
+            $ref: '#/definitions/util.ResponseAny'
+        "401":
+          description: 未登录
+          schema:
+            $ref: '#/definitions/util.ResponseAny'
+        "403":
+          description: 无管理员权限
+          schema:
+            $ref: '#/definitions/util.ResponseAny'
+        "404":
+          description: 定时任务不存在
+          schema:
+            $ref: '#/definitions/util.ResponseAny'
+        "500":
+          description: 修改定时任务失败
+          schema:
+            $ref: '#/definitions/util.ResponseAny'
+      security:
+      - SessionCookie: []
+      summary: 修改定时任务
       tags:
       - admin
   /api/v1/admin/tasks/types:

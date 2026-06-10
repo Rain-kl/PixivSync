@@ -11,25 +11,52 @@ import (
 )
 
 func TestMirrorTaskPayloadValidation(t *testing.T) {
-	illustHandler := &MirrorIllustTaskHandler{}
-	if _, err := illustHandler.ValidatePayload([]byte(`{"illust_id":0}`)); err == nil {
-		t.Fatal("ValidatePayload() error = nil, want illust_id validation error")
+	handler := &MirrorTaskHandler{}
+	if _, err := handler.ValidatePayload([]byte(`{"target_type":0,"target_id":0}`)); err == nil {
+		t.Fatal("ValidatePayload() error = nil, want target_id validation error")
 	}
-	payload, err := illustHandler.ValidatePayload([]byte(`{"illust_id":123}`))
+	if _, err := handler.ValidatePayload([]byte(`{"target_type":3,"target_id":123}`)); err == nil {
+		t.Fatal("ValidatePayload() error = nil, want target_type validation error")
+	}
+	payload, err := handler.ValidatePayload([]byte(`{"target_type":0,"target_id":123}`))
 	if err != nil {
 		t.Fatalf("ValidatePayload() error = %v", err)
 	}
-	var illustReq mirrorIllustPayload
-	if err := json.Unmarshal(payload, &illustReq); err != nil {
+	var req mirrorPayload
+	if err := json.Unmarshal(payload, &req); err != nil {
 		t.Fatalf("decode normalized payload failed: %v", err)
 	}
-	if illustReq.IllustID != 123 {
-		t.Fatalf("illust_id = %d, want 123", illustReq.IllustID)
+	if req.TargetType != TargetTypeIllust || req.TargetID != 123 {
+		t.Fatalf("req = %+v, want illust target_id 123", req)
+	}
+}
+
+func TestExportBookmarksTaskPayloadValidation(t *testing.T) {
+	handler := &ExportBookmarksTaskHandler{}
+	payload, err := handler.ValidatePayload(nil)
+	if err != nil {
+		t.Fatalf("ValidatePayload(nil) error = %v", err)
+	}
+	var req exportBookmarksPayload
+	if err := json.Unmarshal(payload, &req); err != nil {
+		t.Fatalf("decode normalized payload failed: %v", err)
+	}
+	if req.TargetType != nil {
+		t.Fatalf("expected TargetType to be nil, got: %v", req.TargetType)
 	}
 
-	novelHandler := &MirrorNovelTaskHandler{}
-	if _, err := novelHandler.ValidatePayload([]byte(`{"novel_id":-1}`)); err == nil {
-		t.Fatal("ValidatePayload() error = nil, want novel_id validation error")
+	if _, err := handler.ValidatePayload([]byte(`{"target_type":3}`)); err == nil {
+		t.Fatal("ValidatePayload() error = nil, want target_type validation error")
+	}
+	payload, err = handler.ValidatePayload([]byte(`{"target_type":1,"pixiv_user_id":" 100 "}`))
+	if err != nil {
+		t.Fatalf("ValidatePayload() error = %v", err)
+	}
+	if err := json.Unmarshal(payload, &req); err != nil {
+		t.Fatalf("decode normalized payload failed: %v", err)
+	}
+	if req.TargetType == nil || *req.TargetType != TargetTypeNovel || req.PixivUserID != "100" {
+		t.Fatalf("req = %+v, want novel user_id 100", req)
 	}
 }
 
@@ -47,18 +74,18 @@ func TestAutoMirrorTaskPayloadValidation(t *testing.T) {
 		t.Fatalf("default limit = %d, want 50", req.Limit)
 	}
 
-	payload, err = handler.ValidatePayload([]byte(`{"target_type":"illust","limit":999}`))
+	payload, err = handler.ValidatePayload([]byte(`{"target_type":0,"limit":999}`))
 	if err != nil {
 		t.Fatalf("ValidatePayload() error = %v", err)
 	}
 	if err := json.Unmarshal(payload, &req); err != nil {
 		t.Fatalf("decode capped payload failed: %v", err)
 	}
-	if req.TargetType != "illust" || req.Limit != 500 {
+	if req.TargetType == nil || *req.TargetType != TargetTypeIllust || req.Limit != 500 {
 		t.Fatalf("normalized payload = %+v, want illust limit 500", req)
 	}
 
-	if _, err := handler.ValidatePayload([]byte(`{"target_type":"bad"}`)); err == nil {
+	if _, err := handler.ValidatePayload([]byte(`{"target_type":3}`)); err == nil {
 		t.Fatal("ValidatePayload() error = nil, want target_type validation error")
 	}
 }

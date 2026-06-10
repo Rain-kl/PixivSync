@@ -15,11 +15,6 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-const (
-	defaultRemovedBookmarkLimit = 30
-	maxRemovedBookmarkLimit     = 100
-)
-
 // ListRemovedBookmarkIllusts returns exported illustrations that disappeared from Pixiv bookmarks.
 func ListRemovedBookmarkIllusts(c *gin.Context) {
 	userID, ok := pixivUserIDParam(c)

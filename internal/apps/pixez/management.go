@@ -23,14 +23,6 @@ import (
 	"gorm.io/gorm"
 )
 
-const (
-	defaultManagementPageSize = 24
-	maxExportRunPageSize      = 50
-	maxManagementPageSize     = 100
-	dashboardRecentRunLimit   = 8
-	percentScale              = 100
-)
-
 type pixezDashboardResponse struct {
 	Accounts   int64               `json:"accounts"`
 	Illusts    pixezMirrorProgress `json:"illusts"`
@@ -434,10 +426,8 @@ func pixezQueueStatsForTasks(ctx context.Context) (pixezQueueStats, error) {
 
 func pixezTaskTypes() []string {
 	return []string{
-		task.TaskTypePixezMirrorIllust,
-		task.TaskTypePixezMirrorNovel,
-		task.TaskTypePixezExportIllustBookmarks,
-		task.TaskTypePixezExportNovelBookmarks,
+		task.TaskTypePixezMirror,
+		task.TaskTypePixezExportBookmarks,
 		task.TaskTypePixezAutoEnqueueBookmarkMirrors,
 		task.TaskTypePixezImportLegacyServer,
 	}
