@@ -1136,6 +1136,206 @@ paths:
       summary: 校验人机验证解答
       tags:
       - cap
+  /api/pixez/bookmark-export-runs:
+    get:
+      description: Returns paginated bookmark export run records for PixEz management.
+      parameters:
+      - default: 1
+        description: Page number
+        in: query
+        name: page
+        type: integer
+      - default: 20
+        description: Page size
+        in: query
+        name: page_size
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/util.ResponseAny'
+            - properties:
+                data:
+                  type: object
+              type: object
+      security:
+      - SessionCookie: []
+      summary: List PixEz bookmark export runs
+      tags:
+      - pixez
+  /api/pixez/bookmarks/illusts:
+    get:
+      description: Returns paginated Pixiv bookmark illustration records with mirror
+        state and cover URLs.
+      parameters:
+      - description: Search by ID, title, artist, or Pixiv account
+        in: query
+        name: q
+        type: string
+      - description: Pixiv account filter
+        in: query
+        name: pixiv_user_id
+        type: string
+      - description: 'Mirror status: success, processing, failed, none'
+        in: query
+        name: mirror_status
+        type: string
+      - description: 'Work status: visible, muted, unavailable, removed, all'
+        in: query
+        name: work_status
+        type: string
+      - default: 1
+        description: Page number
+        in: query
+        name: page
+        type: integer
+      - default: 24
+        description: Page size
+        in: query
+        name: page_size
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/util.ResponseAny'
+            - properties:
+                data:
+                  type: object
+              type: object
+      security:
+      - SessionCookie: []
+      summary: List PixEz bookmark illustrations
+      tags:
+      - pixez
+  /api/pixez/bookmarks/illusts/{illust_id}/detail:
+    get:
+      description: Returns one bookmarked illustration with mirror read-model diagnostics.
+      parameters:
+      - description: Pixiv illustration ID
+        in: path
+        name: illust_id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/util.ResponseAny'
+            - properties:
+                data:
+                  type: object
+              type: object
+      security:
+      - SessionCookie: []
+      summary: Get PixEz bookmark illustration detail
+      tags:
+      - pixez
+  /api/pixez/bookmarks/novels:
+    get:
+      description: Returns paginated Pixiv bookmark novel records with mirror state
+        and cover URLs.
+      parameters:
+      - description: Search by ID, title, author, or Pixiv account
+        in: query
+        name: q
+        type: string
+      - description: Pixiv account filter
+        in: query
+        name: pixiv_user_id
+        type: string
+      - description: 'Mirror status: success, processing, failed, none'
+        in: query
+        name: mirror_status
+        type: string
+      - description: 'Work status: visible, muted, unavailable, removed, all'
+        in: query
+        name: work_status
+        type: string
+      - default: 1
+        description: Page number
+        in: query
+        name: page
+        type: integer
+      - default: 24
+        description: Page size
+        in: query
+        name: page_size
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/util.ResponseAny'
+            - properties:
+                data:
+                  type: object
+              type: object
+      security:
+      - SessionCookie: []
+      summary: List PixEz bookmark novels
+      tags:
+      - pixez
+  /api/pixez/bookmarks/novels/{novel_id}/detail:
+    get:
+      description: Returns one bookmarked novel with mirror read-model diagnostics.
+      parameters:
+      - description: Pixiv novel ID
+        in: path
+        name: novel_id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/util.ResponseAny'
+            - properties:
+                data:
+                  type: object
+              type: object
+      security:
+      - SessionCookie: []
+      summary: Get PixEz bookmark novel detail
+      tags:
+      - pixez
+  /api/pixez/dashboard:
+    get:
+      description: Returns account count, bookmark mirror progress, queue status,
+        and recent bookmark export runs.
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/util.ResponseAny'
+            - properties:
+                data:
+                  type: object
+              type: object
+      security:
+      - SessionCookie: []
+      summary: PixEz management dashboard
+      tags:
+      - pixez
   /api/pixez/ping:
     get:
       description: Verifies that the PixEz sync API is reachable with Wavelet authentication.
@@ -1244,6 +1444,27 @@ paths:
       security:
       - SessionCookie: []
       summary: Upsert Pixiv user credentials
+      tags:
+      - pixez
+  /api/pixez/users/{pixiv_user_id}/refresh-token:
+    post:
+      description: Refreshes the stored Pixiv access token for a PixEz account.
+      parameters:
+      - description: Pixiv user ID
+        in: path
+        name: pixiv_user_id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/util.ResponseAny'
+      security:
+      - SessionCookie: []
+      summary: Refresh PixEz Pixiv token
       tags:
       - pixez
   /api/pixez/users/{pixiv_user_id}/sync-data:

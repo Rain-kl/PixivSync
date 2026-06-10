@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
+	"time"
 
 	"github.com/Rain-kl/Wavelet/internal/apps/oauth"
 	"github.com/Rain-kl/Wavelet/internal/config"
@@ -41,8 +42,15 @@ func setupPixezTestRouter() *gin.Engine {
 	group := r.Group("/api/pixez")
 	group.Use(oauth.LoginRequired())
 	group.GET("/ping", Ping)
+	group.GET("/dashboard", GetDashboard)
+	group.GET("/bookmark-export-runs", ListBookmarkExportRuns)
+	group.GET("/bookmarks/illusts", ListBookmarkIllusts)
+	group.GET("/bookmarks/illusts/:illust_id/detail", GetBookmarkIllustDetail)
+	group.GET("/bookmarks/novels", ListBookmarkNovels)
+	group.GET("/bookmarks/novels/:novel_id/detail", GetBookmarkNovelDetail)
 	group.GET("/users", ListUsers)
 	group.GET("/users/:pixiv_user_id", GetUser)
+	group.POST("/users/:pixiv_user_id/refresh-token", RefreshUserToken)
 	group.PUT("/users/:pixiv_user_id", UpsertUser)
 	group.DELETE("/users/:pixiv_user_id", DeleteUser)
 	group.GET("/users/:pixiv_user_id/sync-data", GetUserData)
@@ -178,6 +186,261 @@ func TestPixezUserCRUD(t *testing.T) {
 	w = performJSON(router, http.MethodDelete, "/api/pixez/users/12345", nil, auth)
 	if resp := decodeResponse(t, w); resp.ErrorMsg != "" {
 		t.Fatalf("delete error_msg = %q", resp.ErrorMsg)
+	}
+}
+
+func TestPixezManagementDashboard(t *testing.T) {
+	_, _, cleanup := testhelper.SetupTestEnvironment(t)
+	defer cleanup()
+
+	router := setupPixezTestRouter()
+	auth := authHeader(t, "pixez-management-dashboard")
+	seedPixezManagementData(t)
+
+	w := performJSON(router, http.MethodGet, "/api/pixez/dashboard", nil, auth)
+	if w.Code != http.StatusOK {
+		t.Fatalf("dashboard status = %d, want 200. Body: %s", w.Code, w.Body.String())
+	}
+	resp := decodeResponse(t, w)
+	if resp.ErrorMsg != "" {
+		t.Fatalf("dashboard error_msg = %q", resp.ErrorMsg)
+	}
+
+	var dashboard pixezDashboardResponse
+	if err := json.Unmarshal(resp.Data, &dashboard); err != nil {
+		t.Fatalf("decode dashboard data failed: %v. Body: %s", err, string(resp.Data))
+	}
+	if got, want := dashboard.Accounts, int64(1); got != want {
+		t.Errorf("GetDashboard().Accounts = %d, want %d", got, want)
+	}
+	if got, want := dashboard.Illusts.Total, int64(3); got != want {
+		t.Errorf("GetDashboard().Illusts.Total = %d, want %d", got, want)
+	}
+	if got, want := dashboard.Illusts.Succeeded, int64(1); got != want {
+		t.Errorf("GetDashboard().Illusts.Succeeded = %d, want %d", got, want)
+	}
+	if got, want := dashboard.Queue.Running, int64(1); got != want {
+		t.Errorf("GetDashboard().Queue.Running = %d, want %d", got, want)
+	}
+	if got, want := len(dashboard.RecentRuns), 1; got != want {
+		t.Errorf("GetDashboard().RecentRuns length = %d, want %d", got, want)
+	}
+}
+
+func TestPixezManagementBookmarkListAndDetail(t *testing.T) {
+	_, _, cleanup := testhelper.SetupTestEnvironment(t)
+	defer cleanup()
+
+	router := setupPixezTestRouter()
+	auth := authHeader(t, "pixez-management-bookmarks")
+	seedPixezManagementData(t)
+
+	w := performJSON(router, http.MethodGet, "/api/pixez/bookmarks/illusts?mirror_status=failed&q=Broken", nil, auth)
+	if w.Code != http.StatusOK {
+		t.Fatalf("list illusts status = %d, want 200. Body: %s", w.Code, w.Body.String())
+	}
+	resp := decodeResponse(t, w)
+	if resp.ErrorMsg != "" {
+		t.Fatalf("list illusts error_msg = %q", resp.ErrorMsg)
+	}
+	var list struct {
+		Items []pixezIllustBookmarkDTO `json:"items"`
+		Total int64                    `json:"total"`
+	}
+	if err := json.Unmarshal(resp.Data, &list); err != nil {
+		t.Fatalf("decode illust list failed: %v. Body: %s", err, string(resp.Data))
+	}
+	if got, want := list.Total, int64(1); got != want {
+		t.Errorf("ListBookmarkIllusts(total) = %d, want %d", got, want)
+	}
+	if got, want := list.Items[0].IllustID, int64(1002); got != want {
+		t.Errorf("ListBookmarkIllusts(items[0].IllustID) = %d, want %d", got, want)
+	}
+	if list.Items[0].CoverURL == "" {
+		t.Error("ListBookmarkIllusts(items[0].CoverURL) is empty, want cover URL from illust_json")
+	}
+
+	w = performJSON(router, http.MethodGet, "/api/pixez/bookmarks/illusts/1001/detail", nil, auth)
+	if w.Code != http.StatusOK {
+		t.Fatalf("illust detail status = %d, want 200. Body: %s", w.Code, w.Body.String())
+	}
+	resp = decodeResponse(t, w)
+	if resp.ErrorMsg != "" {
+		t.Fatalf("illust detail error_msg = %q", resp.ErrorMsg)
+	}
+	var detail pixezIllustBookmarkDetailDTO
+	if err := json.Unmarshal(resp.Data, &detail); err != nil {
+		t.Fatalf("decode illust detail failed: %v. Body: %s", err, string(resp.Data))
+	}
+	if detail.Mirror == nil {
+		t.Fatal("GetBookmarkIllustDetail().Mirror is nil, want mirror diagnostics")
+	}
+	if got, want := len(detail.ImageFiles), 1; got != want {
+		t.Errorf("GetBookmarkIllustDetail().ImageFiles length = %d, want %d", got, want)
+	}
+	if got, want := len(detail.RetryURLs), 1; got != want {
+		t.Errorf("GetBookmarkIllustDetail().RetryURLs length = %d, want %d", got, want)
+	}
+}
+
+func seedPixezManagementData(t *testing.T) {
+	t.Helper()
+	ctx := context.Background()
+	now := time.Now().Add(-2 * time.Minute)
+	finishedAt := now.Add(90 * time.Second)
+	pixivUserID := "98765432"
+
+	user := model.PixezPixivUser{
+		PixivUserID:  pixivUserID,
+		Name:         "Pixiv Admin",
+		Account:      "pixiv_admin",
+		AccessToken:  "access-token",
+		RefreshToken: "refresh-token",
+		CreatedAt:    now,
+		UpdatedAt:    now,
+	}
+	if err := db.DB(ctx).Create(&user).Error; err != nil {
+		t.Fatalf("seed PixezPixivUser failed: %v", err)
+	}
+
+	illusts := []model.PixezBookmarkIllust{
+		{
+			PixivUserID:      pixivUserID,
+			Restrict:         "public",
+			IllustID:         1001,
+			Title:            "Finished Illust",
+			UserID:           2001,
+			UserName:         "Painter",
+			PageCount:        2,
+			Visible:          true,
+			IllustJSON:       `{"image_urls":{"square_medium":"https://i.pximg.net/c/360x360/1001.jpg"}}`,
+			LastExportRunID:  "pixez_illust_run_1",
+			LastSeenAt:       now,
+			MirrorStatus:     model.PixezBookmarkMirrorDone,
+			MirrorRetryCount: 1,
+			CreatedAt:        now,
+			UpdatedAt:        now,
+		},
+		{
+			PixivUserID:      pixivUserID,
+			Restrict:         "public",
+			IllustID:         1002,
+			Title:            "Broken Illust",
+			UserID:           2002,
+			UserName:         "Painter",
+			PageCount:        1,
+			Visible:          true,
+			IllustJSON:       `{"image_urls":{"square_medium":"https://i.pximg.net/c/360x360/1002.jpg"}}`,
+			LastExportRunID:  "pixez_illust_run_1",
+			LastSeenAt:       now,
+			MirrorStatus:     model.PixezBookmarkMirrorFailed,
+			MirrorRetryCount: 2,
+			CreatedAt:        now,
+			UpdatedAt:        now,
+		},
+		{
+			PixivUserID:     pixivUserID,
+			Restrict:        "public",
+			IllustID:        1003,
+			Title:           "Queued Illust",
+			UserID:          2003,
+			UserName:        "Painter",
+			PageCount:       1,
+			Visible:         true,
+			IllustJSON:      `{"image_urls":{"square_medium":"https://i.pximg.net/c/360x360/1003.jpg"}}`,
+			LastExportRunID: "pixez_illust_run_1",
+			LastSeenAt:      now,
+			MirrorStatus:    model.PixezBookmarkMirrorProcessing,
+			CreatedAt:       now,
+			UpdatedAt:       now,
+		},
+	}
+	if err := db.DB(ctx).Create(&illusts).Error; err != nil {
+		t.Fatalf("seed PixezBookmarkIllust failed: %v", err)
+	}
+
+	novel := model.PixezBookmarkNovel{
+		PixivUserID:     pixivUserID,
+		Restrict:        "public",
+		NovelID:         3001,
+		Title:           "Novel Title",
+		UserID:          4001,
+		UserName:        "Writer",
+		TextLength:      12000,
+		Visible:         true,
+		CoverURL:        "https://i.pximg.net/c/240x480/3001.jpg",
+		NovelJSON:       `{"image_urls":{"medium":"https://i.pximg.net/c/240x480/3001.jpg"}}`,
+		LastExportRunID: "pixez_novel_run_1",
+		LastSeenAt:      now,
+		MirrorStatus:    model.PixezBookmarkMirrorNone,
+		CreatedAt:       now,
+		UpdatedAt:       now,
+	}
+	if err := db.DB(ctx).Create(&novel).Error; err != nil {
+		t.Fatalf("seed PixezBookmarkNovel failed: %v", err)
+	}
+
+	mirror := model.PixezMirrorIllust{
+		IllustID:        1001,
+		TaskID:          "task_1001",
+		Status:          model.PixezMirrorStatusSuccess,
+		ImageFilesJSON:  `[{"pixiv_url":"https://i.pximg.net/img-original/1001_p0.jpg","page":0,"upload_id":"1","file_name":"1001_p0.jpg","hash":"sha256","mime":"image/jpeg","size":1234,"storage_key":"uploads/1001.jpg"}]`,
+		RequestURLsJSON: `["https://i.pximg.net/img-original/1001_p0.jpg","https://i.pximg.net/img-original/1001_p1.jpg"]`,
+		RetryURLsJSON:   `["https://i.pximg.net/img-original/1001_p1.jpg"]`,
+		TotalCount:      2,
+		SuccessCount:    1,
+		FailedCount:     1,
+		CreatedAt:       now,
+		UpdatedAt:       now,
+	}
+	if err := db.DB(ctx).Create(&mirror).Error; err != nil {
+		t.Fatalf("seed PixezMirrorIllust failed: %v", err)
+	}
+
+	run := model.PixezBookmarkExportRun{
+		ID:           "pixez_illust_run_1",
+		TargetType:   model.PixezMirrorTargetIllust,
+		PixivUserID:  pixivUserID,
+		Restrict:     "public",
+		Status:       model.PixezBookmarkExportStatusSuccess,
+		TotalCount:   3,
+		NewCount:     2,
+		UpdatedCount: 1,
+		RemovedCount: 0,
+		StartedAt:    now,
+		FinishedAt:   &finishedAt,
+		CreatedAt:    now,
+		UpdatedAt:    now,
+	}
+	if err := db.DB(ctx).Create(&run).Error; err != nil {
+		t.Fatalf("seed PixezBookmarkExportRun failed: %v", err)
+	}
+
+	executions := []model.TaskExecution{
+		{
+			TaskID:      "pixez_running",
+			TaskType:    "pixez_mirror_illust",
+			TaskName:    "PixEz 镜像插画",
+			Status:      model.TaskExecutionStatusRunning,
+			TriggeredBy: "manual",
+			StartedAt:   &now,
+			CreatedAt:   now,
+			UpdatedAt:   now,
+		},
+		{
+			TaskID:      "pixez_pending",
+			TaskType:    "pixez_export_bookmark_illusts",
+			TaskName:    "PixEz 导出插画收藏",
+			Status:      model.TaskExecutionStatusPending,
+			TriggeredBy: "manual",
+			CreatedAt:   now,
+			UpdatedAt:   now,
+		},
+	}
+	for i := range executions {
+		if err := model.CreateTaskExecution(ctx, &executions[i]); err != nil {
+			t.Fatalf("seed TaskExecution(%s) failed: %v", executions[i].TaskID, err)
+		}
 	}
 }
 

@@ -45,12 +45,14 @@ import {
 } from "@/components/ui/alert-dialog"
 import {
   ArrowUpRight,
+  BarChart3,
   ChevronDown,
   CreditCard,
   Database,
   FileQuestionMark,
   FileText,
   FolderOpen,
+  GalleryVerticalEnd,
   Home,
   Layers,
   LogOut,
@@ -59,6 +61,7 @@ import {
   ShieldCheck,
   Terminal,
   UserRound,
+  UsersRound,
 } from "lucide-react"
 
 import {useUser} from "@/contexts/user-context"
@@ -69,13 +72,18 @@ const data = {
   navMain: [
     { title: "首页", url: "/home", icon: Home },
   ],
+  pixez: [
+    { title: "看板", url: "/pixez/dashboard", icon: BarChart3 },
+    { title: "账号管理", url: "/pixez/accounts", icon: UsersRound },
+    { title: "镜像管理", url: "/pixez/mirrors", icon: GalleryVerticalEnd },
+  ],
   admin: [
     { title: "用户管理", url: "/admin/users", icon: UserRound },
     { title: "文件管理", url: "/admin/files", icon: FolderOpen },
     { title: "任务管理", url: "/admin/tasks", icon: Layers },
-    { title: "系统配置", url: "/admin/system", icon: ShieldCheck },
     { title: "数据管理", url: "/admin/database", icon: Database },
     { title: "系统日志", url: "/admin/logs", icon: Terminal },
+    { title: "系统配置", url: "/admin/system", icon: ShieldCheck },
     { title: "系统设置", url: "/admin/settings", icon: Settings },
   ],
   document: [
@@ -165,6 +173,11 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
   const navMainFiltered = React.useMemo(() => {
     const displayConfig = parseMenuDisplayConfig(config?.menu_display_config)
     return data.navMain.filter((item) => displayConfig[item.url] !== false)
+  }, [config])
+
+  const pixezFiltered = React.useMemo(() => {
+    const displayConfig = parseMenuDisplayConfig(config?.menu_display_config)
+    return data.pixez.filter((item) => displayConfig[item.url] !== false)
   }, [config])
 
   const adminFiltered = React.useMemo(() => {
@@ -307,6 +320,32 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
                       <SidebarMenuButton
                         tooltip={item.title}
                         isActive={pathname === item.url}
+                        asChild
+                      >
+                        <Link href={item.url} onClick={handleCloseSidebar}>
+                          {item.icon && <item.icon />}
+                          <span>{item.title}</span>
+                        </Link>
+                      </SidebarMenuButton>
+                    </SidebarMenuItem>
+                  ))}
+                </SidebarMenu>
+              </SidebarGroupContent>
+            </SidebarGroup>
+          )}
+
+          {pixezFiltered.length > 0 && (
+            <SidebarGroup className="py-0 pt-4">
+              <SidebarGroupLabel className="text-xs font-normal text-muted-foreground">
+                PixEz
+              </SidebarGroupLabel>
+              <SidebarGroupContent className="py-1">
+                <SidebarMenu className="gap-1">
+                  {pixezFiltered.map((item) => (
+                    <SidebarMenuItem key={item.title}>
+                      <SidebarMenuButton
+                        tooltip={item.title}
+                        isActive={pathname === item.url || pathname.startsWith(`${item.url}/`)}
                         asChild
                       >
                         <Link href={item.url} onClick={handleCloseSidebar}>

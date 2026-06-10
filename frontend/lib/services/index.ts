@@ -26,6 +26,7 @@ import {UserService} from './user';
 import {ConfigService} from './config';
 import {UploadService} from './upload';
 import {DbManageService} from './db-manage';
+import {PixezService} from './pixez';
 
 /**
  * 服务对象
@@ -47,6 +48,8 @@ const services = {
   upload: UploadService,
   /** 数据库管理服务 */
   dbManage: DbManageService,
+  /** PixEz 镜像同步服务 */
+  pixez: PixezService,
 } as const;
 
 export default services;
@@ -123,3 +126,25 @@ export type { UploadImageResponse } from './upload';
 // 数据库管理服务
 export { DbManageService } from './db-manage';
 export type { DBOverview, TableDataResponse, ExecuteSQLResponse } from './db-manage';
+
+// PixEz 服务
+export { PixezService } from './pixez';
+export type {
+  PixezAccount,
+  PixezBookmarkQuery,
+  PixezDashboard,
+  PixezExportRun,
+  PixezIllustBookmark,
+  PixezIllustBookmarkDetail,
+  PixezMirrorDetail,
+  PixezMirrorImageFile,
+  PixezMirrorProgress,
+  PixezMirrorStatus,
+  PixezMirrorStatusText,
+  PixezMirrorTarget,
+  PixezNovelBookmark,
+  PixezNovelBookmarkDetail,
+  PixezPaginatedResponse,
+  PixezQueueStats,
+  PixezRunStatus,
+} from './pixez';

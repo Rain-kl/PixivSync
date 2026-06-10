@@ -137,9 +137,9 @@ func TestListSystemConfigs(t *testing.T) {
 		var configs []model.SystemConfig
 		_ = json.Unmarshal(dataBytes, &configs)
 
-		// Defaults seed 23 configurations
-		if len(configs) != 23 {
-			t.Errorf("expected 23 default configs, got %d", len(configs))
+		const expectedDefaultConfigCount = 26
+		if len(configs) != expectedDefaultConfigCount {
+			t.Errorf("expected %d default configs, got %d", expectedDefaultConfigCount, len(configs))
 		}
 	})
 
@@ -155,8 +155,21 @@ func TestListSystemConfigs(t *testing.T) {
 		var configs []model.SystemConfig
 		_ = json.Unmarshal(dataBytes, &configs)
 
-		if len(configs) != 1 || configs[0].Key != model.ConfigKeyMaxAPIKeysPerUser {
-			t.Errorf("expected 1 business config (max_api_keys_per_user), got %d: %v", len(configs), configs)
+		expectedKeys := map[string]bool{
+			model.ConfigKeyMaxAPIKeysPerUser:            true,
+			model.ConfigKeyPixezMirrorDownloadInterval:  true,
+			model.ConfigKeyPixezMirrorIllustConcurrency: true,
+			model.ConfigKeyPixezMirrorNovelConcurrency:  true,
+		}
+		for _, config := range configs {
+			delete(expectedKeys, config.Key)
+		}
+		if len(expectedKeys) != 0 {
+			t.Errorf("missing business configs: %v; got %v", expectedKeys, configs)
+		}
+		const expectedBusinessConfigCount = 4
+		if len(configs) != expectedBusinessConfigCount {
+			t.Errorf("expected %d business configs, got %d: %v", expectedBusinessConfigCount, len(configs), configs)
 		}
 	})
 }

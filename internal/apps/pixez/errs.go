@@ -20,4 +20,9 @@ const (
 	errTooManyMirrorIDs            = "mirror ID list must not exceed 500 items"
 	errDeleteMirrorFailed          = "failed to delete mirror record"
 	errFetchRemovedBookmarksFailed = "failed to fetch removed bookmarks"
+	errFetchDashboardFailed        = "failed to fetch PixEz dashboard"
+	errFetchExportRunsFailed       = "failed to fetch bookmark export runs"
+	errFetchBookmarksFailed        = "failed to fetch bookmark mirror records"
+	errFetchBookmarkDetailFailed   = "failed to fetch bookmark mirror detail"
+	errRefreshPixivAccountFailed   = "failed to refresh Pixiv account state"
 )

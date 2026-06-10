@@ -100,6 +100,342 @@
                 }
             }
         },
+        "/api/pixez/bookmark-export-runs": {
+            "get": {
+                "security": [
+                    {
+                        "SessionCookie": []
+                    }
+                ],
+                "description": "Returns paginated bookmark export run records for PixEz management.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "pixez"
+                ],
+                "summary": "List PixEz bookmark export runs",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "default": 1,
+                        "description": "Page number",
+                        "name": "page",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "default": 20,
+                        "description": "Page size",
+                        "name": "page_size",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/util.ResponseAny"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "object"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                }
+            }
+        },
+        "/api/pixez/bookmarks/illusts": {
+            "get": {
+                "security": [
+                    {
+                        "SessionCookie": []
+                    }
+                ],
+                "description": "Returns paginated Pixiv bookmark illustration records with mirror state and cover URLs.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "pixez"
+                ],
+                "summary": "List PixEz bookmark illustrations",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Search by ID, title, artist, or Pixiv account",
+                        "name": "q",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Pixiv account filter",
+                        "name": "pixiv_user_id",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Mirror status: success, processing, failed, none",
+                        "name": "mirror_status",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Work status: visible, muted, unavailable, removed, all",
+                        "name": "work_status",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "default": 1,
+                        "description": "Page number",
+                        "name": "page",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "default": 24,
+                        "description": "Page size",
+                        "name": "page_size",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/util.ResponseAny"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "object"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                }
+            }
+        },
+        "/api/pixez/bookmarks/illusts/{illust_id}/detail": {
+            "get": {
+                "security": [
+                    {
+                        "SessionCookie": []
+                    }
+                ],
+                "description": "Returns one bookmarked illustration with mirror read-model diagnostics.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "pixez"
+                ],
+                "summary": "Get PixEz bookmark illustration detail",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "Pixiv illustration ID",
+                        "name": "illust_id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/util.ResponseAny"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "object"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                }
+            }
+        },
+        "/api/pixez/bookmarks/novels": {
+            "get": {
+                "security": [
+                    {
+                        "SessionCookie": []
+                    }
+                ],
+                "description": "Returns paginated Pixiv bookmark novel records with mirror state and cover URLs.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "pixez"
+                ],
+                "summary": "List PixEz bookmark novels",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Search by ID, title, author, or Pixiv account",
+                        "name": "q",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Pixiv account filter",
+                        "name": "pixiv_user_id",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Mirror status: success, processing, failed, none",
+                        "name": "mirror_status",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Work status: visible, muted, unavailable, removed, all",
+                        "name": "work_status",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "default": 1,
+                        "description": "Page number",
+                        "name": "page",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "default": 24,
+                        "description": "Page size",
+                        "name": "page_size",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/util.ResponseAny"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "object"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                }
+            }
+        },
+        "/api/pixez/bookmarks/novels/{novel_id}/detail": {
+            "get": {
+                "security": [
+                    {
+                        "SessionCookie": []
+                    }
+                ],
+                "description": "Returns one bookmarked novel with mirror read-model diagnostics.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "pixez"
+                ],
+                "summary": "Get PixEz bookmark novel detail",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "Pixiv novel ID",
+                        "name": "novel_id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/util.ResponseAny"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "object"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                }
+            }
+        },
+        "/api/pixez/dashboard": {
+            "get": {
+                "security": [
+                    {
+                        "SessionCookie": []
+                    }
+                ],
+                "description": "Returns account count, bookmark mirror progress, queue status, and recent bookmark export runs.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "pixez"
+                ],
+                "summary": "PixEz management dashboard",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/util.ResponseAny"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "object"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                }
+            }
+        },
         "/api/pixez/ping": {
             "get": {
                 "security": [
@@ -253,6 +589,40 @@
                     "pixez"
                 ],
                 "summary": "Delete Pixiv user",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Pixiv user ID",
+                        "name": "pixiv_user_id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/util.ResponseAny"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/pixez/users/{pixiv_user_id}/refresh-token": {
+            "post": {
+                "security": [
+                    {
+                        "SessionCookie": []
+                    }
+                ],
+                "description": "Refreshes the stored Pixiv access token for a PixEz account.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "pixez"
+                ],
+                "summary": "Refresh PixEz Pixiv token",
                 "parameters": [
                     {
                         "type": "string",

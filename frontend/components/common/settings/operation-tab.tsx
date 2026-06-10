@@ -8,6 +8,7 @@ import {AdminService} from "@/lib/services"
 import type {SystemConfig} from "@/lib/services/admin"
 import {TemplatesManager} from "./templates"
 import {toast} from "sonner"
+import {PixEzRateLimitForm} from "@/components/common/pixez/PixEzRateLimitForm"
 
 interface OperationTabProps {
   configs: Record<string, SystemConfig>
@@ -42,6 +43,9 @@ export function OperationTab({ configs, systemConfigsQuery }: OperationTabProps)
 
   return (
     <div className="space-y-6">
+      {/* PixEz 抓取限制 */}
+      <PixEzRateLimitForm />
+
       {/* 搜索引擎检索设置 */}
       <Card className="border border-dashed shadow-sm">
         <CardHeader className="border-b border-dashed pb-4">
@@ -79,6 +83,7 @@ export function OperationTab({ configs, systemConfigsQuery }: OperationTabProps)
 
       {/* 通知模板管理 */}
       <TemplatesManager />
+
     </div>
   )
 }
