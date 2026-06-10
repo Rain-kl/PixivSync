@@ -14,6 +14,7 @@ export type {
   PixezMirrorTarget,
   PixezNovelBookmark,
   PixezNovelBookmarkDetail,
+  PixezNovelTextPreview,
   PixezPaginatedResponse,
   PixezQueueStats,
   PixezRunStatus,

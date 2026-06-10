@@ -3,13 +3,12 @@
 import {useState} from "react"
 import Image from "next/image"
 import {useQueryClient} from "@tanstack/react-query"
-import {ChevronLeft, ChevronRight, ImageIcon, RotateCcw} from "lucide-react"
+import {ChevronLeft, ChevronRight, Eye, ImageIcon} from "lucide-react"
 import {toast} from "sonner"
 
 import {Badge} from "@/components/ui/badge"
 import {Button} from "@/components/ui/button"
 import {Card, CardContent, CardFooter} from "@/components/ui/card"
-import {Spinner} from "@/components/ui/spinner"
 import {EmptyStateWithBorder} from "@/components/layout/empty"
 import {LoadingStateWithBorder} from "@/components/layout/loading"
 import {PixezService} from "@/lib/services"
@@ -17,6 +16,7 @@ import type {PixezIllustBookmark, PixezMirrorTarget, PixezNovelBookmark} from "@
 
 import {formatPixEzNumber, mirrorImageURL, pixezMirrorStatusLabel} from "./pixez-format"
 import {MirrorDetailDrawer} from "./MirrorDetailDrawer"
+import {MirrorPreviewDialog} from "./MirrorPreviewDialog"
 
 type MirrorItem = PixezIllustBookmark | PixezNovelBookmark
 
@@ -68,12 +68,19 @@ export function MirrorGallery({
   const queryClient = useQueryClient()
   const [selectedItem, setSelectedItem] = useState<MirrorItem | null>(null)
   const [detailOpen, setDetailOpen] = useState(false)
+  const [previewItem, setPreviewItem] = useState<MirrorItem | null>(null)
+  const [previewOpen, setPreviewOpen] = useState(false)
   const [retryingID, setRetryingID] = useState<number | null>(null)
   const totalPages = Math.max(1, Math.ceil(total / pageSize))
 
   const openDetail = (item: MirrorItem) => {
     setSelectedItem(item)
     setDetailOpen(true)
+  }
+
+  const openPreview = (item: MirrorItem) => {
+    setPreviewItem(item)
+    setPreviewOpen(true)
   }
 
   const handleRetry = async (item: MirrorItem) => {
@@ -160,15 +167,9 @@ export function MirrorGallery({
                 <Button variant="outline" size="sm" className="flex-1" onClick={() => openDetail(item)}>
                   详情
                 </Button>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="flex-1"
-                  onClick={() => handleRetry(item)}
-                  disabled={retryingID === id}
-                >
-                  {retryingID === id ? <Spinner /> : <RotateCcw />}
-                  重新下载
+                <Button variant="outline" size="sm" className="flex-1" onClick={() => openPreview(item)}>
+                  <Eye data-icon="inline-start" />
+                  预览
                 </Button>
               </CardFooter>
             </Card>
@@ -209,6 +210,12 @@ export function MirrorGallery({
         retrying={retryingID === (selectedItem ? itemID(target, selectedItem) : 0)}
         onOpenChange={setDetailOpen}
         onRetry={handleRetry}
+      />
+      <MirrorPreviewDialog
+        target={target}
+        item={previewItem}
+        open={previewOpen}
+        onOpenChange={setPreviewOpen}
       />
     </div>
   )

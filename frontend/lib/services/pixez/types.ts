@@ -163,6 +163,10 @@ export interface PixezNovelBookmarkDetail {
   retry_urls: string[]
 }
 
+export interface PixezNovelTextPreview {
+  text: string
+}
+
 export interface PixezMirrorStatus {
   task_id: string
   illust_id?: number

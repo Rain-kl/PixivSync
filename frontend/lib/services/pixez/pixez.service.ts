@@ -9,6 +9,7 @@ import type {
   PixezMirrorStatus,
   PixezNovelBookmark,
   PixezNovelBookmarkDetail,
+  PixezNovelTextPreview,
   PixezPaginatedResponse,
 } from "./types"
 
@@ -80,6 +81,12 @@ export class PixezService extends BaseService {
 
   static async getNovelBookmarkDetail(novelID: number): Promise<PixezNovelBookmarkDetail> {
     return this.get<PixezNovelBookmarkDetail>(`/bookmarks/novels/${novelID}/detail`)
+  }
+
+  static async getMirroredNovelText(novelID: number): Promise<PixezNovelTextPreview> {
+    return this.rawGet<PixezNovelTextPreview>("/mirror/webview/v2/novel", {
+      novel_id: novelID,
+    })
   }
 
   static async mirrorIllust(illustID: number): Promise<PixezMirrorStatus> {
