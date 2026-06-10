@@ -2,6 +2,7 @@ package pixez
 
 import (
 	"context"
+	//nolint:gosec // MD5 is used only for non-cryptographic checksums of sync data
 	"crypto/md5"
 	"encoding/hex"
 	"errors"
@@ -594,6 +595,7 @@ func computeHash(lines []string) string {
 		return "empty"
 	}
 	sort.Strings(lines)
+	//nolint:gosec // MD5 is used only for non-cryptographic checksums of sync data
 	sum := md5.Sum([]byte(strings.Join(lines, "\n")))
 	return hex.EncodeToString(sum[:])
 }

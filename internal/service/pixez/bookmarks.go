@@ -41,45 +41,33 @@ const (
 
 // ExportIllustBookmarks exports Pixiv illustration bookmarks for one or all saved Pixiv users.
 func ExportIllustBookmarks(ctx context.Context, client *Client, pixivUserID string) (ExportSummary, error) {
-	if client == nil {
-		client = DefaultClient
-	}
-	users, err := exportUsers(ctx, pixivUserID)
-	if err != nil {
-		return ExportSummary{TargetType: model.PixezMirrorTargetIllust}, err
-	}
-
-	summary := ExportSummary{TargetType: model.PixezMirrorTargetIllust, UserCount: len(users)}
-	for _, user := range users {
-		for _, restrict := range bookmarkRestricts {
-			runSummary, err := exportIllustRestrict(ctx, client, user, restrict)
-			summary.RunCount++
-			summary.TotalCount += runSummary.TotalCount
-			summary.NewCount += runSummary.NewCount
-			summary.UpdatedCount += runSummary.UpdatedCount
-			summary.RemovedCount += runSummary.RemovedCount
-			if err != nil {
-				return summary, err
-			}
-		}
-	}
-	return summary, nil
+	return exportBookmarks(ctx, client, pixivUserID, model.PixezMirrorTargetIllust, exportIllustRestrict)
 }
 
 // ExportNovelBookmarks exports Pixiv novel bookmarks for one or all saved Pixiv users.
 func ExportNovelBookmarks(ctx context.Context, client *Client, pixivUserID string) (ExportSummary, error) {
+	return exportBookmarks(ctx, client, pixivUserID, model.PixezMirrorTargetNovel, exportNovelRestrict)
+}
+
+func exportBookmarks(
+	ctx context.Context,
+	client *Client,
+	pixivUserID string,
+	targetType string,
+	exportRestrict func(context.Context, *Client, model.PixezPixivUser, string) (ExportSummary, error),
+) (ExportSummary, error) {
 	if client == nil {
 		client = DefaultClient
 	}
 	users, err := exportUsers(ctx, pixivUserID)
 	if err != nil {
-		return ExportSummary{TargetType: model.PixezMirrorTargetNovel}, err
+		return ExportSummary{TargetType: targetType}, err
 	}
 
-	summary := ExportSummary{TargetType: model.PixezMirrorTargetNovel, UserCount: len(users)}
+	summary := ExportSummary{TargetType: targetType, UserCount: len(users)}
 	for _, user := range users {
 		for _, restrict := range bookmarkRestricts {
-			runSummary, err := exportNovelRestrict(ctx, client, user, restrict)
+			runSummary, err := exportRestrict(ctx, client, user, restrict)
 			summary.RunCount++
 			summary.TotalCount += runSummary.TotalCount
 			summary.NewCount += runSummary.NewCount

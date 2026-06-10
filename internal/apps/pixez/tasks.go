@@ -150,20 +150,7 @@ func (h *ExportIllustBookmarksTaskHandler) ValidatePayload(payload []byte) ([]by
 
 // Execute runs illustration bookmark export.
 func (h *ExportIllustBookmarksTaskHandler) Execute(ctx context.Context, payload []byte) (*task.TaskResult, error) {
-	req, err := parseBookmarkExportPayload(payload)
-	if err != nil {
-		return nil, err
-	}
-	task.AppendLog(ctx, "开始导出 PixEz 插画收藏 pixiv_user_id=%s", emptyAsAll(req.PixivUserID))
-	summary, err := pixezsvc.ExportIllustBookmarks(ctx, pixezsvc.DefaultClient, req.PixivUserID)
-	if err != nil {
-		task.AppendLog(ctx, "插画收藏导出失败: %v", err)
-		return nil, err
-	}
-	msg := fmt.Sprintf("插画收藏导出完成 users=%d runs=%d total=%d new=%d updated=%d removed=%d",
-		summary.UserCount, summary.RunCount, summary.TotalCount, summary.NewCount, summary.UpdatedCount, summary.RemovedCount)
-	task.AppendLog(ctx, "%s", msg)
-	return &task.TaskResult{Message: msg}, nil
+	return executeExportBookmarksTask(ctx, payload, "插画", pixezsvc.ExportIllustBookmarks)
 }
 
 // ExportNovelBookmarksTaskHandler exports Pixiv novel bookmarks.
@@ -176,18 +163,27 @@ func (h *ExportNovelBookmarksTaskHandler) ValidatePayload(payload []byte) ([]byt
 
 // Execute runs novel bookmark export.
 func (h *ExportNovelBookmarksTaskHandler) Execute(ctx context.Context, payload []byte) (*task.TaskResult, error) {
+	return executeExportBookmarksTask(ctx, payload, "小说", pixezsvc.ExportNovelBookmarks)
+}
+
+func executeExportBookmarksTask(
+	ctx context.Context,
+	payload []byte,
+	label string,
+	exportFn func(context.Context, *pixezsvc.Client, string) (pixezsvc.ExportSummary, error),
+) (*task.TaskResult, error) {
 	req, err := parseBookmarkExportPayload(payload)
 	if err != nil {
 		return nil, err
 	}
-	task.AppendLog(ctx, "开始导出 PixEz 小说收藏 pixiv_user_id=%s", emptyAsAll(req.PixivUserID))
-	summary, err := pixezsvc.ExportNovelBookmarks(ctx, pixezsvc.DefaultClient, req.PixivUserID)
+	task.AppendLog(ctx, "开始导出 PixEz %s收藏 pixiv_user_id=%s", label, emptyAsAll(req.PixivUserID))
+	summary, err := exportFn(ctx, pixezsvc.DefaultClient, req.PixivUserID)
 	if err != nil {
-		task.AppendLog(ctx, "小说收藏导出失败: %v", err)
+		task.AppendLog(ctx, "%s收藏导出失败: %v", label, err)
 		return nil, err
 	}
-	msg := fmt.Sprintf("小说收藏导出完成 users=%d runs=%d total=%d new=%d updated=%d removed=%d",
-		summary.UserCount, summary.RunCount, summary.TotalCount, summary.NewCount, summary.UpdatedCount, summary.RemovedCount)
+	msg := fmt.Sprintf("%s收藏导出完成 users=%d runs=%d total=%d new=%d updated=%d removed=%d",
+		label, summary.UserCount, summary.RunCount, summary.TotalCount, summary.NewCount, summary.UpdatedCount, summary.RemovedCount)
 	task.AppendLog(ctx, "%s", msg)
 	return &task.TaskResult{Message: msg}, nil
 }

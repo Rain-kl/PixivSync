@@ -392,6 +392,7 @@ func BatchDeleteMirroredItems(c *gin.Context) {
 	c.JSON(http.StatusOK, util.OK(gin.H{"deleted_count": deleted}))
 }
 
+//nolint:dupl // Illust and novel mirror dispatch flows keep parallel structures for distinct model types
 func dispatchIllustMirrorIfNeeded(c *gin.Context, illustID int64) (model.PixezMirrorIllust, error) {
 	record, err := pixezsvc.GetMirrorIllust(c.Request.Context(), illustID)
 	if err == nil && record.Status != model.PixezMirrorStatusFailed {
@@ -408,6 +409,7 @@ func dispatchIllustMirrorIfNeeded(c *gin.Context, illustID int64) (model.PixezMi
 	return pixezsvc.EnsureMirrorIllustQueued(c.Request.Context(), illustID, taskID)
 }
 
+//nolint:dupl // Illust and novel mirror dispatch flows keep parallel structures for distinct model types
 func dispatchNovelMirrorIfNeeded(c *gin.Context, novelID int64) (model.PixezMirrorNovel, error) {
 	record, err := pixezsvc.GetMirrorNovel(c.Request.Context(), novelID)
 	if err == nil && record.Status != model.PixezMirrorStatusFailed {

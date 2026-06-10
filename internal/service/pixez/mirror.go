@@ -426,6 +426,7 @@ func registerMirrorUpload(ctx context.Context, pixivURL string, pageIndex int, d
 			return model.PixezMirrorImageFile{}, fmt.Errorf("create local upload dir: %w", err)
 		}
 		filePath = filepath.Join(localDir, fmt.Sprintf("%d.%s", id, ext))
+		//nolint:gosec // filePath is safely constructed inside the local uploads directory
 		if err := os.WriteFile(filePath, data, localUploadFilePerm); err != nil {
 			return model.PixezMirrorImageFile{}, fmt.Errorf("write mirrored Pixiv image: %w", err)
 		}
@@ -454,6 +455,7 @@ func registerMirrorUpload(ctx context.Context, pixivURL string, pageIndex int, d
 	}
 	if err := db.DB(ctx).Create(&upload).Error; err != nil {
 		if storageDriver == "local" {
+			//nolint:gosec // filePath is safely constructed inside the local uploads directory
 			_ = os.Remove(filePath)
 		}
 		return model.PixezMirrorImageFile{}, fmt.Errorf("create upload record: %w", err)

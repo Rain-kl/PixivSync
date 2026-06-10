@@ -370,6 +370,7 @@ func importLegacyMirrorIllust(ctx context.Context, legacyDB *gorm.DB, mirrorDir 
 			requestURLs = append(requestURLs, file.URL)
 		}
 		filePath := resolveLegacyMirrorPath(mirrorDir, file)
+		//nolint:gosec // filePath is sanitized by resolveLegacyMirrorPath and this is an admin legacy import operation
 		data, err := os.ReadFile(filePath)
 		if err != nil {
 			if errors.Is(err, os.ErrNotExist) {

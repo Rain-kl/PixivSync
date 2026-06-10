@@ -20,6 +20,7 @@ package pixez
 import (
 	"bytes"
 	"context"
+	//nolint:gosec // MD5 is required by the official Pixiv API signature format
 	"crypto/md5"
 	"encoding/hex"
 	"encoding/json"
@@ -352,6 +353,7 @@ func pixivClientTime() string {
 
 func pixivClientHash(t string) string {
 	hashSalt := "28c1fdd170a5204386cb1313c7077b34f83e4aaf4aa829ce78c231e05b0bae2c"
+	//nolint:gosec // MD5 is required by the official Pixiv API signature format
 	h := md5.Sum([]byte(t + hashSalt))
 	return hex.EncodeToString(h[:])
 }
