@@ -152,7 +152,7 @@ INSERT INTO system_configs (key, value, type, visibility, description, created_a
     ('upload_allowed_extensions', 'jpg,png,webp', 'system', 1, '允许上传的图片扩展名（逗号分隔）', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
     ('site_name', 'Wavelet', 'system', 1, '系统平台的展示名称', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
     ('password_login_enabled', 'true', 'system', 1, '是否允许使用账号密码登录', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
-    ('registration_enabled', 'true', 'system', 1, '控制普通用户是否可以自主注册（true/false）', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
+    ('registration_enabled', 'false', 'system', 1, '控制普通用户是否可以自主注册（true/false）', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
     ('password_register_enabled', 'true', 'system', 1, '是否允许通过密码创建本地账号', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
     ('oidc_login_enabled', 'true', 'system', 1, '是否允许使用第三方 OIDC 认证源登录', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
     ('max_api_keys_per_user', '5', 'business', 1, '限制每个普通用户可以创建的 API Key 最大数量', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
