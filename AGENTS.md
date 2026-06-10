@@ -5,6 +5,7 @@ specialized workflows still live in `.agent/skills/`.
 
 ## Always Read The Matching Skill
 
+- `new-api`: use when adding or changing custom business APIs, handlers, service layer logic, or registering customized endpoints.
 - `new-async-task`: use when adding or changing Asynq tasks, scheduled jobs,
   task metadata, task payload validation, task logs, task retry behavior, or
   Admin task APIs.
@@ -259,3 +260,11 @@ frontend/lib/services/<service-name>/
 - `make license-check`: validate Go license headers.
 
 Never delete `frontend/node_modules`; refresh dependencies with `pnpm install`.
+
+<!-- BEGIN:nextjs-agent-rules -->
+ 
+# Next.js: ALWAYS read docs before coding
+ 
+Before any Next.js work, find and read the relevant doc in `node_modules/next/dist/docs/`. Your training data is outdated — the docs are the source of truth.
+ 
+<!-- END:nextjs-agent-rules -->

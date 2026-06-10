@@ -1,19 +1,6 @@
-/*
-Copyright 2025 linux.do
-Modified by Arctel.net, 2026
-
-Licensed under the Apache License, Version 2.0 (the "License");
-you may not use this file except in compliance with the License.
-You may obtain a copy of the License at
-
-    http://www.apache.org/licenses/LICENSE-2.0
-
-Unless required by applicable law or agreed to in writing, software
-distributed under the License is distributed on an "AS IS" BASIS,
-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-See the License for the specific language governing permissions and
-limitations under the License.
-*/
+// Copyright 2025 linux.do
+// Copyright 2026 Arctel.net
+// SPDX-License-Identifier: Apache-2.0
 
 package router
 
@@ -50,7 +37,6 @@ import (
 	_ "github.com/Rain-kl/Wavelet/docs"
 	"github.com/Rain-kl/Wavelet/internal/apps/admin/system_config"
 	"github.com/Rain-kl/Wavelet/internal/apps/oauth"
-	"github.com/Rain-kl/Wavelet/internal/apps/pixez"
 	"github.com/Rain-kl/Wavelet/internal/config"
 	"github.com/Rain-kl/Wavelet/internal/otel_trace"
 	"github.com/gin-contrib/sessions"
@@ -62,8 +48,6 @@ import (
 )
 
 // Serve 启动 HTTP API 服务
-//
-//nolint:maintidx // Serve is the central route composition point by project convention.
 func Serve() {
 	// 运行模式
 	if config.Config.App.IsProduction() {
@@ -169,196 +153,139 @@ func registerRoutes(r *gin.Engine) {
 		// API V1
 		apiV1Router := apiGroup.Group("/v1")
 		{
-			registerV1Routes(apiV1Router, apiGroup)
+			// Health
+			apiV1Router.GET("/health", health.Health)
+
+			// OAuth
+			apiV1Router.GET("/oauth/sources", oauth.GetLoginSources)
+			apiV1Router.GET("/oauth/login", oauth.GetLoginURL)
+			apiV1Router.GET("/oauth/:source/authorize", oauth.Authorize)
+			apiV1Router.GET("/oauth/logout", oauth.Logout)
+			apiV1Router.POST("/oauth/callback", oauth.Callback)
+			apiV1Router.GET("/oauth/user-info", oauth.LoginRequired(), oauth.UserInfo)
+			apiV1Router.GET("/user-info", oauth.LoginRequired(), oauth.UserInfo)
+			apiV1Router.GET("/oauth/external-accounts", oauth.LoginRequired(), oauth.ListExternalAccounts)
+			apiV1Router.POST("/oauth/external-accounts/:id/delete", oauth.LoginRequired(), oauth.DeleteExternalAccount)
+
+			// User
+			userRouter := apiV1Router.Group("/user")
+			{
+				userRouter.POST("/login", capApp.VerifyMiddleware(capUtil.GetDefaultManager(), "login", func() bool {
+					enabled, err := model.GetBoolByKey(context.Background(), model.ConfigKeyCapLoginEnabled)
+					if err != nil {
+						return false
+					}
+					return enabled
+				}), user.Login)
+				userRouter.POST("/register", user.Register)
+				userRouter.POST("/send-email-code", user.SendEmailCode)
+				userRouter.GET("/logout", user.Logout)
+				userRouter.GET("/self", oauth.LoginRequired(), oauth.UserInfo)
+				userRouter.POST("/change-password", oauth.LoginRequired(), user.ChangePassword)
+				userRouter.PUT("/profile", oauth.LoginRequired(), user.UpdateProfile)
+
+				// Access Token
+				tokenRouter := userRouter.Group("/access-tokens")
+				tokenRouter.Use(oauth.LoginRequired())
+				{
+					tokenRouter.GET("", user.ListAccessTokens)
+					tokenRouter.POST("", user.CreateAccessToken)
+					tokenRouter.DELETE("/:id", user.DeleteAccessToken)
+					tokenRouter.POST("/:id/rotate", user.RotateAccessToken)
+				}
+			}
+
+			// Upload
+			uploadRouter := apiV1Router.Group("/upload")
+			uploadRouter.Use(oauth.LoginRequired())
+			{
+				uploadRouter.POST("", upload.UploadFile)
+				uploadRouter.GET("/my", upload.ListMyFiles)
+				uploadRouter.DELETE("/:id", upload.DeleteFile)
+				uploadRouter.GET("/download/:id", upload.DownloadFile)
+				uploadRouter.POST("/download/batch", upload.BatchDownloadFiles)
+			}
+
+			// Config (public)
+			configRouter := apiV1Router.Group("/config")
+			{
+				configRouter.GET("/public", publicconfig.GetPublicConfig)
+			}
+
+			// Admin
+			adminRouter := apiV1Router.Group("/admin")
+			adminRouter.Use(oauth.LoginRequired(), admin.LoginAdminRequired())
+			{
+				// System status
+				adminRouter.GET("/status", admin_status.GetSystemStatus)
+
+				// Database info & export
+				adminRouter.GET("/db-info", admin_status.GetDatabaseInfo)
+				adminRouter.GET("/db-export", admin_status.ExportDatabase)
+
+				// Database management
+				adminRouter.GET("/db-manage/overview", admin_db_manage.GetDBOverview)
+				adminRouter.GET("/db-manage/tables", admin_db_manage.ListDBTables)
+				adminRouter.GET("/db-manage/table-data", admin_db_manage.GetDBTableData)
+				adminRouter.POST("/db-manage/query", admin_db_manage.ExecuteSQL)
+
+				// System logs
+				adminRouter.GET("/logs", admin_logs.GetLogs)
+				adminRouter.GET("/logs/access", admin_logs.GetAccessLogs)
+				adminRouter.GET("/logs/analytics", admin_logs.GetLogsAnalytics)
+				adminRouter.GET("/logs/ws", admin_logs.HandleLogWebSocket)
+
+				// Task dispatch
+				adminRouter.GET("/tasks/types", admin_task.ListTaskTypes)
+				adminRouter.POST("/tasks/dispatch", admin_task.DispatchTask)
+
+				// Task executions
+				adminRouter.GET("/tasks/executions", admin_task.ListTaskExecutions)
+				adminRouter.GET("/tasks/executions/:id", admin_task.GetTaskExecution)
+				adminRouter.POST("/tasks/executions/:id/retry", admin_task.RetryTask)
+
+				// Users
+				adminRouter.GET("/users", admin_user.ListUsers)
+				adminRouter.POST("/users", admin_user.CreateUser)
+				adminRouter.GET("/users/:id", admin_user.GetUser)
+				adminRouter.PUT("/users/:id/status", admin_user.UpdateUserStatus)
+				adminRouter.DELETE("/users/:id", admin_user.DeleteUser)
+
+				// System Config
+				adminRouter.POST("/system-configs", system_config.CreateSystemConfig)
+				adminRouter.GET("/system-configs", system_config.ListSystemConfigs)
+				adminRouter.POST("/system-configs/smtp/test", system_config.TestSMTP)
+
+				systemConfigRouter := adminRouter.Group("/system-configs/:key")
+				{
+					systemConfigRouter.GET("", system_config.GetSystemConfig)
+					systemConfigRouter.PUT("", system_config.UpdateSystemConfig)
+				}
+
+				// Templates
+				adminRouter.GET("/templates", admin_template.ListTemplates)
+				adminRouter.POST("/templates", admin_template.CreateTemplate)
+
+				templateRouter := adminRouter.Group("/templates/:key")
+				{
+					templateRouter.GET("", admin_template.GetTemplate)
+					templateRouter.PUT("", admin_template.UpdateTemplate)
+					templateRouter.DELETE("", admin_template.DeleteTemplate)
+				}
+
+				// Auth Sources
+				adminRouter.GET("/auth-sources", admin_auth_source.ListAuthSources)
+				adminRouter.POST("/auth-sources", admin_auth_source.CreateAuthSource)
+				adminRouter.PUT("/auth-sources/:id", admin_auth_source.UpdateAuthSource)
+				adminRouter.PUT("/auth-sources/:id/toggle", admin_auth_source.ToggleAuthSource)
+				adminRouter.DELETE("/auth-sources/:id", admin_auth_source.DeleteAuthSource)
+			}
+
+			// Register custom business routes
+			registerCustomRoutes(apiV1Router)
 		}
 	}
-
-	registerMirrorRoutes(r)
 
 	// 注册前端静态路由（当启用 embed_frontend 编译标签时）
 	registerFrontend(r)
-}
-
-func registerV1Routes(apiV1Router *gin.RouterGroup, apiGroup *gin.RouterGroup) {
-	// Health
-	apiV1Router.GET("/health", health.Health)
-
-	// OAuth
-	registerOAuthRoutes(apiV1Router)
-
-	// User
-	registerUserRoutes(apiV1Router)
-
-	// Upload
-	registerUploadRoutes(apiV1Router)
-
-	// Config (public)
-	apiV1Router.GET("/config/public", publicconfig.GetPublicConfig)
-
-	// PixEz companion sync API
-	registerPixezSyncRoutes(apiGroup)
-
-	// Admin
-	registerAdminRoutes(apiV1Router)
-}
-
-func registerOAuthRoutes(apiV1Router *gin.RouterGroup) {
-	apiV1Router.GET("/oauth/sources", oauth.GetLoginSources)
-	apiV1Router.GET("/oauth/login", oauth.GetLoginURL)
-	apiV1Router.GET("/oauth/:source/authorize", oauth.Authorize)
-	apiV1Router.GET("/oauth/logout", oauth.Logout)
-	apiV1Router.POST("/oauth/callback", oauth.Callback)
-	apiV1Router.GET("/oauth/user-info", oauth.LoginRequired(), oauth.UserInfo)
-	apiV1Router.GET("/user-info", oauth.LoginRequired(), oauth.UserInfo)
-	apiV1Router.GET("/oauth/external-accounts", oauth.LoginRequired(), oauth.ListExternalAccounts)
-	apiV1Router.POST("/oauth/external-accounts/:id/delete", oauth.LoginRequired(), oauth.DeleteExternalAccount)
-}
-
-func registerUserRoutes(apiV1Router *gin.RouterGroup) {
-	userRouter := apiV1Router.Group("/user")
-	{
-		userRouter.POST("/login", capApp.VerifyMiddleware(capUtil.GetDefaultManager(), "login", func() bool {
-			enabled, err := model.GetBoolByKey(context.Background(), model.ConfigKeyCapLoginEnabled)
-			if err != nil {
-				return false
-			}
-			return enabled
-		}), user.Login)
-		userRouter.POST("/register", user.Register)
-		userRouter.POST("/send-email-code", user.SendEmailCode)
-		userRouter.GET("/logout", user.Logout)
-		userRouter.GET("/self", oauth.LoginRequired(), oauth.UserInfo)
-		userRouter.POST("/change-password", oauth.LoginRequired(), user.ChangePassword)
-		userRouter.PUT("/profile", oauth.LoginRequired(), user.UpdateProfile)
-
-		// Access Token
-		tokenRouter := userRouter.Group("/access-tokens")
-		tokenRouter.Use(oauth.LoginRequired())
-		{
-			tokenRouter.GET("", user.ListAccessTokens)
-			tokenRouter.POST("", user.CreateAccessToken)
-			tokenRouter.DELETE("/:id", user.DeleteAccessToken)
-			tokenRouter.POST("/:id/rotate", user.RotateAccessToken)
-		}
-	}
-}
-
-func registerUploadRoutes(apiV1Router *gin.RouterGroup) {
-	uploadRouter := apiV1Router.Group("/upload")
-	uploadRouter.Use(oauth.LoginRequired())
-	{
-		uploadRouter.POST("", upload.UploadFile)
-		uploadRouter.GET("/my", upload.ListMyFiles)
-		uploadRouter.DELETE("/:id", upload.DeleteFile)
-		uploadRouter.GET("/download/:id", upload.DownloadFile)
-		uploadRouter.POST("/download/batch", upload.BatchDownloadFiles)
-	}
-}
-
-func registerPixezSyncRoutes(apiGroup *gin.RouterGroup) {
-	pixezRouter := apiGroup.Group("/pixez")
-	pixezRouter.Use(oauth.LoginRequired())
-	{
-		pixezRouter.GET("/ping", pixez.Ping)
-		pixezRouter.GET("/users", pixez.ListUsers)
-		pixezRouter.GET("/users/:pixiv_user_id", pixez.GetUser)
-		pixezRouter.PUT("/users/:pixiv_user_id", pixez.UpsertUser)
-		pixezRouter.DELETE("/users/:pixiv_user_id", pixez.DeleteUser)
-		pixezRouter.GET("/users/:pixiv_user_id/sync-data", pixez.GetUserData)
-		pixezRouter.POST("/users/:pixiv_user_id/sync-data", pixez.PostUserData)
-		pixezRouter.GET("/users/:pixiv_user_id/sync-data/hashes", pixez.GetUserDataHashes)
-		pixezRouter.GET("/users/:pixiv_user_id/bookmarks/illust/removed", pixez.ListRemovedBookmarkIllusts)
-		pixezRouter.POST("/illusts/:illust_id/mirror", pixez.MirrorIllust)
-		pixezRouter.GET("/illusts/:illust_id/mirror", pixez.CheckIllustMirror)
-		pixezRouter.POST("/illusts/mirror/batch", pixez.BatchCheckIllustMirror)
-		pixezRouter.POST("/novels/:novel_id/mirror", pixez.MirrorNovel)
-		pixezRouter.GET("/novels/:novel_id/mirror", pixez.CheckNovelMirror)
-		pixezRouter.POST("/novels/mirror/batch", pixez.BatchCheckNovelMirror)
-		pixezRouter.GET("/mirror/illusts", pixez.ListMirroredIllusts)
-		pixezRouter.GET("/mirror/novels", pixez.ListMirroredNovels)
-		pixezRouter.DELETE("/mirror/illusts/:illust_id", pixez.DeleteMirroredIllust)
-		pixezRouter.DELETE("/mirror/novels/:novel_id", pixez.DeleteMirroredNovel)
-		pixezRouter.POST("/mirror/batch-delete", pixez.BatchDeleteMirroredItems)
-	}
-}
-
-func registerAdminRoutes(apiV1Router *gin.RouterGroup) {
-	adminRouter := apiV1Router.Group("/admin")
-	adminRouter.Use(oauth.LoginRequired(), admin.LoginAdminRequired())
-	{
-		// System status
-		adminRouter.GET("/status", admin_status.GetSystemStatus)
-
-		// Database info & export
-		adminRouter.GET("/db-info", admin_status.GetDatabaseInfo)
-		adminRouter.GET("/db-export", admin_status.ExportDatabase)
-
-		// Database management
-		adminRouter.GET("/db-manage/overview", admin_db_manage.GetDBOverview)
-		adminRouter.GET("/db-manage/tables", admin_db_manage.ListDBTables)
-		adminRouter.GET("/db-manage/table-data", admin_db_manage.GetDBTableData)
-		adminRouter.POST("/db-manage/query", admin_db_manage.ExecuteSQL)
-
-		// System logs
-		adminRouter.GET("/logs", admin_logs.GetLogs)
-		adminRouter.GET("/logs/access", admin_logs.GetAccessLogs)
-		adminRouter.GET("/logs/analytics", admin_logs.GetLogsAnalytics)
-		adminRouter.GET("/logs/ws", admin_logs.HandleLogWebSocket)
-
-		// Task dispatch
-		adminRouter.GET("/tasks/types", admin_task.ListTaskTypes)
-		adminRouter.POST("/tasks/dispatch", admin_task.DispatchTask)
-
-		// Task executions
-		adminRouter.GET("/tasks/executions", admin_task.ListTaskExecutions)
-		adminRouter.GET("/tasks/executions/:id", admin_task.GetTaskExecution)
-		adminRouter.POST("/tasks/executions/:id/retry", admin_task.RetryTask)
-
-		// Users
-		adminRouter.GET("/users", admin_user.ListUsers)
-		adminRouter.POST("/users", admin_user.CreateUser)
-		adminRouter.GET("/users/:id", admin_user.GetUser)
-		adminRouter.PUT("/users/:id/status", admin_user.UpdateUserStatus)
-		adminRouter.DELETE("/users/:id", admin_user.DeleteUser)
-
-		// System Config
-		adminRouter.POST("/system-configs", system_config.CreateSystemConfig)
-		adminRouter.GET("/system-configs", system_config.ListSystemConfigs)
-		adminRouter.POST("/system-configs/smtp/test", system_config.TestSMTP)
-
-		systemConfigRouter := adminRouter.Group("/system-configs/:key")
-		{
-			systemConfigRouter.GET("", system_config.GetSystemConfig)
-			systemConfigRouter.PUT("", system_config.UpdateSystemConfig)
-		}
-
-		// Templates
-		adminRouter.GET("/templates", admin_template.ListTemplates)
-		adminRouter.POST("/templates", admin_template.CreateTemplate)
-
-		templateRouter := adminRouter.Group("/templates/:key")
-		{
-			templateRouter.GET("", admin_template.GetTemplate)
-			templateRouter.PUT("", admin_template.UpdateTemplate)
-			templateRouter.DELETE("", admin_template.DeleteTemplate)
-		}
-
-		// Auth Sources
-		adminRouter.GET("/auth-sources", admin_auth_source.ListAuthSources)
-		adminRouter.POST("/auth-sources", admin_auth_source.CreateAuthSource)
-		adminRouter.PUT("/auth-sources/:id", admin_auth_source.UpdateAuthSource)
-		adminRouter.PUT("/auth-sources/:id/toggle", admin_auth_source.ToggleAuthSource)
-		adminRouter.DELETE("/auth-sources/:id", admin_auth_source.DeleteAuthSource)
-	}
-}
-
-func registerMirrorRoutes(r *gin.Engine) {
-	mirrorRouter := r.Group("/mirror")
-	mirrorRouter.Use(oauth.LoginRequired())
-	{
-		mirrorRouter.GET("/v1/illust/detail", pixez.GetMirroredIllustDetail)
-		mirrorRouter.GET("/pximg/*path", pixez.ServeMirroredImage)
-		mirrorRouter.GET("/v1/novel/detail", pixez.GetMirroredNovelDetail)
-		mirrorRouter.GET("/webview/v2/novel", pixez.GetMirroredNovelText)
-	}
 }
