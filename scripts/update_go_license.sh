@@ -9,14 +9,16 @@ usage() {
 Usage:
   scripts/update_go_license.sh [--check]
 
-Updates Go source files with the project license header.
+Updates Go source files with the project SPDX license header.
 
 Rules:
-  - Existing Apache license headers gain:
-      Modified by Arctel.net, 2026
-    directly after the Copyright line.
-  - Go files without a license header receive an Arctel.net Apache header.
-  - //go:build and legacy // +build constraints stay at the top of the file.
+  - Files already carrying a correct SPDX header are left untouched.
+  - Legacy block-comment (/* ... */) Apache headers are converted to
+    the short SPDX form, preserving copyright attribution.
+  - Go files without any license header receive:
+      // Copyright 2026 Arctel.net
+      // SPDX-License-Identifier: Apache-2.0
+  - //go:build and legacy // +build constraints stay at the top.
 
 Options:
   --check   Report files that would change and exit non-zero if any are found.
@@ -73,30 +75,20 @@ local $/;
 my $src = <$in>;
 close $in;
 
-my $modified = 'Modified by Arctel.net, 2026';
-my $new_header = <<'HEADER';
-/*
-Copyright 2026 Arctel.net
+my $new_only_header =
+    "// Copyright 2026 Arctel.net\n" .
+    "// SPDX-License-Identifier: Apache-2.0";
 
-Licensed under the Apache License, Version 2.0 (the "License");
-you may not use this file except in compliance with the License.
-You may obtain a copy of the License at
-
-    http://www.apache.org/licenses/LICENSE-2.0
-
-Unless required by applicable law or agreed to in writing, software
-distributed under the License is distributed on an "AS IS" BASIS,
-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-See the License for the specific language governing permissions and
-limitations under the License.
-*/
-HEADER
-chomp $new_header;
+my $modified_header =
+    "// Copyright 2025 linux.do\n" .
+    "// Copyright 2026 Arctel.net\n" .
+    "// SPDX-License-Identifier: Apache-2.0";
 
 my @lines = split /\n/, $src, -1;
 my @prefix;
 my $i = 0;
 
+# Preserve //go:build and // +build constraint lines at the top.
 if (@lines && ($lines[0] =~ m{^//go:build } || $lines[0] =~ m{^// \+build })) {
     while ($i < @lines) {
         if ($lines[$i] =~ m{^//go:build } || $lines[$i] =~ m{^// \+build }) {
@@ -116,22 +108,41 @@ my $prefix = @prefix ? join("\n", @prefix) . "\n" : '';
 my $body = join "\n", @lines[$i .. $#lines];
 my $result;
 
-if ($body =~ m{\A(/\*.*?\*/)(\n*)}s) {
+# --- Case 1: already has SPDX header (correct format, leave untouched) ---
+if ($body =~ m{\A(// Copyright [^\x0a]+\x0a(?:// Copyright [^\x0a]+\x0a)?// SPDX-License-Identifier: Apache-2\.0)(\x0a?)}s) {
+    $result = $prefix . $body;
+}
+# --- Case 2: legacy block-comment header (/* ... */) ---
+elsif ($body =~ m{\A(/\*.*?\*/)(\n*)}s) {
     my $block = $1;
     my $rest = substr($body, length($1) + length($2));
+    $rest =~ s/\A\n+//;
 
-    if ($block =~ /Licensed under the Apache License, Version 2\.0/ && $block =~ /Copyright /) {
-        if ($block !~ /Copyright [^\n]*Arctel\.net/ && $block !~ /\Q$modified\E/) {
-            $block =~ s/^(Copyright [^\n]*)$/$1\n$modified/m;
+    if ($block =~ /Licensed under the Apache License/ && $block =~ /Copyright /) {
+        my $has_linux_do  = ($block =~ /Copyright [^\n]*linux\.do/);
+        my $has_arctel    = ($block =~ /Copyright [^\n]*Arctel\.net/);
+        my $has_modified  = ($block =~ /Modified by Arctel\.net/);
+
+        if ($has_linux_do && ($has_arctel || $has_modified)) {
+            $result = $prefix . $modified_header . "\n\n" . $rest;
+        } elsif ($has_arctel && !$has_linux_do) {
+            $result = $prefix . $new_only_header . "\n\n" . $rest;
+        } elsif ($has_linux_do && !$has_arctel && !$has_modified) {
+            my $h = "// Copyright 2025 linux.do\n" .
+                    "// SPDX-License-Identifier: Apache-2.0";
+            $result = $prefix . $h . "\n\n" . $rest;
+        } else {
+            $result = $prefix . $new_only_header . "\n\n" . $rest;
         }
-        $result = $prefix . $block . "\n\n" . $rest;
     } else {
-        $rest =~ s/\A\n+//;
-        $result = $prefix . $new_header . "\n\n" . $block . "\n\n" . $rest;
+        # Non-Apache block comment — prepend new header.
+        $result = $prefix . $new_only_header . "\n\n" . $block . "\n\n" . $rest;
     }
-} else {
+}
+# --- Case 3: no header at all ---
+else {
     $body =~ s/\A\n+//;
-    $result = $prefix . $new_header . "\n\n" . $body;
+    $result = $prefix . $new_only_header . "\n\n" . $body;
 }
 
 open my $fh, '>', $out or die "write $out: $!";

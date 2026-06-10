@@ -1,18 +1,5 @@
-/*
-Copyright 2026 Arctel.net
-
-Licensed under the Apache License, Version 2.0 (the "License");
-you may not use this file except in compliance with the License.
-You may obtain a copy of the License at
-
-    http://www.apache.org/licenses/LICENSE-2.0
-
-Unless required by applicable law or agreed to in writing, software
-distributed under the License is distributed on an "AS IS" BASIS,
-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-See the License for the specific language governing permissions and
-limitations under the License.
-*/
+// Copyright 2026 Arctel.net
+// SPDX-License-Identifier: Apache-2.0
 
 // Package cap 提供人机验证（CAPTCHA）功能
 package cap
@@ -32,11 +19,11 @@ import (
 
 const (
 	jwtHeaderB64          = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9"
-	jwtPartsCount         = 3    // JWT 三段结构
-	defaultChallengeCount = 50   // 默认 PoW 难题数
-	defaultChallengeSize  = 32   // 默认盐值长度
-	defaultDifficulty     = 4    // 默认难度
-	defaultNonceLength    = 25   // 随机 Nonce 字节长度
+	jwtPartsCount         = 3                // JWT 三段结构
+	defaultChallengeCount = 50               // 默认 PoW 难题数
+	defaultChallengeSize  = 32               // 默认盐值长度
+	defaultDifficulty     = 4                // 默认难度
+	defaultNonceLength    = 25               // 随机 Nonce 字节长度
 	defaultExpires        = 10 * time.Minute // 默认过期时间
 )
 

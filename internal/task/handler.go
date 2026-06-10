@@ -1,25 +1,13 @@
-/*
-Copyright 2025-2026 linux.do
-Modified by Arctel.net, 2026
-
-Licensed under the Apache License, Version 2.0 (the "License");
-you may not use this file except in compliance with the License.
-You may obtain a copy of the License at
-
-    http://www.apache.org/licenses/LICENSE-2.0
-
-Unless required by applicable law or agreed to in writing, software
-distributed under the License is distributed on an "AS IS" BASIS,
-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-See the License for the specific language governing permissions and
-limitations under the License.
-*/
+// Copyright 2025 linux.do
+// Copyright 2026 Arctel.net
+// SPDX-License-Identifier: Apache-2.0
 
 package task
 
 import "context"
 
 // TaskResult 任务执行结果
+//
 //nolint:revive // TaskResult 保留完整名称以避免与通用 Result 混淆
 type TaskResult struct {
 	Message string // 结果摘要，如 "共清理 120 个文件，耗时 3.2s"
