@@ -222,8 +222,7 @@ func upsertBookmarkIllust(ctx context.Context, pixivUserID string, restrict stri
 			"updated_at":         now,
 		}
 		status := bookmarkSaveSkipped
-		if existing.Removed || existing.IllustJSON != illustJSON {
-			fillIllustBookmarkUpdates(updates, illust, illustJSON)
+		if existing.Removed {
 			status = bookmarkSaveUpdated
 		}
 		if err := db.DB(ctx).Model(&model.PixezBookmarkIllust{}).Where("id = ?", existing.ID).Updates(updates).Error; err != nil {
@@ -318,8 +317,7 @@ func upsertBookmarkNovel(ctx context.Context, pixivUserID string, restrict strin
 			"updated_at":         now,
 		}
 		status := bookmarkSaveSkipped
-		if existing.Removed || existing.NovelJSON != novelJSON {
-			fillNovelBookmarkUpdates(updates, novel, novelJSON)
+		if existing.Removed {
 			status = bookmarkSaveUpdated
 		}
 		if err := db.DB(ctx).Model(&model.PixezBookmarkNovel{}).Where("id = ?", existing.ID).Updates(updates).Error; err != nil {
@@ -410,24 +408,6 @@ func fillIllustBookmarkRecord(record *model.PixezBookmarkIllust, illust Illust, 
 	record.IllustJSON = illustJSON
 }
 
-func fillIllustBookmarkUpdates(updates map[string]any, illust Illust, illustJSON string) {
-	updates["title"] = illust.Title
-	updates["type"] = illust.Type
-	updates["user_id"] = illust.User.ID
-	updates["user_name"] = illust.User.Name
-	updates["page_count"] = illust.PageCount
-	updates["width"] = illust.Width
-	updates["height"] = illust.Height
-	updates["sanity_level"] = illust.SanityLevel
-	updates["x_restrict"] = illust.XRestrict
-	updates["total_view"] = illust.TotalView
-	updates["total_bookmarks"] = illust.TotalBookmarks
-	updates["visible"] = illust.Visible
-	updates["is_muted"] = illust.IsMuted
-	updates["illust_ai_type"] = illust.IllustAIType
-	updates["illust_json"] = illustJSON
-}
-
 func fillNovelBookmarkRecord(record *model.PixezBookmarkNovel, novel BookmarkNovel, novelJSON string) {
 	record.Title = novel.Title
 	record.Caption = novel.Caption
@@ -450,34 +430,6 @@ func fillNovelBookmarkRecord(record *model.PixezBookmarkNovel, novel BookmarkNov
 		record.CoverURL = novel.ImageUrls.Medium
 	}
 	record.NovelJSON = novelJSON
-}
-
-func fillNovelBookmarkUpdates(updates map[string]any, novel BookmarkNovel, novelJSON string) {
-	updates["title"] = novel.Title
-	updates["caption"] = novel.Caption
-	updates["user_id"] = novel.User.ID
-	updates["user_name"] = novel.User.Name
-	updates["text_length"] = novel.TextLength
-	updates["x_restrict"] = novel.XRestrict
-	updates["total_view"] = novel.TotalView
-	updates["total_bookmarks"] = novel.TotalBookmarks
-	updates["is_original"] = novel.IsOriginal
-	updates["visible"] = novel.Visible
-	updates["is_muted"] = novel.IsMuted
-	updates["novel_ai_type"] = novel.NovelAIType
-	if novel.Series != nil {
-		updates["series_id"] = novel.Series.ID
-		updates["series_title"] = novel.Series.Title
-	} else {
-		updates["series_id"] = nil
-		updates["series_title"] = nil
-	}
-	coverURL := novel.ImageUrls.Large
-	if coverURL == "" {
-		coverURL = novel.ImageUrls.Medium
-	}
-	updates["cover_url"] = coverURL
-	updates["novel_json"] = novelJSON
 }
 
 func markMissingIllustBookmarksRemoved(ctx context.Context, pixivUserID string, restrict string, runID string) (int, error) {
