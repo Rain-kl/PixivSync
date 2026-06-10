@@ -8,7 +8,7 @@ const nextConfig: NextConfig = {
   },
   ...(isExport ? { output: 'export' } : {
     async rewrites() {
-      const backendUrl = process.env.WAVELET_BACKEND_URL || 'http://localhost:8000';
+      const backendUrl = process.env.WAVELET_BACKEND_URL || 'http://localhost:8061';
       return [
         // 上传文件静态资源
         {

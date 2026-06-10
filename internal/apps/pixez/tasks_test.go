@@ -79,15 +79,41 @@ func TestAutoMirrorTaskPayloadValidation(t *testing.T) {
 
 func TestImportLegacyTaskPayloadDefaults(t *testing.T) {
 	handler := &ImportLegacyServerTaskHandler{}
+
+	// Test boolean true
 	payload, err := handler.ValidatePayload([]byte(`{"dry_run":true}`))
 	if err != nil {
-		t.Fatalf("ValidatePayload() error = %v", err)
+		t.Fatalf("ValidatePayload(dry_run:true) error = %v", err)
 	}
 	var req pixezsvc.ImportLegacyRequest
 	if err := json.Unmarshal(payload, &req); err != nil {
 		t.Fatalf("decode import payload failed: %v", err)
 	}
 	if req.SQLitePath != "server/pixez-sync.db" || req.MirrorDir != "server/data/mirror" || !req.DryRun {
-		t.Fatalf("unexpected import defaults: %+v", req)
+		t.Fatalf("unexpected import defaults with true: %+v", req)
+	}
+
+	// Test string "true"
+	payload, err = handler.ValidatePayload([]byte(`{"dry_run":"true"}`))
+	if err != nil {
+		t.Fatalf("ValidatePayload(dry_run:\"true\") error = %v", err)
+	}
+	if err := json.Unmarshal(payload, &req); err != nil {
+		t.Fatalf("decode import payload failed: %v", err)
+	}
+	if !req.DryRun {
+		t.Fatalf("expected DryRun to be true when parsed from string \"true\"")
+	}
+
+	// Test string "false"
+	payload, err = handler.ValidatePayload([]byte(`{"dry_run":"false"}`))
+	if err != nil {
+		t.Fatalf("ValidatePayload(dry_run:\"false\") error = %v", err)
+	}
+	if err := json.Unmarshal(payload, &req); err != nil {
+		t.Fatalf("decode import payload failed: %v", err)
+	}
+	if req.DryRun {
+		t.Fatalf("expected DryRun to be false when parsed from string \"false\"")
 	}
 }

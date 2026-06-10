@@ -517,12 +517,21 @@ func FindMirroredImageUpload(ctx context.Context, pximgPath string) (model.Uploa
 	}
 
 	originalName := originalImageFilename(requestedName)
+	stripExt := func(filename string) string {
+		return strings.TrimSuffix(filename, path.Ext(filename))
+	}
+	originalBase := stripExt(originalName)
+	requestedBase := stripExt(requestedName)
+
 	var files []model.PixezMirrorImageFile
 	if err := json.Unmarshal([]byte(record.ImageFilesJSON), &files); err != nil {
 		return model.Upload{}, fmt.Errorf("parse image_files_json: %w", err)
 	}
 	for _, file := range files {
-		if file.FileName == requestedName || file.FileName == originalName || path.Base(file.PixivURL) == originalName {
+		fileBase := stripExt(file.FileName)
+		pixivBase := stripExt(path.Base(file.PixivURL))
+		if file.FileName == requestedName || file.FileName == originalName || path.Base(file.PixivURL) == originalName ||
+			fileBase == requestedBase || fileBase == originalBase || pixivBase == originalBase {
 			var upload model.Upload
 			if err := db.DB(ctx).
 				Where("id = ? AND status IN (?, ?)", file.UploadID, model.UploadStatusPending, model.UploadStatusUsed).

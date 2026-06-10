@@ -26,6 +26,7 @@ import (
 	"net/http"
 	"os"
 	"strconv"
+	"strings"
 
 	"github.com/Rain-kl/Wavelet/internal/db"
 	"github.com/Rain-kl/Wavelet/internal/model"
@@ -188,27 +189,49 @@ func GetMirroredIllustDetail(c *gin.Context) {
 // ServeMirroredImage streams a mirrored pximg file from Upload storage.
 func ServeMirroredImage(c *gin.Context) {
 	upload, err := pixezsvc.FindMirroredImageUpload(c.Request.Context(), c.Param("path"))
-	if err != nil {
+	if err == nil {
+		c.Header("Content-Type", upload.MimeType)
+		c.Header("Content-Length", strconv.FormatInt(upload.FileSize, 10))
+		if upload.StorageDriver == "local" || (upload.StorageDriver == "" && !storage.IsEnabled()) {
+			c.File(upload.FilePath)
+			return
+		}
+		obj, err := storage.GetObjectViaCache(c.Request.Context(), upload.FilePath)
+		if err != nil {
+			c.JSON(http.StatusNotFound, gin.H{"error": "mirror file not found"})
+			return
+		}
+		if obj.CachePath != "" {
+			c.File(obj.CachePath)
+			return
+		}
+		defer func() { _ = obj.Body.Close() }()
+		_, _ = io.Copy(c.Writer, obj.Body)
+		return
+	}
+
+	// Fallback to proxying from Pixiv on the fly
+	cleanPath := strings.TrimPrefix(c.Param("path"), "/")
+	if cleanPath == "" || strings.Contains(cleanPath, "..") {
 		c.JSON(http.StatusNotFound, gin.H{"error": "mirror file not found"})
 		return
 	}
-	c.Header("Content-Type", upload.MimeType)
-	c.Header("Content-Length", strconv.FormatInt(upload.FileSize, 10))
-	if upload.StorageDriver == "local" || (upload.StorageDriver == "" && !storage.IsEnabled()) {
-		c.File(upload.FilePath)
-		return
-	}
-	obj, err := storage.GetObjectViaCache(c.Request.Context(), upload.FilePath)
+
+	pixivURL := "https://i.pximg.net/" + cleanPath
+	data, mimeType, err := pixezsvc.DefaultClient.DownloadFile(c.Request.Context(), pixivURL)
 	if err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "mirror file not found"})
-		return
+		// Try s.pximg.net as fallback
+		pixivURL = "https://s.pximg.net/" + cleanPath
+		data, mimeType, err = pixezsvc.DefaultClient.DownloadFile(c.Request.Context(), pixivURL)
+		if err != nil {
+			c.JSON(http.StatusNotFound, gin.H{"error": "mirror file not found"})
+			return
+		}
 	}
-	if obj.CachePath != "" {
-		c.File(obj.CachePath)
-		return
-	}
-	defer func() { _ = obj.Body.Close() }()
-	_, _ = io.Copy(c.Writer, obj.Body)
+
+	c.Header("Content-Type", mimeType)
+	c.Header("Content-Length", strconv.Itoa(len(data)))
+	_, _ = c.Writer.Write(data)
 }
 
 // GetMirroredNovelDetail returns Pixiv-shape mirrored novel detail.
