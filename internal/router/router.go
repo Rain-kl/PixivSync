@@ -206,6 +206,18 @@ func Serve() {
 				pixezRouter.GET("/users/:pixiv_user_id/sync-data", pixez.GetUserData)
 				pixezRouter.POST("/users/:pixiv_user_id/sync-data", pixez.PostUserData)
 				pixezRouter.GET("/users/:pixiv_user_id/sync-data/hashes", pixez.GetUserDataHashes)
+				pixezRouter.GET("/users/:pixiv_user_id/bookmarks/illust/removed", pixez.ListRemovedBookmarkIllusts)
+				pixezRouter.POST("/illusts/:illust_id/mirror", pixez.MirrorIllust)
+				pixezRouter.GET("/illusts/:illust_id/mirror", pixez.CheckIllustMirror)
+				pixezRouter.POST("/illusts/mirror/batch", pixez.BatchCheckIllustMirror)
+				pixezRouter.POST("/novels/:novel_id/mirror", pixez.MirrorNovel)
+				pixezRouter.GET("/novels/:novel_id/mirror", pixez.CheckNovelMirror)
+				pixezRouter.POST("/novels/mirror/batch", pixez.BatchCheckNovelMirror)
+				pixezRouter.GET("/mirror/illusts", pixez.ListMirroredIllusts)
+				pixezRouter.GET("/mirror/novels", pixez.ListMirroredNovels)
+				pixezRouter.DELETE("/mirror/illusts/:illust_id", pixez.DeleteMirroredIllust)
+				pixezRouter.DELETE("/mirror/novels/:novel_id", pixez.DeleteMirroredNovel)
+				pixezRouter.POST("/mirror/batch-delete", pixez.BatchDeleteMirroredItems)
 			}
 
 			// Admin
@@ -271,6 +283,15 @@ func Serve() {
 				adminRouter.DELETE("/auth-sources/:id", admin_auth_source.DeleteAuthSource)
 			}
 		}
+	}
+
+	mirrorRouter := r.Group("/mirror")
+	mirrorRouter.Use(oauth.LoginRequired())
+	{
+		mirrorRouter.GET("/v1/illust/detail", pixez.GetMirroredIllustDetail)
+		mirrorRouter.GET("/pximg/*path", pixez.ServeMirroredImage)
+		mirrorRouter.GET("/v1/novel/detail", pixez.GetMirroredNovelDetail)
+		mirrorRouter.GET("/webview/v2/novel", pixez.GetMirroredNovelText)
 	}
 
 	// 注册前端静态路由（当启用 embed_frontend 编译标签时）

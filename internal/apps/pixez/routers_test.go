@@ -62,6 +62,13 @@ func setupPixezTestRouter() *gin.Engine {
 	group.GET("/users/:pixiv_user_id/sync-data", GetUserData)
 	group.POST("/users/:pixiv_user_id/sync-data", PostUserData)
 	group.GET("/users/:pixiv_user_id/sync-data/hashes", GetUserDataHashes)
+	group.GET("/users/:pixiv_user_id/bookmarks/illust/removed", ListRemovedBookmarkIllusts)
+	group.GET("/illusts/:illust_id/mirror", CheckIllustMirror)
+	group.POST("/illusts/mirror/batch", BatchCheckIllustMirror)
+
+	mirrorGroup := r.Group("/mirror")
+	mirrorGroup.Use(oauth.LoginRequired())
+	mirrorGroup.GET("/v1/illust/detail", GetMirroredIllustDetail)
 	return r
 }
 
@@ -249,5 +256,75 @@ func TestPixezSyncDataSelectiveReplaceAndHashes(t *testing.T) {
 	}
 	if hashes["ban_illusts"] != "empty" {
 		t.Fatalf("empty table hash = %q, want empty", hashes["ban_illusts"])
+	}
+}
+
+func TestPixezMirrorAPIReturnsEnvelope(t *testing.T) {
+	_, _, cleanup := testhelper.SetupTestEnvironment(t)
+	defer cleanup()
+
+	ctx := context.Background()
+	if err := db.DB(ctx).Create(&model.PixezMirrorIllust{
+		IllustID:        123,
+		TaskID:          "task-1",
+		Status:          model.PixezMirrorStatusSuccess,
+		ImageFilesJSON:  "[]",
+		RequestURLsJSON: "[]",
+		RetryURLsJSON:   "[]",
+		TotalCount:      1,
+		SuccessCount:    1,
+	}).Error; err != nil {
+		t.Fatalf("seed mirror record failed: %v", err)
+	}
+
+	router := setupPixezTestRouter()
+	auth := authHeader(t, "pixez-mirror-status")
+	w := performJSON(router, http.MethodGet, "/api/pixez/illusts/123/mirror", nil, auth)
+	if w.Code != http.StatusOK {
+		t.Fatalf("status = %d, want 200. Body: %s", w.Code, w.Body.String())
+	}
+	resp := decodeResponse(t, w)
+	if resp.ErrorMsg != "" {
+		t.Fatalf("error_msg = %q", resp.ErrorMsg)
+	}
+	var status map[string]any
+	if err := json.Unmarshal(resp.Data, &status); err != nil {
+		t.Fatalf("decode mirror status failed: %v", err)
+	}
+	if status["status"] != model.PixezMirrorStatusSuccess || status["mirrored"] != true {
+		t.Fatalf("unexpected mirror status: %+v", status)
+	}
+}
+
+func TestMirrorRouteReturnsPixivShapeWithoutEnvelope(t *testing.T) {
+	_, _, cleanup := testhelper.SetupTestEnvironment(t)
+	defer cleanup()
+
+	ctx := context.Background()
+	if err := db.DB(ctx).Create(&model.PixezMirrorIllust{
+		IllustID:        123,
+		Status:          model.PixezMirrorStatusSuccess,
+		DetailJSON:      `{"illust":{"id":123,"image_urls":{"large":"https://i.pximg.net/img-original/img/2026/01/01/00/00/00/123_p0.jpg"}}}`,
+		ImageFilesJSON:  "[]",
+		RequestURLsJSON: "[]",
+		RetryURLsJSON:   "[]",
+		TotalCount:      1,
+		SuccessCount:    1,
+	}).Error; err != nil {
+		t.Fatalf("seed mirror detail failed: %v", err)
+	}
+
+	router := setupPixezTestRouter()
+	auth := authHeader(t, "pixez-mirror-read")
+	w := performJSON(router, http.MethodGet, "/mirror/v1/illust/detail?illust_id=123", nil, auth)
+	if w.Code != http.StatusOK {
+		t.Fatalf("status = %d, want 200. Body: %s", w.Code, w.Body.String())
+	}
+	body := w.Body.String()
+	if bytes.Contains(w.Body.Bytes(), []byte(`"error_msg"`)) || !bytes.Contains(w.Body.Bytes(), []byte(`"illust"`)) {
+		t.Fatalf("mirror response should be raw Pixiv shape, got: %s", body)
+	}
+	if !bytes.Contains(w.Body.Bytes(), []byte(`/mirror/pximg/img-original/img/2026/01/01/00/00/00/123_p0.jpg`)) {
+		t.Fatalf("mirror response did not rewrite pximg URLs: %s", body)
 	}
 }

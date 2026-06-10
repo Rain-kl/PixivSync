@@ -136,6 +136,15 @@ func DeleteUser(c *gin.Context) {
 		if err := deleteUserSyncData(tx, userID, allSyncTables()); err != nil {
 			return err
 		}
+		if err := tx.Where("pixiv_user_id = ?", userID).Delete(&model.PixezBookmarkIllust{}).Error; err != nil {
+			return err
+		}
+		if err := tx.Where("pixiv_user_id = ?", userID).Delete(&model.PixezBookmarkNovel{}).Error; err != nil {
+			return err
+		}
+		if err := tx.Where("pixiv_user_id = ?", userID).Delete(&model.PixezBookmarkExportRun{}).Error; err != nil {
+			return err
+		}
 		return tx.Where("pixiv_user_id = ?", userID).Delete(&model.PixezPixivUser{}).Error
 	}); err != nil {
 		logger.ErrorF(ctx, "[PixEz] delete user failed pixiv_user_id=%s: %v", userID, err)

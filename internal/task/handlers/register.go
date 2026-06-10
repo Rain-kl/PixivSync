@@ -19,6 +19,7 @@ limitations under the License.
 package handlers
 
 import (
+	"github.com/Rain-kl/Wavelet/internal/apps/pixez"
 	"github.com/Rain-kl/Wavelet/internal/apps/upload"
 	"github.com/Rain-kl/Wavelet/internal/apps/user"
 	"github.com/Rain-kl/Wavelet/internal/task"
@@ -28,4 +29,10 @@ import (
 func Register() {
 	task.RegisterHandler(task.CleanupUnusedUploadsTask, &upload.CleanupUnusedUploadsHandler{})
 	task.RegisterHandler(task.SendEmailTask, &user.SendEmailHandler{})
+	task.RegisterHandler(task.PixezMirrorIllustTask, &pixez.MirrorIllustTaskHandler{})
+	task.RegisterHandler(task.PixezMirrorNovelTask, &pixez.MirrorNovelTaskHandler{})
+	task.RegisterHandler(task.PixezExportIllustTask, &pixez.ExportIllustBookmarksTaskHandler{})
+	task.RegisterHandler(task.PixezExportNovelTask, &pixez.ExportNovelBookmarksTaskHandler{})
+	task.RegisterHandler(task.PixezAutoMirrorTask, &pixez.AutoEnqueueBookmarkMirrorsTaskHandler{})
+	task.RegisterHandler(task.PixezImportLegacyTask, &pixez.ImportLegacyServerTaskHandler{})
 }

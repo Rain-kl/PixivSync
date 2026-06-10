@@ -59,6 +59,11 @@ func SetupTestEnvironment(t *testing.T) (*gorm.DB, *miniredis.Miniredis, func())
 		&model.PixezIllustHistory{},
 		&model.PixezNovelHistory{},
 		&model.PixezTagHistory{},
+		&model.PixezMirrorIllust{},
+		&model.PixezMirrorNovel{},
+		&model.PixezBookmarkExportRun{},
+		&model.PixezBookmarkIllust{},
+		&model.PixezBookmarkNovel{},
 	)
 	if err != nil {
 		t.Fatalf("failed to auto migrate tables: %v", err)
