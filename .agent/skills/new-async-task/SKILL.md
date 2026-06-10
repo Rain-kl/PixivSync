@@ -56,12 +56,9 @@ Admin dispatch -> ValidateAndNormalizePayload -> DispatchTask
    - 在 `internal/task/worker/worker.go` 的 Asynq mux 中添加 `mux.HandleFunc(task.YourAsynqTask, task.ProcessTask)`。
    - 所有业务任务都应交给 `task.ProcessTask`，由 executor 根据 task type 分发到 handler。
 
-5. 如需 Cron 调度，补齐配置链路。
-   - 在 `internal/task/scheduler/scheduler.go` 注册 cron。
-   - 在 `internal/config/model.go` 添加 scheduler config 字段。
-   - 在 `config.example.yaml` 添加对应配置项。
-   - runtime 代码从 `config.Config` 读取配置，不直接读环境变量。
-   - Scheduler 直接入队的任务可能没有 Admin 创建的 `TaskExecution` 记录；需要可见执行记录时，优先通过 Admin dispatch 触发。
+5. 如需 Cron 调度，系统默认定时任务必须通过 SQL 迁移（goose）初始化。
+   - 确保任务在 `DispatchableTasks` 中已正确配置 `TaskMeta`。
+   - 在 `internal/db/migrator/goose/postgres` 和 `sqlite` 下编写 migration 脚本，使用 `INSERT INTO schedules` 语句初始化任务，指定 `task_type` 和 `cron` 等字段。必须妥善处理冲突（如 `ON CONFLICT DO NOTHING`）以支持幂等。
 
 6. 如改动 Admin API。
    - handler 放在 `internal/apps/admin/<module>/` 或现有 Admin task 模块内。

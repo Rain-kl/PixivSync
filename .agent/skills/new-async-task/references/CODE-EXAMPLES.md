@@ -199,34 +199,21 @@ func StartWorker() error {
 
 ## Cron 调度和配置
 
-如果任务需要定时运行，补齐 scheduler、config struct 和 `config.example.yaml`。
+系统默认的定时任务必须通过 Goose SQL 迁移初始化插入到 `schedules` 表。
 
-```go
-const (
-    cleanupDedupWindow = 23 * time.Hour
-    cleanupMaxRetry    = 3
-)
+在 `internal/db/migrator/goose/postgres` 下的示例：
 
-if _, err = scheduler.Register(
-    config.Config.Scheduler.CleanupUnusedUploadsTaskCron,
-    asynq.NewTask(task.CleanupUnusedUploadsTask, nil),
-    asynq.Unique(cleanupDedupWindow),
-    asynq.MaxRetry(cleanupMaxRetry),
-); err != nil {
-    return
-}
+```sql
+-- +goose Up
+INSERT INTO schedules (id, name, task_type, cron, payload, is_active, created_at, updated_at)
+VALUES (1, '清理未使用上传', 'cleanup_unused_uploads', '0 */2 * * *', '{}', TRUE, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+ON CONFLICT (id) DO NOTHING;
+
+-- +goose Down
+-- 根据业务需求决定是否需要在此删除
 ```
 
-```go
-type schedulerConfig struct {
-    CleanupUnusedUploadsTaskCron string `mapstructure:"cleanup_unused_uploads_task_cron"`
-}
-```
-
-```yaml
-scheduler:
-  cleanup_unused_uploads_task_cron: "0 */2 * * *"
-```
+对于 `sqlite` 也可以使用类似的 `INSERT INTO ... ON CONFLICT(id) DO NOTHING` 语法。数据库更新后，后端会自动热重载调度器。
 
 ## Handler 测试
 
