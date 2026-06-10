@@ -1,7 +1,6 @@
 "use client"
 
 import {useCallback, useEffect, useState} from "react"
-import Link from "next/link"
 import {toast} from "sonner"
 import {format} from "date-fns"
 import {Activity, ChevronLeft, ChevronRight, RefreshCw, RotateCcw} from "lucide-react"
@@ -29,6 +28,7 @@ const TRIGGER_LABELS: Record<string, string> = {
   system: "系统",
   manual: "手动",
   retry: "重试",
+  schedule: "定时",
 }
 
 function formatDateTime(value?: string | null) {
@@ -148,21 +148,10 @@ export function TaskExecutionsManager() {
   const totalPages = Math.max(1, Math.ceil(executionsTotal / 10))
 
   return (
-    <div className="py-6 space-y-6">
+    <div className="space-y-6">
+      <br/>
       <div className="flex flex-col gap-3 border-b border-border pb-3 sm:flex-row sm:items-center sm:justify-between">
-        <div className="flex items-center gap-2">
-          <Activity className="size-5 text-muted-foreground" />
-          <div>
-            <div className="text-2xl font-semibold tracking-tight">任务日志</div>
-            <div className="text-xs text-muted-foreground">查看异步任务执行状况，点击任务记录查看详情</div>
-          </div>
-        </div>
         <div className="flex flex-wrap items-center gap-2">
-          <Button variant="outline" size="sm" asChild>
-            <Link href="/admin/tasks">
-              返回
-            </Link>
-          </Button>
           <Select value={executionStatus} onValueChange={(value) => setExecutionStatus(value as TaskExecutionStatus | "all")}>
             <SelectTrigger size="sm" className="w-[120px]">
               <SelectValue placeholder="状态" />

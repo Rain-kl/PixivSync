@@ -78,6 +78,9 @@ func AppendLog(ctx context.Context, format string, args ...interface{}) {
 	}
 
 	logLine := fmt.Sprintf(format, args...)
+	// 无论如何，都打印普通应用日志，方便在控制台和文件日志中查看
+	logger.InfoF(ctx, "[TaskID: %s] %s", taskID, logLine)
+
 	if err := model.AppendTaskExecutionLog(ctx, taskID, logLine); err != nil {
 		logger.ErrorF(ctx, "[TaskExecutor] 追加任务日志失败 taskID=%s: %v", taskID, err)
 	}
@@ -218,25 +221,15 @@ func ProcessTask(ctx context.Context, t *asynq.Task) error {
 		return err
 	}
 
-	// 从数据库加载执行记录
-	execution, err := model.GetTaskExecutionByTaskID(ctx, taskID)
-	if err != nil {
-		logger.ErrorF(ctx, "[TaskExecutor] 查询执行记录失败 taskID=%s: %v", taskID, err)
-		// 执行记录不存在，仍然执行任务但不记录状态
-		_, execErr := handler.Execute(ctx, t.Payload())
-		if execErr != nil {
-			span.SetStatus(codes.Error, execErr.Error())
-			return execErr
-		}
-		return nil
-	}
-
-	// 更新状态为 running
+	// 加载或动态创建执行记录
 	now := time.Now()
-	execution.Status = model.TaskExecutionStatusRunning
-	execution.StartedAt = &now
-	if err := model.UpdateTaskExecution(ctx, execution); err != nil {
-		logger.ErrorF(ctx, "[TaskExecutor] 更新执行状态失败 taskID=%s: %v", taskID, err)
+	execution, err := getOrCreateTaskExecution(ctx, taskID, t, now)
+	if err == nil && execution != nil && execution.TriggeredBy != "schedule" {
+		execution.Status = model.TaskExecutionStatusRunning
+		execution.StartedAt = &now
+		if updateErr := model.UpdateTaskExecution(ctx, execution); updateErr != nil {
+			logger.ErrorF(ctx, "[TaskExecutor] 更新执行状态失败 taskID=%s: %v", taskID, updateErr)
+		}
 	}
 
 	// 开始计时
@@ -245,26 +238,69 @@ func ProcessTask(ctx context.Context, t *asynq.Task) error {
 	// 执行业务逻辑
 	result, execErr := handler.Execute(ctx, t.Payload())
 
-	// 计算耗时
+	// 计算耗时并归档记录
 	duration := time.Since(start)
 	finishTime := time.Now()
+
+	completeTaskExecution(ctx, execution, t, duration, finishTime, result, execErr, span)
+
+	if execution == nil && execErr != nil {
+		span.SetStatus(codes.Error, execErr.Error())
+		return execErr
+	}
+
+	return execErr
+}
+
+// getOrCreateTaskExecution 获取已有的任务执行记录，如果不存在则针对已知任务类型动态创建记录
+func getOrCreateTaskExecution(ctx context.Context, taskID string, t *asynq.Task, now time.Time) (*model.TaskExecution, error) {
+	execution, err := model.GetTaskExecutionByTaskID(ctx, taskID)
+	if err == nil {
+		return execution, nil
+	}
+
+	meta := GetTaskMetaByAsynqTask(t.Type())
+	if meta == nil {
+		return nil, err
+	}
+
+	execution = &model.TaskExecution{
+		TaskID:      taskID,
+		TaskType:    meta.AsynqTask,
+		TaskName:    meta.Name,
+		Status:      model.TaskExecutionStatusRunning,
+		Retryable:   meta.Retryable,
+		MaxRetry:    meta.MaxRetry,
+		RetryCount:  0,
+		Payload:     string(t.Payload()),
+		TriggeredBy: "schedule",
+		StartedAt:   &now,
+	}
+
+	if createErr := model.CreateTaskExecution(ctx, execution); createErr != nil {
+		logger.ErrorF(ctx, "[TaskExecutor] 动态创建执行记录失败 taskID=%s: %v", taskID, createErr)
+		return nil, createErr
+	}
+
+	return execution, nil
+}
+
+// completeTaskExecution 完成并更新任务执行记录的状态和执行结果
+func completeTaskExecution(ctx context.Context, execution *model.TaskExecution, t *asynq.Task, duration time.Duration, finishTime time.Time, result *TaskResult, execErr error, span trace.Span) {
+	if execution == nil {
+		return
+	}
+
 	execution.Duration = duration.Milliseconds()
 	execution.FinishedAt = &finishTime
 
 	if execErr != nil {
-		// 执行失败
 		execution.Status = model.TaskExecutionStatusFailed
 		execution.ErrorMessage = execErr.Error()
-
-		logger.ErrorF(ctx,
-			"[TaskExecutor] 任务处理失败 Type: %s TaskID: %s Duration: %d ms Error: %v",
-			t.Type(), taskID, duration.Milliseconds(), execErr,
-		)
-
+		logger.ErrorF(ctx, "[TaskExecutor] 任务处理失败 Type: %s TaskID: %s Duration: %d ms Error: %v", t.Type(), execution.TaskID, duration.Milliseconds(), execErr)
 		span.SetStatus(codes.Error, execErr.Error())
 		span.RecordError(execErr)
 	} else {
-		// 执行成功
 		execution.Status = model.TaskExecutionStatusSucceeded
 		if result != nil {
 			execution.Result = result.Message
@@ -272,19 +308,12 @@ func ProcessTask(ctx context.Context, t *asynq.Task) error {
 				execution.Result = fmt.Sprintf("%s\n%s", result.Message, result.Detail)
 			}
 		}
-
-		logger.InfoF(ctx,
-			"[TaskExecutor] 任务处理完成 Type: %s TaskID: %s Duration: %d ms",
-			t.Type(), taskID, duration.Milliseconds(),
-		)
+		logger.InfoF(ctx, "[TaskExecutor] 任务处理完成 Type: %s TaskID: %s Duration: %d ms", t.Type(), execution.TaskID, duration.Milliseconds())
 	}
 
-	// 更新执行记录
 	if err := model.UpdateTaskExecution(ctx, execution); err != nil {
-		logger.ErrorF(ctx, "[TaskExecutor] 更新执行记录失败 taskID=%s: %v", taskID, err)
+		logger.ErrorF(ctx, "[TaskExecutor] 更新执行记录失败 taskID=%s: %v", execution.TaskID, err)
 	}
-
-	return execErr
 }
 
 // generateTaskID 生成任务 ID

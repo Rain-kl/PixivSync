@@ -188,6 +188,42 @@ export interface ListTaskExecutionsResponse {
   page_size: number;
 }
 
+/**
+ * 定时任务配置信息
+ */
+export interface Schedule {
+  id: string;
+  name: string;
+  task_type: string;
+  cron: string;
+  payload: string;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+/**
+ * 创建定时任务请求参数
+ */
+export interface CreateScheduleRequest {
+  name: string;
+  task_type: string;
+  cron: string;
+  payload: string;
+  is_active: boolean;
+}
+
+/**
+ * 修改定时任务请求参数
+ */
+export interface UpdateScheduleRequest {
+  name: string;
+  task_type: string;
+  cron: string;
+  payload: string;
+  is_active: boolean;
+}
+
 // ==================== 用户管理 ====================
 
 /**

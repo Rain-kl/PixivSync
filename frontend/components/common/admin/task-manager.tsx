@@ -1,7 +1,6 @@
 "use client"
 
 import {useCallback, useEffect, useState} from "react"
-import Link from "next/link"
 import {toast} from "sonner"
 import {Button} from "@/components/ui/button"
 import {Input} from "@/components/ui/input"
@@ -9,7 +8,7 @@ import {Label} from "@/components/ui/label"
 import {Textarea} from "@/components/ui/textarea"
 import {Spinner} from "@/components/ui/spinner"
 import {Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle} from "@/components/ui/dialog"
-import {Calendar as CalendarIcon, Clock, FileText, Info, Layers, Play} from "lucide-react"
+import {Calendar as CalendarIcon, Clock, Info, Layers, Play} from "lucide-react"
 
 import {AdminService, DispatchTaskRequest, TaskMeta} from "@/lib/services"
 import {ErrorInline} from "@/components/layout/error"
@@ -241,18 +240,8 @@ export function TaskManager() {
   }
 
   return (
-    <div className="py-6 space-y-6">
-      <div className="flex items-center justify-between border-b border-border pb-2">
-        <div className="flex flex-col gap-1">
-          <div className="text-2xl font-semibold tracking-tight">任务管理</div>
-        </div>
-        <Button variant="outline" size="sm" asChild>
-          <Link href="/admin/tasks/executions">
-            <FileText className="size-4" />
-            任务日志
-          </Link>
-        </Button>
-      </div>
+    <div className="space-y-6">
+      <br/>
 
       <div className="space-y-6">
         {error ? (

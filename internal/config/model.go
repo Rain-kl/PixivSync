@@ -120,7 +120,6 @@ type logConfig struct {
 
 // schedulerConfig 定时任务配置
 type schedulerConfig struct {
-	CleanupUnusedUploadsTaskCron string `mapstructure:"cleanup_unused_uploads_task_cron"`
 }
 
 // workerConfig 工作配置

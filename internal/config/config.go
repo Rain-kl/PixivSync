@@ -246,14 +246,6 @@ func applyEnvOverrides(c *configModel) {
 			{Name: "default", Priority: defaultQueuePriority},
 		}
 	}
-
-	// ─── Scheduler ───
-	c.Scheduler.CleanupUnusedUploadsTaskCron = envStr(
-		"SCHEDULER_CLEANUP_CRON", c.Scheduler.CleanupUnusedUploadsTaskCron,
-	)
-	if c.Scheduler.CleanupUnusedUploadsTaskCron == "" {
-		c.Scheduler.CleanupUnusedUploadsTaskCron = "@daily"
-	}
 }
 
 // printConfig 打印配置内容

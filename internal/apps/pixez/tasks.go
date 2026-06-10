@@ -210,6 +210,9 @@ func (h *AutoEnqueueBookmarkMirrorsTaskHandler) Execute(ctx context.Context, pay
 	if req.Limit <= 0 {
 		req.Limit = defaultAutoMirrorLimit
 	}
+
+	task.AppendLog(ctx, "开始自动入队收藏镜像任务，参数: target_type=%s, limit=%d", emptyAsAll(req.TargetType), req.Limit)
+
 	enqueued := 0
 	if req.TargetType == "" || req.TargetType == model.PixezMirrorTargetIllust {
 		n, err := enqueueIllustBookmarkMirrors(ctx, req.Limit-enqueued)
@@ -342,6 +345,7 @@ func enqueueBookmarkMirrors(
 	if err != nil {
 		return 0, err
 	}
+	task.AppendLog(ctx, "表 %s 扫描到 %d 个待镜像候选", tableName, len(candidates))
 	return enqueueBookmarkMirrorCandidates(ctx, candidates, bookmarkModel, taskType, buildPayload, ensure)
 }
 

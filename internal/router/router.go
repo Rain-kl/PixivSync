@@ -244,6 +244,12 @@ func registerRoutes(r *gin.Engine) {
 				adminRouter.GET("/tasks/executions/:id", admin_task.GetTaskExecution)
 				adminRouter.POST("/tasks/executions/:id/retry", admin_task.RetryTask)
 
+				// Task schedules
+				adminRouter.GET("/tasks/schedules", admin_task.ListSchedules)
+				adminRouter.POST("/tasks/schedules", admin_task.CreateSchedule)
+				adminRouter.PUT("/tasks/schedules/:id", admin_task.UpdateSchedule)
+				adminRouter.DELETE("/tasks/schedules/:id", admin_task.DeleteSchedule)
+
 				// Users
 				adminRouter.GET("/users", admin_user.ListUsers)
 				adminRouter.POST("/users", admin_user.CreateUser)

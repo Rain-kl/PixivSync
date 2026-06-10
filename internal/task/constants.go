@@ -204,3 +204,13 @@ func GetTaskMeta(taskType string) *TaskMeta {
 	}
 	return nil
 }
+
+// GetTaskMetaByAsynqTask 根据 Asynq 任务名称获取元数据
+func GetTaskMetaByAsynqTask(asynqTask string) *TaskMeta {
+	for _, t := range DispatchableTasks {
+		if t.AsynqTask == asynqTask {
+			return &t
+		}
+	}
+	return nil
+}

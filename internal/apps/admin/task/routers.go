@@ -12,11 +12,14 @@ import (
 	"time"
 
 	"github.com/Rain-kl/Wavelet/internal/apps/admin"
+	"github.com/Rain-kl/Wavelet/internal/logger"
 	"github.com/Rain-kl/Wavelet/internal/model"
 	"github.com/Rain-kl/Wavelet/internal/task"
 	taskhandlers "github.com/Rain-kl/Wavelet/internal/task/handlers"
+	"github.com/Rain-kl/Wavelet/internal/task/scheduler"
 	"github.com/Rain-kl/Wavelet/internal/util"
 	"github.com/gin-gonic/gin"
+	"github.com/robfig/cron/v3"
 )
 
 func init() {
@@ -193,4 +196,219 @@ func RetryTask(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, util.OK(newTaskID))
+}
+
+// ListSchedules 获取定时任务列表
+// @Summary 获取定时任务列表
+// @Description 返回系统所有的定时任务配置列表，包括名称、关联的异步任务类型、Cron 表达式和启用状态，需要管理员权限
+// @Tags admin
+// @Produce json
+// @Security SessionCookie
+// @Success 200 {object} util.ResponseAny{data=[]model.Schedule} "定时任务列表"
+// @Failure 401 {object} util.ResponseAny "未登录"
+// @Failure 403 {object} util.ResponseAny "无管理员权限"
+// @Router /api/v1/admin/tasks/schedules [get]
+func ListSchedules(c *gin.Context) {
+	schedules, err := model.ListSchedules(c.Request.Context())
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, util.Err(err.Error()))
+		return
+	}
+	c.JSON(http.StatusOK, util.OK(schedules))
+}
+
+// CreateScheduleRequest 创建定时任务请求
+type CreateScheduleRequest struct {
+	Name     string `json:"name" binding:"required"`
+	TaskType string `json:"task_type" binding:"required"`
+	Cron     string `json:"cron" binding:"required"`
+	Payload  string `json:"payload"`
+	IsActive *bool  `json:"is_active" binding:"required"`
+}
+
+// CreateSchedule 创建定时任务
+// @Summary 创建定时任务
+// @Description 新增一个动态定时任务配置，关联已有的异步任务，配置 Cron 表达式和执行参数，并触发调度器热加载，需要管理员权限
+// @Tags admin
+// @Accept json
+// @Produce json
+// @Security SessionCookie
+// @Param request body CreateScheduleRequest true "创建定时任务请求参数"
+// @Success 200 {object} util.ResponseAny{data=model.Schedule} "创建成功的定时任务信息"
+// @Failure 400 {object} util.ResponseAny "Cron 表达式无效、异步任务类型不存在或参数错误"
+// @Failure 401 {object} util.ResponseAny "未登录"
+// @Failure 403 {object} util.ResponseAny "无管理员权限"
+// @Failure 500 {object} util.ResponseAny "保存定时任务失败"
+// @Router /api/v1/admin/tasks/schedules [post]
+func CreateSchedule(c *gin.Context) {
+	var req CreateScheduleRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, util.Err(err.Error()))
+		return
+	}
+
+	// 校验 Cron 表达式
+	if _, err := cron.ParseStandard(req.Cron); err != nil {
+		c.JSON(http.StatusBadRequest, util.Err(InvalidCronExpression))
+		return
+	}
+
+	// 校验关联的异步任务类型
+	meta := task.GetTaskMeta(req.TaskType)
+	if meta == nil {
+		c.JSON(http.StatusBadRequest, util.Err(InvalidTaskType))
+		return
+	}
+
+	// 校验并规范化 Payload
+	var payloadBytes []byte
+	if strings.TrimSpace(req.Payload) != "" {
+		payloadBytes = []byte(req.Payload)
+	}
+	validated, err := task.ValidateAndNormalizePayload(meta.AsynqTask, payloadBytes)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, util.Err(err.Error()))
+		return
+	}
+
+	schedule := &model.Schedule{
+		Name:     req.Name,
+		TaskType: req.TaskType,
+		Cron:     req.Cron,
+		Payload:  string(validated),
+		IsActive: *req.IsActive,
+	}
+
+	if err := model.CreateSchedule(c.Request.Context(), schedule); err != nil {
+		c.JSON(http.StatusInternalServerError, util.Err(fmt.Sprintf("%s: %v", ScheduleSaveFailed, err)))
+		return
+	}
+
+	// 触发调度服务重载
+	if err := scheduler.ReloadScheduler(); err != nil {
+		logger.ErrorF(c.Request.Context(), "[TaskAdmin] 重载调度器失败: %v", err)
+	}
+
+	c.JSON(http.StatusOK, util.OK(schedule))
+}
+
+// UpdateScheduleRequest 修改定时任务请求
+type UpdateScheduleRequest struct {
+	Name     string `json:"name" binding:"required"`
+	TaskType string `json:"task_type" binding:"required"`
+	Cron     string `json:"cron" binding:"required"`
+	Payload  string `json:"payload"`
+	IsActive *bool  `json:"is_active" binding:"required"`
+}
+
+// UpdateSchedule 修改定时任务
+// @Summary 修改定时任务
+// @Description 修改一个定时任务的配置（名称、Cron 表达式、异步任务参数和是否启用等），并触发调度器热加载，需要管理员权限
+// @Tags admin
+// @Accept json
+// @Produce json
+// @Security SessionCookie
+// @Param id path int true "定时任务 ID"
+// @Param request body UpdateScheduleRequest true "修改定时任务请求参数"
+// @Success 200 {object} util.ResponseAny{data=model.Schedule} "修改后的定时任务信息"
+// @Failure 400 {object} util.ResponseAny "Cron 表达式无效、参数错误"
+// @Failure 401 {object} util.ResponseAny "未登录"
+// @Failure 403 {object} util.ResponseAny "无管理员权限"
+// @Failure 404 {object} util.ResponseAny "定时任务不存在"
+// @Failure 500 {object} util.ResponseAny "修改定时任务失败"
+// @Router /api/v1/admin/tasks/schedules/{id} [put]
+func UpdateSchedule(c *gin.Context) {
+	id, err := strconv.ParseUint(c.Param("id"), 10, 64)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, util.Err("无效的定时任务ID"))
+		return
+	}
+
+	var req UpdateScheduleRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, util.Err(err.Error()))
+		return
+	}
+
+	// 检查定时任务是否存在
+	schedule, err := model.GetScheduleByID(c.Request.Context(), id)
+	if err != nil {
+		c.JSON(http.StatusNotFound, util.Err(ScheduleNotFound))
+		return
+	}
+
+	// 校验 Cron 表达式
+	if _, err := cron.ParseStandard(req.Cron); err != nil {
+		c.JSON(http.StatusBadRequest, util.Err(InvalidCronExpression))
+		return
+	}
+
+	// 校验关联的异步任务类型
+	meta := task.GetTaskMeta(req.TaskType)
+	if meta == nil {
+		c.JSON(http.StatusBadRequest, util.Err(InvalidTaskType))
+		return
+	}
+
+	// 校验并规范化 Payload
+	var payloadBytes []byte
+	if strings.TrimSpace(req.Payload) != "" {
+		payloadBytes = []byte(req.Payload)
+	}
+	validated, err := task.ValidateAndNormalizePayload(meta.AsynqTask, payloadBytes)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, util.Err(err.Error()))
+		return
+	}
+
+	schedule.Name = req.Name
+	schedule.TaskType = req.TaskType
+	schedule.Cron = req.Cron
+	schedule.Payload = string(validated)
+	schedule.IsActive = *req.IsActive
+
+	if err := model.UpdateSchedule(c.Request.Context(), schedule); err != nil {
+		c.JSON(http.StatusInternalServerError, util.Err(fmt.Sprintf("%s: %v", ScheduleSaveFailed, err)))
+		return
+	}
+
+	// 触发调度服务重载
+	if err := scheduler.ReloadScheduler(); err != nil {
+		logger.ErrorF(c.Request.Context(), "[TaskAdmin] 重载调度器失败: %v", err)
+	}
+
+	c.JSON(http.StatusOK, util.OK(schedule))
+}
+
+// DeleteSchedule 删除定时任务
+// @Summary 删除定时任务
+// @Description 删除指定的定时任务配置，并触发调度器热加载，需要管理员权限
+// @Tags admin
+// @Produce json
+// @Security SessionCookie
+// @Param id path int true "定时任务 ID"
+// @Success 200 {object} util.ResponseAny{data=string} "删除结果"
+// @Failure 400 {object} util.ResponseAny "参数错误"
+// @Failure 401 {object} util.ResponseAny "未登录"
+// @Failure 403 {object} util.ResponseAny "无管理员权限"
+// @Failure 500 {object} util.ResponseAny "删除定时任务失败"
+// @Router /api/v1/admin/tasks/schedules/{id} [delete]
+func DeleteSchedule(c *gin.Context) {
+	id, err := strconv.ParseUint(c.Param("id"), 10, 64)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, util.Err("无效的定时任务ID"))
+		return
+	}
+
+	if err := model.DeleteSchedule(c.Request.Context(), id); err != nil {
+		c.JSON(http.StatusInternalServerError, util.Err(fmt.Sprintf("%s: %v", ScheduleDeleteFailed, err)))
+		return
+	}
+
+	// 触发调度服务重载
+	if err := scheduler.ReloadScheduler(); err != nil {
+		logger.ErrorF(c.Request.Context(), "[TaskAdmin] 重载调度器失败: %v", err)
+	}
+
+	c.JSON(http.StatusOK, util.OKNil())
 }

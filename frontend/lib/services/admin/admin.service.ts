@@ -3,6 +3,7 @@ import type {
   AdminUser,
   AuthSource,
   AuthSourceRequest,
+  CreateScheduleRequest,
   CreateSystemConfigRequest,
   CreateTemplateRequest,
   CreateUserRequest,
@@ -12,6 +13,7 @@ import type {
   ListTaskExecutionsResponse,
   ListUsersRequest,
   ListUsersResponse,
+  Schedule,
   SystemConfig,
   SystemStatus,
   TaskExecution,
@@ -19,6 +21,7 @@ import type {
   TaskTypeResponse,
   Template,
   ToggleAuthSourceRequest,
+  UpdateScheduleRequest,
   UpdateSystemConfigRequest,
   UpdateTemplateRequest,
   UpdateUserStatusRequest,
@@ -233,6 +236,36 @@ export class AdminService extends BaseService {
    */
   static async retryTaskExecution(id: string): Promise<string> {
     return this.post<string>(`/tasks/executions/${ id }/retry`);
+  }
+
+  // ==================== 定时任务管理 ====================
+
+  /**
+   * 获取定时任务列表
+   */
+  static async listSchedules(): Promise<Schedule[]> {
+    return this.get<Schedule[]>('/tasks/schedules');
+  }
+
+  /**
+   * 创建定时任务
+   */
+  static async createSchedule(request: CreateScheduleRequest): Promise<Schedule> {
+    return this.post<Schedule>('/tasks/schedules', request);
+  }
+
+  /**
+   * 更新定时任务
+   */
+  static async updateSchedule(id: string, request: UpdateScheduleRequest): Promise<Schedule> {
+    return this.put<Schedule>(`/tasks/schedules/${ id }`, request);
+  }
+
+  /**
+   * 删除定时任务
+   */
+  static async deleteSchedule(id: string): Promise<void> {
+    return this.delete<void>(`/tasks/schedules/${ id }`);
   }
 
   // ==================== 用户管理 ====================
