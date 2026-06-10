@@ -191,6 +191,12 @@ func ProcessMirrorIllust(ctx context.Context, client *Client, taskID string, ill
 	if client == nil {
 		client = DefaultClient
 	}
+
+	// 限制并发执行插画下载任务数
+	if err := waitMirrorConcurrencyLimit(ctx, &model.PixezMirrorIllust{}, "illust_id", illustID, model.ConfigKeyPixezMirrorIllustConcurrency); err != nil {
+		return err
+	}
+
 	if err := updateMirrorIllust(ctx, illustID, map[string]any{
 		"task_id":       taskID,
 		"status":        model.PixezMirrorStatusProcessing,
@@ -217,7 +223,22 @@ func ProcessMirrorIllust(ctx context.Context, client *Client, taskID string, ill
 	requestURLsJSON := mustJSON(imageURLs)
 	files := make([]model.PixezMirrorImageFile, 0, len(imageURLs))
 	failedURLs := make([]string, 0)
+
+	// 获取多图下载间隔
+	downloadInterval, err := model.GetIntByKey(ctx, model.ConfigKeyPixezMirrorDownloadInterval)
+	if err != nil {
+		downloadInterval = 1 // 默认 1 秒
+	}
+
 	for idx, imageURL := range imageURLs {
+		if idx > 0 && downloadInterval > 0 {
+			select {
+			case <-ctx.Done():
+				return ctx.Err()
+			case <-time.After(time.Duration(downloadInterval) * time.Second):
+			}
+		}
+
 		data, mimeType, err := client.DownloadFile(ctx, imageURL)
 		if err != nil {
 			failedURLs = append(failedURLs, imageURL)
@@ -267,6 +288,12 @@ func ProcessMirrorNovel(ctx context.Context, client *Client, taskID string, nove
 	if client == nil {
 		client = DefaultClient
 	}
+
+	// 限制并发执行小说下载任务数
+	if err := waitMirrorConcurrencyLimit(ctx, &model.PixezMirrorNovel{}, "novel_id", novelID, model.ConfigKeyPixezMirrorNovelConcurrency); err != nil {
+		return err
+	}
+
 	if err := updateMirrorNovel(ctx, novelID, map[string]any{
 		"task_id":       taskID,
 		"status":        model.PixezMirrorStatusProcessing,
@@ -576,4 +603,31 @@ func mustJSON(v any) string {
 		return "[]"
 	}
 	return string(data)
+}
+
+func waitMirrorConcurrencyLimit(ctx context.Context, modelObj any, idColumn string, targetID int64, configKey string) error {
+	maxConcurrency, err := model.GetIntByKey(ctx, configKey)
+	if err != nil {
+		maxConcurrency = 5 // 默认限制为 5
+	}
+
+	const checkInterval = 2 * time.Second
+	for {
+		var activeCount int64
+		// 防御性设计：只统计 15 分钟内更新过的活跃任务，防止因进程异常崩溃导致 processing 状态长期泄漏、引发死锁
+		err := db.DB(ctx).Model(modelObj).
+			Where("status = ? AND "+idColumn+" <> ? AND updated_at > ?", model.PixezMirrorStatusProcessing, targetID, time.Now().Add(-15*time.Minute)).
+			Count(&activeCount).Error
+		if err != nil {
+			return fmt.Errorf("check active mirror count for %s: %w", idColumn, err)
+		}
+		if int(activeCount) < maxConcurrency {
+			return nil
+		}
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		case <-time.After(checkInterval):
+		}
+	}
 }

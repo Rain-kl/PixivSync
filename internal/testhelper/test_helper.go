@@ -226,6 +226,24 @@ func seedDefaultConfigs(t *testing.T, tx *gorm.DB) {
 			Type:        "system",
 			Description: "是否允许搜索引擎检索",
 		},
+		{
+			Key:         model.ConfigKeyPixezMirrorDownloadInterval,
+			Value:       "1",
+			Type:        "business",
+			Description: "Pixiv插画多图下载间隔（秒）",
+		},
+		{
+			Key:         model.ConfigKeyPixezMirrorIllustConcurrency,
+			Value:       "5",
+			Type:        "business",
+			Description: "Pixiv插画并发镜像限制（同时镜像的最大插画数）",
+		},
+		{
+			Key:         model.ConfigKeyPixezMirrorNovelConcurrency,
+			Value:       "5",
+			Type:        "business",
+			Description: "Pixiv小说并发镜像限制（同时镜像的最大小说数）",
+		},
 	}
 
 	if err := tx.Create(&defaultConfigs).Error; err != nil {
@@ -246,6 +264,9 @@ func seedDefaultConfigs(t *testing.T, tx *gorm.DB) {
 		model.ConfigKeyEmailRegisterVerificationEnabled: {},
 		model.ConfigKeyMenuDisplayConfig:                {},
 		model.ConfigKeySearchEngineIndexingEnabled:      {},
+		model.ConfigKeyPixezMirrorDownloadInterval:      {},
+		model.ConfigKeyPixezMirrorIllustConcurrency:     {},
+		model.ConfigKeyPixezMirrorNovelConcurrency:      {},
 	}
 	keys := make([]string, 0, len(publicKeys))
 	for key := range publicKeys {
