@@ -1,352 +1,245 @@
-# wavelet
+# Pixez Cloud
 
-🚀 A modern, production-ready full-stack boilerplate for building scalable web applications
+为 PixEz 打造的云端备份与同步服务
 
-[中文](./README_zh.md)
-
-[![License: Apache2.0](https://img.shields.io/badge/License-Apache2.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
+[![Lic ense: Apache2.0](https://img.shields.io/badge/License-Apache2.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
 [![Go Version](https://img.shields.io/badge/Go-1.25+-blue.svg)](https://golang.org/)
 [![Next.js](https://img.shields.io/badge/Next.js-16-black.svg)](https://nextjs.org/)
 [![React](https://img.shields.io/badge/React-19-blue.svg)](https://reactjs.org/)
 
-## 📖 Introduction
+Pixez Cloud 是专为 PixEz 用户打造的云端数据伴侣。无论你拥有几台设备，它都能让你的 Pixiv 账号凭证、浏览记录、屏蔽名单等关键数据无缝同步，告别每台设备都要单独配置的烦恼。
 
-**wavelet** is a generic, production-ready full-stack boilerplate built with **Go (Gin + GORM)** on the backend and **Next.js (App Router + Shadcn UI)** on the frontend. It ships with everything you need to bootstrap a modern SaaS, internal tool, or developer platform — without the boilerplate headaches.
+![hero_page.png](docs/assets/hero_page.png)
 
-The project was designed from the ground up to be **framework-first and business-agnostic**: plug in your own domain logic while reusing the battle-tested infrastructure that comes out of the box.
+## 它能为你做什么
 
-### ✨ Key Features
+### 🔐 一键恢复登录
 
-- 🔐 **Multi-auth System** — Local password login/registration + pluggable OIDC/OAuth2 providers (supports multiple auth sources simultaneously)
-- 🗝️ **Personal Access Tokens** — API key management for programmatic access; supports `Authorization: Bearer` and `X-Access-Token` headers
-- 👤 **User Management** — Admin panel for listing, searching, filtering, enabling/disabling user accounts
-- ⚙️ **Dynamic System Config** — Key-value system configuration management with live reload, controllable from the admin UI
-- 📋 **Async Task Queue** — Background job processing with [Asynq](https://github.com/hibiken/asynq) (Redis-backed), including a scheduling dashboard
-- 📁 **S3 File Storage** — Unified file upload/download via S3-compatible APIs with local disk cache
-- 📊 **Observability** — Structured logging (Zap) + distributed tracing (OpenTelemetry)
-- 🎨 **Modern UI** — Responsive, dark-mode-ready design system built with Tailwind CSS 4 and Shadcn UI
-- 📖 **Built-in Documentation** — Integrated docs portal with usage guides, API reference, privacy policy, and terms of service
+换个设备登录 Pixiv？不用再翻找密码。Pixez Cloud 帮你保管登录凭证，新设备上点一下就能恢复账号状态。
 
-## 🏗️ Architecture Overview
+### 💨 图片加速访问
 
+网络不畅时，插画加载总是转圈圈？云端自动缓存你浏览过的作品，图片加载更快更稳定。
+
+### 📦 收藏不怕丢
+
+辛苦攒下的几千个收藏，万一丢失怎么办？云端定期备份你的收藏列表，还能帮你追踪哪些作品已经失效。
+
+### 📱 多设备随心切换
+
+手机、平板、多台手机——所有设备的浏览记录、屏蔽设置、搜索历史，统统保持一致。
+
+![dashboard.png](docs/assets/dashboard.png)
+
+
+## 快速开始
+
+### Docker Compose 部署
+
+```yaml
+services:
+  wavelet:
+    image: ghcr.io/rain-kl/pixezserver:latest
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      TZ: ${TZ:-Asia/Shanghai}
+    ports:
+      - "${APP_PORT:-8061}:8061"
+    volumes:
+      - ./uploads:/app/uploads
+      - ./data/:/app/data
+    depends_on:
+      redis:
+        condition: service_healthy
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    command: ["redis-server", "--appendonly", "yes"]
+    volumes:
+      - ./data/redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 5s
 ```
-┌─────────────────┐    ┌─────────────────────────────┐    ┌─────────────────┐
-│   Frontend      │    │          Backend             │    │   Database      │
-│   (Next.js)     │◄──►│           (Go)               │◄──►│  (PostgreSQL)   │
-│                 │    │                              │    │                 │
-│ • React 19      │    │ • Gin HTTP Framework         │    │ • PostgreSQL    │
-│ • TypeScript    │    │ • GORM ORM                   │    │ • Redis Cache   │
-│ • Tailwind 4    │    │ • Multi-provider Auth        │    │                 │
-│ • Shadcn UI     │    │ • AccessToken Middleware     │    │                 │
-│                 │    │ • Asynq Task Queue           │    │                 │
-│                 │    │ • OpenTelemetry Tracing      │    │                 │
-│                 │    │ • Swagger API Docs           │    │                 │
-└─────────────────┘    └─────────────────────────────┘    └─────────────────┘
-                                      │
-                           ┌──────────┴──────────┐
-                           │   Multi-Process CLI  │
-                           │  (Cobra + Viper)     │
-                           │ • api      (HTTP)    │
-                           │ • worker   (Queue)   │
-                           │ • scheduler(Cron)    │
-                           └─────────────────────┘
-```
 
-## 🛠️ Tech Stack
-
-### Backend
-- **[Go 1.25+](https://go.dev/doc)** — Primary language
-- **[Gin](https://github.com/gin-gonic/gin)** — HTTP web framework
-- **[GORM](https://github.com/go-gorm/gorm)** — ORM with PostgreSQL & ClickHouse support
-- **[Redis](https://github.com/redis/redis)** — Cache, session store, and task queue backend
-- **[Asynq](https://github.com/hibiken/asynq)** — Distributed task queue (Redis-backed)
-- **[Cobra + Viper](https://github.com/spf13/cobra)** — CLI entrypoint and configuration management
-- **[OpenTelemetry](https://opentelemetry.io)** — Distributed tracing and observability
-- **[Zap](https://github.com/uber-go/zap)** — Structured, high-performance logging
-- **[Swagger (Swaggo)](https://github.com/swaggo/swag)** — Auto-generated API documentation
-- **[AWS SDK v2](https://github.com/aws/aws-sdk-go-v2)** — S3-compatible file storage
-- **[Snowflake](https://github.com/bwmarrin/snowflake)** — Distributed ID generation
-
-### Frontend
-- **[Next.js 16](https://github.com/vercel/next.js)** — React framework with App Router
-- **[React 19](https://github.com/facebook/react)** — UI library
-- **[TypeScript](https://github.com/microsoft/TypeScript)** — Type safety
-- **[Tailwind CSS 4](https://github.com/tailwindlabs/tailwindcss)** — Utility-first styling
-- **[Shadcn UI](https://github.com/shadcn-ui/ui)** — Accessible, composable component library
-- **[Lucide Icons](https://github.com/lucide-icons/lucide)** — Icon library
-
-## 📋 Requirements
-
-- **Go** >= 1.25
-- **Node.js** >= 18.0
-- **PostgreSQL** >= 14
-- **Redis** >= 6.0
-- **pnpm** >= 8.0 (recommended)
-
-## 🚀 Quick Start
-
-### 1. Clone the Repository
+下载仓库的 .env.example 文件到本地：
 
 ```bash
-git clone https://github.com/Rain-kl/Wavelet.git refreshing
-cd refreshing
+cp .env.example .env
 ```
 
-### 2. Configure Environment
+- 将 `APP_SESSION_SECRET` 改为足够长的随机字符串。
+- 本地 HTTP 测试时设置 `APP_SESSION_SECURE=false`。
+- 只有在 HTTPS 部署时保留 `APP_SESSION_SECURE=true`。
+
+启动服务：
+
+```bash
+docker compose up -d
+```
+
+初始本地管理员账号：
+
+```text
+username: admin
+password: 12345678
+```
+
+## 接入 PixEz Flutter
+
+下载修改版的 PixEz Flutter 客户端，安装到设备上：
+
+地址: https://github.com/Rain-kl/pixez-flutter/releases
+
+1. 登录 Pixez Sync Web 管理端。
+2. 打开 `/settings/access-token`，为客户端创建 AccessToken。
+3. 在 PixEz Flutter 的自定义数据同步设置页填写服务器地址。
+4. 地址示例：`https://pixez.example.com`。
+5. 粘贴 AccessToken。
+
+Flutter custom 层应把 Wavelet envelope 解包集中保留在 sync API service 内：`error_msg == ""` 表示接口成功。`/mirror/**` 是 Pixiv 形态响应，不参与 envelope 解包。
+
+
+
+## 系统架构
+
+```text
+PixEz Flutter custom layer
+  |
+  |  Authorization: Bearer <access_token>
+  v
+PixEzServer / Wavelet
+  |-- /api/pixez/**        Wavelet envelope 包裹的业务接口
+  |-- /mirror/**           Pixiv 形态镜像读取和图片流
+  |-- /api/v1/admin/tasks  任务下发、重试、调度和日志
+  |
+  v
+internal/service/pixez
+  |-- Pixiv App API client 与 token refresh
+  |-- sync-data 备份与 hash 对比
+  |-- 插画 / 小说镜像处理
+  |-- 收藏导出与 removed 状态追踪
+  |-- 旧 SQLite 与镜像文件导入
+  |
+  v
+GORM models + goose migrations + uploads + task_executions
+  |
+  v
+Redis / Asynq worker + 本地磁盘或 S3 兼容存储
+```
+
+## 核心能力
+
+### Pixiv 账号同步
+
+PixEz Flutter 可以上报 Pixiv 用户信息、access token、refresh token、device token、会员标记和限制标记。后端保存到 `pixiv_users`，对外提供不含 token 的用户列表，并在客户端需要一键恢复登录时返回完整凭证。
+
+### 本地数据备份
+
+同步 API 会按 Pixiv 用户保存 7 张 PixEz 本地表：
+
+- `ban_comments`
+- `ban_illusts`
+- `ban_tags`
+- `ban_users`
+- `illust_histories`
+- `novel_histories`
+- `tag_histories`
+
+Hash 接口用于让客户端跳过未变化的表，避免每次全量上传。
+
+### 插画镜像
+
+`POST /api/pixez/illusts/:illust_id/mirror` 会幂等下发 Asynq 任务。Worker 请求 Pixiv `v1/illust/detail`，下载 original 图片，经 Wavelet Upload 存储写入本地或 S3，并把映射保存到 `mirror_illust`。
+
+`/mirror/v1/illust/detail` 返回 Pixiv 形态详情 JSON，并把 pximg 域名改写到 `/mirror/pximg`；`/mirror/pximg/*path` 优先流式输出已缓存文件，未命中时可回退代理 Pixiv 原始地址。
+
+### 小说镜像
+
+`POST /api/pixez/novels/:novel_id/mirror` 会下发小说镜像任务。Worker 保存 Pixiv `v2/novel/detail` 与 `webview/v2/novel` 原始 JSON 到 `mirror_novel`。
+
+Flutter custom 层可以在小说详情页打开时自动入队镜像，该行为由客户端“自动镜像小说”同步设置控制。
+
+### 收藏导出与失效追踪
+
+后台任务按 public/private 分页导出插画和小说收藏。导出规则是增量式的：
+
+- 新作品插入数据库。
+- 已存在且仍 active 的记录，只更新本轮运行 ID 和最近出现时间。
+- 包含 `limit_unknown_360`、`limit_unknown_100` 等占位图的作品立即标记 removed。
+- 只有整轮分页成功结束后，才把本轮未出现的历史 active 记录标记为 removed。
+- 分页中途失败时不做缺失标记，避免误判。
+
+PixEz 管理界面基于这些 read-model 展示镜像进度、失败项、不可见作品和最近导出批次。
+
+### 任务与运维控制台
+
+PixEz 任务接入 Wavelet Admin 任务体系：
+
+| Admin task type | Asynq task | 用途 |
+| --- | --- | --- |
+| `pixez_mirror` | `pixez:mirror` | 镜像单个插画或小说 |
+| `pixez_export_bookmarks` | `pixez:export_bookmarks` | 导出收藏 read-model 并维护 removed 状态 |
+| `pixez_auto_enqueue_bookmark_mirrors` | `pixez:auto_enqueue_bookmark_mirrors` | 扫描未镜像或失败的收藏条目并批量入队 |
+| `pixez_import_legacy_server` | `pixez:import_legacy_server` | 导入旧 PixEz sync SQLite 数据与镜像文件 |
+
+`task_executions` 记录执行状态、日志、重试信息和失败原因。默认收藏自动入队镜像调度为 `*/10 * * * *`。
+
+## 本地源码开发
+
+环境要求：
+
+- Go 1.25+
+- Node.js 18+
+- pnpm 8+
+- Redis 6+
+- 如果启用 PostgreSQL，需要 PostgreSQL 14+
+
+启动本地 Redis：
+
+```bash
+docker compose up -d redis
+```
+
+准备配置：
 
 ```bash
 cp config.example.yaml config.yaml
 ```
 
-Edit `config.yaml` to configure your database and Redis. OIDC auth sources are configured at runtime in the admin settings page.
+SQLite 开发可将 `database.enabled` 设为 `false` 并设置 `database.sqlite_path`。PostgreSQL 开发则保留 `database.enabled=true` 并更新数据库连接信息。
 
-### 3. Initialize Database
-
-```bash
-# Start local dependencies (PostgreSQL + Redis)
-docker compose up -d
-
-# Optional: also start ClickHouse
-docker compose --profile clickhouse up -d
-
-# If you use an external PostgreSQL instance instead of Docker, create the database manually
-createdb -h <host> -p 5432 -U postgres refreshing
-
-# Database schema is auto-migrated on first startup
-```
-
-### 4. Start the Backend
+运行后端进程：
 
 ```bash
-# Install Go dependencies
 go mod tidy
-
-# Generate Swagger API documentation
-make swagger
-
-# Start the HTTP API server
 go run main.go api
-```
-
-> The backend also supports separate `scheduler` and `worker` processes for async task processing:
-> ```bash
-> go run main.go scheduler   # Cron job scheduler
-> go run main.go worker      # Asynq task worker
-> ```
-
-### 5. Start the Frontend
-
-```bash
-cd frontend
-
-# Install dependencies
-pnpm install
-
-# Start dev server (Turbopack)
-pnpm dev
-```
-
-### 6. Access the Application
-
-| Service | URL |
-|---------|-----|
-| Frontend | http://localhost:3000 |
-| Swagger API Docs | http://localhost:8000/swagger/index.html |
-| Health Check | http://localhost:8000/api/health |
-
-## ⚙️ Configuration
-
-Key configuration options (see `config.example.yaml` for the full reference):
-
-| Option | Description | Example |
-|--------|-------------|---------|
-| `app.addr` | Backend listen address | `:8000` |
-| `database.host` | PostgreSQL host | `127.0.0.1` |
-| `database.database` | Database name | `refreshing` |
-| `redis.host` | Redis host | `127.0.0.1` |
-| `storage.endpoint` | S3-compatible endpoint | `s3.amazonaws.com` |
-
-## 🔧 Development Guide
-
-### Backend
-
-```bash
-# Run API server
-go run main.go api
-
-# Run task scheduler
 go run main.go scheduler
-
-# Run async worker
 go run main.go worker
-
-# Regenerate Swagger docs (required after controller changes)
-make swagger
-
-# Format & vet code
-make tidy
 ```
 
-### Frontend
+运行前端：
 
 ```bash
 cd frontend
-
-# Development mode (Turbopack)
+pnpm install
 pnpm dev
-
-# Production build
-pnpm build
-
-# Start production server
-pnpm start
-
-# Lint & format
-pnpm lint
-pnpm format
 ```
 
-## 📁 Project Structure
-
-```
-wavelet/
-├── main.go                  # Entry point (delegates to internal/cmd)
-├── config.example.yaml      # Configuration template
-├── Makefile                 # Common commands (swagger, tidy, license, cross-build)
-├── docker/                  # Docker image build files (integrated/frontend/backend)
-├── docs/                    # Swagger auto-generated docs
-├── frontend/                # Next.js frontend application
-│   ├── app/                 # App Router pages
-│   ├── components/          # React components (ui, common, layout)
-│   ├── lib/services/        # API service layer
-│   └── types/               # TypeScript type definitions
-└── internal/                # Go backend (private)
-    ├── cmd/                 # CLI commands (api, scheduler, worker)
-    ├── apps/                # Business modules (oauth, user, admin, upload)
-    ├── model/               # GORM entities and business methods
-    ├── router/              # HTTP route registration
-    ├── task/                # Async task definitions and workers
-    ├── db/                  # Database and Redis initialization
-    ├── storage/             # S3 file storage abstraction
-    └── common/              # Shared utilities and response helpers
-```
-
-## 📚 API Documentation
-
-Swagger API documentation is auto-generated and available once the backend is running:
-
-```
-http://localhost:8000/swagger/index.html
-```
-
-The built-in frontend docs portal at `/docs` includes:
-- **Usage Guide** — Step-by-step walkthrough for getting started
-- **API Reference** — Detailed interface documentation
-- **Privacy Policy** — Template privacy policy (customize as needed)
-- **Terms of Service** — Template terms of service
-
-## 🧪 Testing
+常用质量门禁：
 
 ```bash
-# Backend tests
-go test ./...
-
-# Frontend lint
-cd frontend && pnpm lint
+make swagger       # API handler 变化后执行
+make code-check    # 提交前必跑
+make build-test    # 前后端构建验证
+make build-embedded
 ```
 
-## 🚀 Deployment
-
-### Cross-platform Binary
-
-Build static binaries for all 6 targets (Linux / macOS / Windows × amd64 / arm64) with a single command.
-The compiled frontend is embedded in every binary — no separate deployment needed.
-
-**Prerequisites:** Docker with BuildKit enabled (Docker 23+ defaults to on).
-
-```bash
-# Build all 6 binaries → ./bin/
-make cross-build
-
-# Stamp a release version
-make cross-build VERSION=v1.2.3
-
-# Build only a specific OS (both architectures)
-make cross-build GOOS=linux
-make cross-build GOOS=darwin
-make cross-build GOOS=windows
-
-# Build only a specific architecture (all OSes)
-make cross-build GOARCH=amd64
-make cross-build GOARCH=arm64
-
-# Combine filters — single binary
-make cross-build GOOS=linux GOARCH=arm64
-make cross-build GOOS=darwin GOARCH=amd64 VERSION=v1.2.3
-```
-
-Output files in `./bin/`:
-
-| File | Platform |
-|------|----------|
-| `wavelet_linux_amd64` | Linux x86-64 |
-| `wavelet_linux_arm64` | Linux ARM64 |
-| `wavelet_darwin_amd64` | macOS Intel |
-| `wavelet_darwin_arm64` | macOS Apple Silicon |
-| `wavelet_windows_amd64.exe` | Windows x86-64 |
-| `wavelet_windows_arm64.exe` | Windows ARM64 |
-
-> The version string is accessible at runtime via `wavelet --version`.
-
-### Docker
-
-```bash
-# Build image
-docker build -t refreshing .
-
-# Run (pass your config as a volume mount)
-docker run -d -p 8000:8000 \
-  -v $(pwd)/config.yaml:/app/config.yaml \
-  refreshing api
-```
-
-### Production
-
-1. Build the frontend:
-   ```bash
-   cd frontend && pnpm build
-   ```
-
-2. Compile the backend:
-   ```bash
-   go build -o refreshing main.go
-   ```
-
-3. Configure `config.yaml` for production.
-
-4. Start services:
-   ```bash
-   ./refreshing api        # HTTP API
-   ./refreshing scheduler  # Cron scheduler (optional)
-   ./refreshing worker     # Task worker (optional)
-   ```
-
-## 🤝 Contributing
-
-We welcome contributions! Please read the following before submitting code:
-
-- [Contributing Guidelines](CONTRIBUTING.md)
-- [Code of Conduct](CODE_OF_CONDUCT.md)
-- [Contributor License Agreement](CLA.md)
-
-### Workflow
-
-1. Fork the repository
-2. Create a feature branch (`git checkout -b feature/your-feature`)
-3. Commit your changes (`git commit -am 'Add your feature'`)
-4. Push to the branch (`git push origin feature/your-feature`)
-5. Open a Pull Request
-
-## 📄 License
+## License
 
 This project is licensed under the [Apache 2.0 License](LICENSE).
