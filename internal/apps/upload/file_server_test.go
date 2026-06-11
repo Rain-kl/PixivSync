@@ -320,6 +320,36 @@ func TestImageCompression(t *testing.T) {
 		}
 	})
 
+	t.Run("serve compressed WebP file and check cache headers and 304 Not Modified", func(t *testing.T) {
+		req, _ := http.NewRequest("GET", "/f/3001?quality=medium", nil)
+		w := httptest.NewRecorder()
+		r.ServeHTTP(w, req)
+
+		if w.Code != http.StatusOK {
+			t.Fatalf("expected status 200, got %d", w.Code)
+		}
+
+		etag := w.Header().Get("ETag")
+		if etag == "" {
+			t.Error("expected ETag header, got empty")
+		}
+
+		cacheControl := w.Header().Get("Cache-Control")
+		if cacheControl != "public, max-age=31536000" {
+			t.Errorf("expected Cache-Control 'public, max-age=31536000', got %q", cacheControl)
+		}
+
+		// Perform conditional GET request
+		reqCond, _ := http.NewRequest("GET", "/f/3001?quality=medium", nil)
+		reqCond.Header.Set("If-None-Match", etag)
+		wCond := httptest.NewRecorder()
+		r.ServeHTTP(wCond, reqCond)
+
+		if wCond.Code != http.StatusNotModified {
+			t.Errorf("expected status 304, got %d", wCond.Code)
+		}
+	})
+
 	t.Run("serve original file with origin quality", func(t *testing.T) {
 		req, _ := http.NewRequest("GET", "/f/3001?quality=origin", nil)
 		w := httptest.NewRecorder()

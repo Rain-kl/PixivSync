@@ -86,13 +86,83 @@ func getUploadRecordByID(c *gin.Context) (*model.Upload, error) {
 	return &upload, nil
 }
 
+// fileTypeCategory 定义文件的大类，便于未来扩展不同的处理方式
+type fileTypeCategory string
+
+const (
+	fileTypeImage fileTypeCategory = "image"
+	fileTypeVideo fileTypeCategory = "video"
+	fileTypeAudio fileTypeCategory = "audio"
+	fileTypeOther fileTypeCategory = "other"
+)
+
+// getFileTypeCategory 判断并返回文件的大类
+func getFileTypeCategory(upload *model.Upload) fileTypeCategory {
+	mime := strings.ToLower(upload.MimeType)
+	ext := strings.ToLower(upload.Extension)
+
+	if strings.HasPrefix(mime, "image/") || isImageExtension(ext) {
+		return fileTypeImage
+	}
+	if strings.HasPrefix(mime, "video/") {
+		return fileTypeVideo
+	}
+	if strings.HasPrefix(mime, "audio/") {
+		return fileTypeAudio
+	}
+	return fileTypeOther
+}
+
 // ServeUpload 将已存在的文件内容读取并流式响应给客户端，支持本地和 S3/CDN 驱动，并可选支持 WebP 图片压缩与本地缓存。
 func ServeUpload(c *gin.Context, upload *model.Upload) {
-	quality := normalizeImageQuality(c.Query("quality"))
-	isImage := strings.HasPrefix(strings.ToLower(upload.MimeType), "image/") || isImageExtension(strings.ToLower(upload.Extension))
+	// 设置通用的缓存控制响应头
+	setCacheHeaders(c, upload)
 
-	if quality == imageQualityOrigin || !isImage {
-		serveOriginal(c, upload)
+	category := getFileTypeCategory(upload)
+	quality := normalizeImageQuality(c.Query("quality"))
+
+	switch category {
+	case fileTypeImage:
+		// 如果是图片且不是原图质量，则提供压缩优化后的图片预览
+		if quality != imageQualityOrigin {
+			serveCompressedImage(c, upload, quality)
+			return
+		}
+		// 请求原图质量时，退化到默认提供原文件
+		fallthrough
+
+	default:
+		// 默认提供原文件，并执行协商缓存校验
+		serveOriginalWithConditionalCheck(c, upload)
+	}
+}
+
+func setCacheHeaders(c *gin.Context, upload *model.Upload) {
+	if isFilePublic(c.Request.Context(), upload.Type) {
+		c.Header("Cache-Control", "public, max-age=31536000")
+	} else {
+		c.Header("Cache-Control", "private, no-cache")
+	}
+}
+
+func serveOriginalWithConditionalCheck(c *gin.Context, upload *model.Upload) {
+	etag := fmt.Sprintf(`W/"%s"`, upload.Hash)
+	c.Header("ETag", etag)
+
+	if c.GetHeader("If-None-Match") == etag {
+		c.AbortWithStatus(http.StatusNotModified)
+		return
+	}
+
+	serveOriginal(c, upload)
+}
+
+func serveCompressedImage(c *gin.Context, upload *model.Upload, quality string) {
+	etag := fmt.Sprintf(`W/"%s-%s"`, upload.Hash, quality)
+	c.Header("ETag", etag)
+
+	if c.GetHeader("If-None-Match") == etag {
+		c.AbortWithStatus(http.StatusNotModified)
 		return
 	}
 
@@ -211,11 +281,11 @@ func getOriginalFileBytes(ctx context.Context, upload *model.Upload) ([]byte, er
 	return io.ReadAll(obj.Body)
 }
 
-// checkFileAccessPermission 校验文件是否可以被当前请求访问
-func checkFileAccessPermission(c *gin.Context, uploadType string) error {
+// isFilePublic 校验文件类型是否在公开访问白名单中
+func isFilePublic(ctx context.Context, uploadType string) bool {
 	var sc model.SystemConfig
 	var whitelist []string
-	if err := sc.GetByKey(c.Request.Context(), model.ConfigKeyFileAccessWhitelist); err == nil && sc.Value != "" {
+	if err := sc.GetByKey(ctx, model.ConfigKeyFileAccessWhitelist); err == nil && sc.Value != "" {
 		if err := json.Unmarshal([]byte(sc.Value), &whitelist); err != nil {
 			// 降级使用逗号分隔解析
 			parts := strings.Split(sc.Value, ",")
@@ -231,15 +301,17 @@ func checkFileAccessPermission(c *gin.Context, uploadType string) error {
 		whitelist = []string{"avatar"}
 	}
 
-	inWhitelist := false
 	for _, w := range whitelist {
 		if strings.EqualFold(w, uploadType) {
-			inWhitelist = true
-			break
+			return true
 		}
 	}
+	return false
+}
 
-	if !inWhitelist {
+// checkFileAccessPermission 校验文件是否可以被当前请求访问
+func checkFileAccessPermission(c *gin.Context, uploadType string) error {
+	if !isFilePublic(c.Request.Context(), uploadType) {
 		// 必须进行鉴权
 		if _, err := oauth.GetUserFromRequest(c); err != nil {
 			return err
