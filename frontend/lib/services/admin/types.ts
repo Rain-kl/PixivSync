@@ -93,12 +93,20 @@ export interface TaskTypeResponse {
 }
 
 /**
+ * 任务参数的数据类型
+ * - string  → 单行文本输入，JSON 中序列化为 string
+ * - text    → 多行文本输入，JSON 中序列化为 string
+ * - number  → 数字输入，JSON 中序列化为 number（而非 string）
+ */
+export type TaskParamType = 'string' | 'text' | 'number';
+
+/**
  * 任务参数定义
  */
 export interface TaskParam {
   name: string;
   label: string;
-  type: string;
+  type: TaskParamType;
   required: boolean;
   placeholder: string;
   description: string;

@@ -29,6 +29,8 @@ export type {
   AuthSourceRequest,
   ToggleAuthSourceRequest,
   TaskMeta,
+  TaskParam,
+  TaskParamType,
   TaskExecution,
   TaskExecutionStatus,
   ListTaskExecutionsRequest,

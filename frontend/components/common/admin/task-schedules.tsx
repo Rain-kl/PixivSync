@@ -13,6 +13,7 @@ import {Table, TableBody, TableCell, TableHead, TableHeader, TableRow} from "@/c
 import {Clock, Edit2, Info, Plus, RefreshCw, Trash2} from "lucide-react"
 
 import {AdminService, CreateScheduleRequest, Schedule, TaskMeta, UpdateScheduleRequest} from "@/lib/services"
+import {buildTaskPayload} from "@/lib/task-param-utils"
 import {ErrorInline} from "@/components/layout/error"
 import {LoadingStateWithBorder} from "@/components/layout/loading"
 import {EmptyStateWithBorder} from "@/components/layout/empty"
@@ -146,21 +147,17 @@ export function TaskSchedulesManager() {
       setSubmitLoading(true)
 
       const targetTask = taskTypes.find(t => t.type === selectedTaskType)
-      const payloadData: Record<string, string> = {}
+      let payloadStr = '{}'
 
-      if (targetTask?.params) {
-        for (const param of targetTask.params) {
-          const val = (paramValues[param.name] || "").trim()
-          if (param.required && !val) {
-            toast.error(`${param.label}不能为空`)
-            setSubmitLoading(false)
-            return
-          }
-          payloadData[param.name] = val
+      if (targetTask?.params && targetTask.params.length > 0) {
+        const { payload, error } = buildTaskPayload(targetTask.params, paramValues)
+        if (error) {
+          toast.error(error)
+          setSubmitLoading(false)
+          return
         }
+        payloadStr = payload ?? '{}'
       }
-
-      const payloadStr = JSON.stringify(payloadData)
 
       if (editingSchedule) {
         const req: UpdateScheduleRequest = {

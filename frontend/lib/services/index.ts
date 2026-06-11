@@ -102,6 +102,8 @@ export type {
   CreateUserRequest,
   UpdateSystemConfigRequest,
   TaskMeta,
+  TaskParam,
+  TaskParamType,
   TaskExecution,
   TaskExecutionStatus,
   ListTaskExecutionsRequest,

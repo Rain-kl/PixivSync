@@ -11,6 +11,7 @@ import {Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, Di
 import {Calendar as CalendarIcon, Clock, Info, Layers, Play} from "lucide-react"
 
 import {AdminService, DispatchTaskRequest, TaskMeta} from "@/lib/services"
+import {buildTaskPayload} from "@/lib/task-param-utils"
 import {ErrorInline} from "@/components/layout/error"
 import {LoadingStateWithBorder} from "@/components/layout/loading"
 import {EmptyStateWithBorder} from "@/components/layout/empty"
@@ -195,19 +196,16 @@ export function TaskManager() {
         if (userId) params.user_id = userId
       }
 
-      // Handle dynamic parameters
+      // Handle dynamic parameters — type coercion (number vs string) is
+      // centralised in buildTaskPayload; do not inline it here.
       if (targetTask?.params && targetTask.params.length > 0) {
-        const payloadData: Record<string, string> = {}
-        for (const param of targetTask.params) {
-          const val = (paramValues[param.name] || "").trim()
-          if (param.required && !val) {
-            toast.error(`${param.label}不能为空`)
-            setDispatching(false)
-            return
-          }
-          payloadData[param.name] = val
+        const { payload, error } = buildTaskPayload(targetTask.params, paramValues)
+        if (error) {
+          toast.error(error)
+          setDispatching(false)
+          return
         }
-        params.payload = JSON.stringify(payloadData)
+        params.payload = payload ?? undefined
       }
 
       const taskID = await AdminService.dispatchTask(params)

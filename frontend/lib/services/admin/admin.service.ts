@@ -18,6 +18,7 @@ import type {
   SystemStatus,
   TaskExecution,
   TaskMeta,
+  TaskParamType,
   TaskTypeResponse,
   Template,
   ToggleAuthSourceRequest,
@@ -187,7 +188,9 @@ export class AdminService extends BaseService {
       params: (item.Params || item.params || []).map(p => ({
         name: p.Name || p.name || '',
         label: p.Label || p.label || '',
-        type: p.Type || p.type || '',
+        // Cast to TaskParamType: backend only emits 'string' | 'text' | 'number'.
+        // Unknown future values fall through safely to the string branch.
+        type: (p.Type || p.type || 'string') as TaskParamType,
         required: p.Required ?? p.required ?? false,
         placeholder: p.Placeholder || p.placeholder || '',
         description: p.Description || p.description || '',
