@@ -1,3 +1,6 @@
+// Copyright 2026 Arctel.net
+// SPDX-License-Identifier: AGPL-3.0-only
+
 // Package cache provides HTTP handlers for managing disk cache.
 package cache
 

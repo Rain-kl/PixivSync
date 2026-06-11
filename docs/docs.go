@@ -14,8 +14,8 @@ const docTemplate = `{
             "url": "https://github.com/Rain-kl/Wavelet"
         },
         "license": {
-            "name": "Apache 2.0",
-            "url": "http://www.apache.org/licenses/LICENSE-2.0.html"
+            "name": "AGPL-3.0",
+            "url": "https://www.gnu.org/licenses/agpl-3.0.html"
         },
         "version": "{{.Version}}"
     },

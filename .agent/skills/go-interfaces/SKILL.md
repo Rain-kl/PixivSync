@@ -1,7 +1,7 @@
 ---
 name: go-interfaces
 description: Use when defining or implementing Go interfaces, designing abstractions, creating mockable boundaries for testing, or composing types through embedding. Also use when deciding whether to accept an interface or return a concrete type, or using type assertions or type switches, even if the user doesn't explicitly mention interfaces. Does not cover generics-based polymorphism (see go-generics).
-license: Apache-2.0
+license: AGPL-3.0-only
 metadata:
   sources: "Effective Go, Google Style Guide, Uber Style Guide"
 allowed-tools: Bash(bash:*)

@@ -1,5 +1,5 @@
 // Copyright 2026 Arctel.net
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: AGPL-3.0-only
 
 // Package storage 提供文件存储抽象层，包括 S3 兼容存储和本地缓存。
 package storage

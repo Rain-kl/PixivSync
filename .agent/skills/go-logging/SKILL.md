@@ -1,7 +1,7 @@
 ---
 name: go-logging
 description: 在选择日志方案、配置 slog、编写结构化日志语句或决定日志级别时使用。也适用于设置生产日志、为日志添加请求作用域上下文或从 log 迁移到 slog 的场景，即使用户未明确提及日志。不涵盖错误处理策略（参见 go-error-handling）。
-license: Apache-2.0
+license: AGPL-3.0-only
 compatibility: slog requires Go 1.21+; slog/slogtest requires Go 1.22+
 metadata:
   sources: "Google Style Guide, Uber Style Guide"

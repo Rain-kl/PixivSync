@@ -1,7 +1,7 @@
 ---
 name: go-functional-options
 description: Use when designing a Go constructor or factory function with optional configuration — especially with 3+ optional parameters or extensible APIs. Also use when building a New* function that takes many settings, even if they don't mention "functional options" by name. Does not cover general function design (see go-functions).
-license: Apache-2.0
+license: AGPL-3.0-only
 metadata:
   sources: "Uber Style Guide"
 ---

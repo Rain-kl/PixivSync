@@ -1,3 +1,6 @@
+// Copyright 2026 Arctel.net
+// SPDX-License-Identifier: AGPL-3.0-only
+
 // Package diskcache implements a platform-level disk-backed cache with size limit, TTL, and LRU eviction.
 package diskcache
 

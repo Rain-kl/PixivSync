@@ -1,7 +1,7 @@
 ---
 name: go-context
 description: 在 Go 中使用 context.Context 时使用 — 包括函数签名中的位置、传播取消和截止时间、以及在 context 中存储值与使用参数的对比。也适用于取消长时间运行的操作、设置超时或传递请求作用域数据，即使未直接提及 context.Context。不涵盖 goroutine 生命周期或 sync 原语（参见 go-concurrency）。
-license: Apache-2.0
+license: AGPL-3.0-only
 compatibility: 需要 Go 1.7+（context 在 Go 1.7 中移入标准库）
 metadata:
   sources: "Go Wiki CodeReviewComments"

@@ -1,7 +1,7 @@
 ---
 name: go-documentation
 description: 在编写或审查 Go 包、类型、函数或方法的文档时使用。在创建新的导出类型、函数或包时也应主动使用，即使用户没有明确询问文档问题。不涵盖未导出符号的代码注释（参见 go-style-core）。
-license: Apache-2.0
+license: AGPL-3.0-only
 metadata:
   sources: "Google 风格指南"
 allowed-tools: Bash(bash:*)

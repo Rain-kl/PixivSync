@@ -17,7 +17,7 @@ Rules:
     the short SPDX form, preserving copyright attribution.
   - Go files without any license header receive:
       // Copyright 2026 Arctel.net
-      // SPDX-License-Identifier: Apache-2.0
+      // SPDX-License-Identifier: AGPL-3.0-only
   - //go:build and legacy // +build constraints stay at the top.
 
 Options:
@@ -77,12 +77,12 @@ close $in;
 
 my $new_only_header =
     "// Copyright 2026 Arctel.net\n" .
-    "// SPDX-License-Identifier: Apache-2.0";
+    "// SPDX-License-Identifier: AGPL-3.0-only";
 
 my $modified_header =
     "// Copyright 2025 linux.do\n" .
     "// Copyright 2026 Arctel.net\n" .
-    "// SPDX-License-Identifier: Apache-2.0";
+    "// SPDX-License-Identifier: AGPL-3.0-only";
 
 my @lines = split /\n/, $src, -1;
 my @prefix;
@@ -109,8 +109,19 @@ my $body = join "\n", @lines[$i .. $#lines];
 my $result;
 
 # --- Case 1: already has SPDX header (correct format, leave untouched) ---
-if ($body =~ m{\A(// Copyright [^\x0a]+\x0a(?:// Copyright [^\x0a]+\x0a)?// SPDX-License-Identifier: Apache-2\.0)(\x0a?)}s) {
+if ($body =~ m{\A(// Copyright [^\x0a]+\x0a(?:// Copyright [^\x0a]+\x0a)?// SPDX-License-Identifier: AGPL-3\.0-only)(\x0a?)}s) {
     $result = $prefix . $body;
+}
+# --- Case 1.5: has old SPDX header (Apache-2.0), convert it to AGPL-3.0-only ---
+elsif ($body =~ m{\A((?:// Copyright [^\x0a]+\x0a){1,2}// SPDX-License-Identifier: Apache-2\.0)(\x0a*)}s) {
+    my $match = $1;
+    my $rest = substr($body, length($1) + length($2));
+    $rest =~ s/\A\n+//;
+    if ($match =~ /linux\.do/) {
+        $result = $prefix . $modified_header . "\n\n" . $rest;
+    } else {
+        $result = $prefix . $new_only_header . "\n\n" . $rest;
+    }
 }
 # --- Case 2: legacy block-comment header (/* ... */) ---
 elsif ($body =~ m{\A(/\*.*?\*/)(\n*)}s) {
@@ -129,7 +140,7 @@ elsif ($body =~ m{\A(/\*.*?\*/)(\n*)}s) {
             $result = $prefix . $new_only_header . "\n\n" . $rest;
         } elsif ($has_linux_do && !$has_arctel && !$has_modified) {
             my $h = "// Copyright 2025 linux.do\n" .
-                    "// SPDX-License-Identifier: Apache-2.0";
+                    "// SPDX-License-Identifier: AGPL-3.0-only";
             $result = $prefix . $h . "\n\n" . $rest;
         } else {
             $result = $prefix . $new_only_header . "\n\n" . $rest;

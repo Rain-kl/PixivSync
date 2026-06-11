@@ -1,7 +1,7 @@
 ---
 name: go-functions
 description: Use when organizing functions within a Go file, formatting function signatures, designing return values, or following Printf-style naming conventions. Also use when a user is adding or refactoring any Go function, even if they don't mention function design or signature formatting. Does not cover functional options constructors (see go-functional-options).
-license: Apache-2.0
+license: AGPL-3.0-only
 metadata:
   sources: "Effective Go, Google Style Guide, Uber Style Guide"
 ---

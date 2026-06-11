@@ -1,6 +1,6 @@
 // Copyright 2025 linux.do
 // Copyright 2026 Arctel.net
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: AGPL-3.0-only
 
 package system_config
 
@@ -137,7 +137,7 @@ func TestListSystemConfigs(t *testing.T) {
 		var configs []model.SystemConfig
 		_ = json.Unmarshal(dataBytes, &configs)
 
-		const expectedDefaultConfigCount = 29
+		const expectedDefaultConfigCount = 30
 		if len(configs) != expectedDefaultConfigCount {
 			t.Errorf("expected %d default configs, got %d", expectedDefaultConfigCount, len(configs))
 		}
