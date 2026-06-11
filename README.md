@@ -230,7 +230,8 @@ make build-embedded
 
 ## 友情链接
 
-- LINUX DO —— 新的理想型社区，技术爱好者的聚集地。
+- [LINUX DO](https://linux.do/) —— 新的理想型社区，技术爱好者的聚集地。
+
 
 ## License
 
