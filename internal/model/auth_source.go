@@ -144,14 +144,14 @@ func GetAuthSourceByID(id uint64) (*AuthSource, error) {
 	return &source, nil
 }
 
-// GetAuthSourceByName 根据名称获取认证源
+// GetAuthSourceByName 根据名称获取认证源（名称比较不区分大小写）
 func GetAuthSourceByName(name string) (*AuthSource, error) {
 	name = strings.TrimSpace(name)
 	if name == "" {
 		return nil, errors.New(errAuthSourceNameRequired)
 	}
 	var source AuthSource
-	if err := db.DB(context.Background()).First(&source, "name = ?", name).Error; err != nil {
+	if err := db.DB(context.Background()).First(&source, "LOWER(name) = LOWER(?)", name).Error; err != nil {
 		return nil, err
 	}
 	source.ClientSecretConfigured = source.ClientSecret != ""
