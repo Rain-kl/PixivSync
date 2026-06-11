@@ -273,7 +273,7 @@ func (c *Client) RefreshPixivToken(ctx context.Context, userID string, refreshTo
 
 	updates := map[string]any{
 		"access_token": tokenResp.Response.AccessToken,
-		"updated_at":   time.Now(),
+		keyUpdatedAt:   time.Now(),
 	}
 	if tokenResp.Response.RefreshToken != "" {
 		updates["refresh_token"] = tokenResp.Response.RefreshToken

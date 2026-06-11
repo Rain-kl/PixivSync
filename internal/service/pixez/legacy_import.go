@@ -93,7 +93,7 @@ func importLegacyUsers(ctx context.Context, legacyDB *gorm.DB, dryRun bool, summ
 		return nil
 	}
 	return db.DB(ctx).Clauses(clause.OnConflict{
-		Columns:   []clause.Column{{Name: "pixiv_user_id"}},
+		Columns:   []clause.Column{{Name: keyPixivUserID}},
 		UpdateAll: true,
 	}).Create(&users).Error
 }
@@ -241,7 +241,7 @@ func importLegacyBookmarks(ctx context.Context, legacyDB *gorm.DB, dryRun bool, 
 	}
 	if len(illusts) > 0 {
 		if err := db.DB(ctx).Clauses(clause.OnConflict{
-			Columns:   []clause.Column{{Name: "pixiv_user_id"}, {Name: "restrict"}, {Name: "illust_id"}},
+			Columns:   []clause.Column{{Name: keyPixivUserID}, {Name: "restrict"}, {Name: "illust_id"}},
 			UpdateAll: true,
 		}).Create(&illusts).Error; err != nil {
 			return err
@@ -249,7 +249,7 @@ func importLegacyBookmarks(ctx context.Context, legacyDB *gorm.DB, dryRun bool, 
 	}
 	if len(novels) > 0 {
 		if err := db.DB(ctx).Clauses(clause.OnConflict{
-			Columns:   []clause.Column{{Name: "pixiv_user_id"}, {Name: "restrict"}, {Name: "novel_id"}},
+			Columns:   []clause.Column{{Name: keyPixivUserID}, {Name: "restrict"}, {Name: "novel_id"}},
 			UpdateAll: true,
 		}).Create(&novels).Error; err != nil {
 			return err

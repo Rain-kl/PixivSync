@@ -239,7 +239,7 @@ func GetMirroredIllustDetail(c *gin.Context) {
 	}
 	record, err := pixezsvc.GetMirrorIllust(c.Request.Context(), illustID)
 	if err != nil || record.DetailJSON == "" {
-		c.JSON(http.StatusNotFound, gin.H{"error": "mirror not found"})
+		c.JSON(http.StatusNotFound, gin.H{keyError: "mirror not found"})
 		return
 	}
 	c.Header("Content-Type", "application/json; charset=utf-8")
@@ -267,7 +267,7 @@ func ServeMirroredImage(c *gin.Context) {
 	// Fallback to proxying from Pixiv on the fly
 	cleanPath := strings.TrimPrefix(c.Param("path"), "/")
 	if cleanPath == "" || strings.Contains(cleanPath, "..") {
-		c.JSON(http.StatusNotFound, gin.H{"error": "mirror file not found"})
+		c.JSON(http.StatusNotFound, gin.H{keyError: "mirror file not found"})
 		return
 	}
 
@@ -278,7 +278,7 @@ func ServeMirroredImage(c *gin.Context) {
 		pixivURL = "https://s.pximg.net/" + cleanPath
 		data, mimeType, err = pixezsvc.DefaultClient.DownloadFile(c.Request.Context(), pixivURL)
 		if err != nil {
-			c.JSON(http.StatusNotFound, gin.H{"error": "mirror file not found"})
+			c.JSON(http.StatusNotFound, gin.H{keyError: "mirror file not found"})
 			return
 		}
 	}
@@ -316,7 +316,7 @@ func GetMirroredNovelDetail(c *gin.Context) {
 	}
 	record, err := pixezsvc.GetMirrorNovel(c.Request.Context(), novelID)
 	if err != nil || record.DetailJSON == "" {
-		c.JSON(http.StatusNotFound, gin.H{"error": "novel mirror not found"})
+		c.JSON(http.StatusNotFound, gin.H{keyError: "novel mirror not found"})
 		return
 	}
 	c.Header("Content-Type", "application/json; charset=utf-8")
@@ -331,7 +331,7 @@ func GetMirroredNovelText(c *gin.Context) {
 	}
 	record, err := pixezsvc.GetMirrorNovel(c.Request.Context(), novelID)
 	if err != nil || record.TextJSON == "" {
-		c.JSON(http.StatusNotFound, gin.H{"error": "novel mirror not found"})
+		c.JSON(http.StatusNotFound, gin.H{keyError: "novel mirror not found"})
 		return
 	}
 	c.Header("Content-Type", "application/json; charset=utf-8")
@@ -358,7 +358,7 @@ func ListMirroredIllusts(c *gin.Context) {
 		c.JSON(http.StatusOK, util.Err(errQueryMirrorStatusFailed))
 		return
 	}
-	c.JSON(http.StatusOK, util.OK(gin.H{"items": items, "total": total, "page": page, "page_size": pageSize}))
+	c.JSON(http.StatusOK, util.OK(gin.H{keyItems: items, keyTotal: total, keyPage: page, keyPageSize: pageSize}))
 }
 
 // ListMirroredNovels returns paginated mirrored novel read-model rows.
@@ -381,7 +381,7 @@ func ListMirroredNovels(c *gin.Context) {
 		c.JSON(http.StatusOK, util.Err(errQueryMirrorStatusFailed))
 		return
 	}
-	c.JSON(http.StatusOK, util.OK(gin.H{"items": items, "total": total, "page": page, "page_size": pageSize}))
+	c.JSON(http.StatusOK, util.OK(gin.H{keyItems: items, keyTotal: total, keyPage: page, keyPageSize: pageSize}))
 }
 
 // GetMirroredIllustManagementDetail returns one illustration mirror read-model.
@@ -527,11 +527,11 @@ func getMirroredNovelManagementDetail(ctx context.Context, novelID int64) (pixez
 
 func applyMirrorFilters(query *gorm.DB, req listMirrorsRequest, idColumn string) *gorm.DB {
 	switch req.Status {
-	case "success":
+	case statusSuccess:
 		query = query.Where("status = ?", model.PixezMirrorStatusSuccess)
-	case "processing":
+	case statusProcessing:
 		query = query.Where("status IN ?", []string{model.PixezMirrorStatusQueued, model.PixezMirrorStatusProcessing})
-	case "failed":
+	case statusFailed:
 		query = query.Where("status = ?", model.PixezMirrorStatusFailed)
 	}
 	queryText := strings.TrimSpace(req.Query)
@@ -619,11 +619,11 @@ func mirroredNovelDTO(record model.PixezMirrorNovel) pixezMirroredNovelDTO {
 func mirrorStatusText(status string) string {
 	switch status {
 	case model.PixezMirrorStatusSuccess:
-		return "success"
+		return statusSuccess
 	case model.PixezMirrorStatusFailed:
-		return "failed"
+		return statusFailed
 	default:
-		return "processing"
+		return statusProcessing
 	}
 }
 
@@ -746,7 +746,7 @@ func parsePositiveQueryID(c *gin.Context, key string) (int64, bool) {
 	raw := c.Query(key)
 	id, err := strconv.ParseInt(raw, 10, 64)
 	if raw == "" || err != nil || id <= 0 {
-		c.JSON(http.StatusBadRequest, gin.H{"error": fmt.Sprintf("%s is required", key)})
+		c.JSON(http.StatusBadRequest, gin.H{keyError: fmt.Sprintf("%s is required", key)})
 		return 0, false
 	}
 	return id, true

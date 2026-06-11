@@ -108,13 +108,13 @@ func exportIllustRestrict(ctx context.Context, client *Client, user model.PixezP
 		if err := db.DB(ctx).Model(&model.PixezBookmarkExportRun{}).
 			Where("id = ?", run.ID).
 			Updates(map[string]any{
-				"total_count":      summary.TotalCount,
-				"new_count":        summary.NewCount,
-				"updated_count":    summary.UpdatedCount,
-				"removed_count":    summary.RemovedCount,
-				"next_url":         payload.NextURL,
-				"last_request_url": reqURL,
-				"updated_at":       time.Now(),
+				keyTotalCount:     summary.TotalCount,
+				keyNewCount:       summary.NewCount,
+				keyUpdatedCount:   summary.UpdatedCount,
+				keyRemovedCount:   summary.RemovedCount,
+				"next_url":        payload.NextURL,
+				keyLastRequestURL: reqURL,
+				keyUpdatedAt:      time.Now(),
 			}).Error; err != nil {
 			return summary, err
 		}
@@ -161,13 +161,13 @@ func exportNovelRestrict(ctx context.Context, client *Client, user model.PixezPi
 		if err := db.DB(ctx).Model(&model.PixezBookmarkExportRun{}).
 			Where("id = ?", run.ID).
 			Updates(map[string]any{
-				"total_count":      summary.TotalCount,
-				"new_count":        summary.NewCount,
-				"updated_count":    summary.UpdatedCount,
-				"removed_count":    summary.RemovedCount,
-				"next_url":         payload.NextURL,
-				"last_request_url": reqURL,
-				"updated_at":       time.Now(),
+				keyTotalCount:     summary.TotalCount,
+				keyNewCount:       summary.NewCount,
+				keyUpdatedCount:   summary.UpdatedCount,
+				keyRemovedCount:   summary.RemovedCount,
+				"next_url":        payload.NextURL,
+				keyLastRequestURL: reqURL,
+				keyUpdatedAt:      time.Now(),
 			}).Error; err != nil {
 			return summary, err
 		}
@@ -215,11 +215,11 @@ func upsertBookmarkIllust(ctx context.Context, pixivUserID string, restrict stri
 	err := db.DB(ctx).Where("pixiv_user_id = ? AND restrict = ? AND illust_id = ?", pixivUserID, restrict, illust.ID).First(&existing).Error
 	if err == nil {
 		updates := map[string]any{
-			"last_export_run_id": runID,
-			"last_seen_at":       now,
-			"removed":            false,
-			"removed_at":         nil,
-			"updated_at":         now,
+			keyLastExportRunID: runID,
+			keyLastSeenAt:      now,
+			keyRemoved:         false,
+			keyRemovedAt:       nil,
+			keyUpdatedAt:       now,
 		}
 		status := bookmarkSaveSkipped
 		if existing.Removed {
@@ -257,12 +257,12 @@ func markBookmarkIllustRemoved(ctx context.Context, pixivUserID string, restrict
 	err := db.DB(ctx).Where("pixiv_user_id = ? AND restrict = ? AND illust_id = ?", pixivUserID, restrict, illustID).First(&existing).Error
 	if err == nil {
 		updates := map[string]any{
-			"illust_json":        illustJSON,
-			"last_export_run_id": runID,
-			"last_seen_at":       now,
-			"removed":            true,
-			"removed_at":         &now,
-			"updated_at":         now,
+			"illust_json":      illustJSON,
+			keyLastExportRunID: runID,
+			keyLastSeenAt:      now,
+			keyRemoved:         true,
+			keyRemovedAt:       &now,
+			keyUpdatedAt:       now,
 		}
 		if err := db.DB(ctx).Model(&model.PixezBookmarkIllust{}).Where("id = ?", existing.ID).Updates(updates).Error; err != nil {
 			return bookmarkSaveSkipped, err
@@ -310,11 +310,11 @@ func upsertBookmarkNovel(ctx context.Context, pixivUserID string, restrict strin
 	err := db.DB(ctx).Where("pixiv_user_id = ? AND restrict = ? AND novel_id = ?", pixivUserID, restrict, novel.ID).First(&existing).Error
 	if err == nil {
 		updates := map[string]any{
-			"last_export_run_id": runID,
-			"last_seen_at":       now,
-			"removed":            false,
-			"removed_at":         nil,
-			"updated_at":         now,
+			keyLastExportRunID: runID,
+			keyLastSeenAt:      now,
+			keyRemoved:         false,
+			keyRemovedAt:       nil,
+			keyUpdatedAt:       now,
 		}
 		status := bookmarkSaveSkipped
 		if existing.Removed {
@@ -352,12 +352,12 @@ func markBookmarkNovelRemoved(ctx context.Context, pixivUserID string, restrict 
 	err := db.DB(ctx).Where("pixiv_user_id = ? AND restrict = ? AND novel_id = ?", pixivUserID, restrict, novelID).First(&existing).Error
 	if err == nil {
 		updates := map[string]any{
-			"novel_json":         novelJSON,
-			"last_export_run_id": runID,
-			"last_seen_at":       now,
-			"removed":            true,
-			"removed_at":         &now,
-			"updated_at":         now,
+			"novel_json":       novelJSON,
+			keyLastExportRunID: runID,
+			keyLastSeenAt:      now,
+			keyRemoved:         true,
+			keyRemovedAt:       &now,
+			keyUpdatedAt:       now,
 		}
 		if err := db.DB(ctx).Model(&model.PixezBookmarkNovel{}).Where("id = ?", existing.ID).Updates(updates).Error; err != nil {
 			return bookmarkSaveSkipped, err
@@ -437,9 +437,9 @@ func markMissingIllustBookmarksRemoved(ctx context.Context, pixivUserID string, 
 	result := db.DB(ctx).Model(&model.PixezBookmarkIllust{}).
 		Where("pixiv_user_id = ? AND restrict = ? AND removed = ? AND last_export_run_id <> ?", pixivUserID, restrict, false, runID).
 		Updates(map[string]any{
-			"removed":    true,
-			"removed_at": &now,
-			"updated_at": now,
+			keyRemoved:   true,
+			keyRemovedAt: &now,
+			keyUpdatedAt: now,
 		})
 	return int(result.RowsAffected), result.Error
 }
@@ -449,9 +449,9 @@ func markMissingNovelBookmarksRemoved(ctx context.Context, pixivUserID string, r
 	result := db.DB(ctx).Model(&model.PixezBookmarkNovel{}).
 		Where("pixiv_user_id = ? AND restrict = ? AND removed = ? AND last_export_run_id <> ?", pixivUserID, restrict, false, runID).
 		Updates(map[string]any{
-			"removed":    true,
-			"removed_at": &now,
-			"updated_at": now,
+			keyRemoved:   true,
+			keyRemovedAt: &now,
+			keyUpdatedAt: now,
 		})
 	return int(result.RowsAffected), result.Error
 }
@@ -461,11 +461,11 @@ func markBookmarkRunFailed(ctx context.Context, runID string, reqURL string, err
 	_ = db.DB(ctx).Model(&model.PixezBookmarkExportRun{}).
 		Where("id = ?", runID).
 		Updates(map[string]any{
-			"status":           model.PixezBookmarkExportStatusFailed,
-			"error_message":    err.Error(),
-			"last_request_url": reqURL,
-			"finished_at":      &now,
-			"updated_at":       now,
+			keyStatus:         model.PixezBookmarkExportStatusFailed,
+			keyErrorMessage:   err.Error(),
+			keyLastRequestURL: reqURL,
+			"finished_at":     &now,
+			keyUpdatedAt:      now,
 		}).Error
 }
 
@@ -474,13 +474,13 @@ func markBookmarkRunSuccess(ctx context.Context, runID string, summary ExportSum
 	return db.DB(ctx).Model(&model.PixezBookmarkExportRun{}).
 		Where("id = ?", runID).
 		Updates(map[string]any{
-			"status":        model.PixezBookmarkExportStatusSuccess,
-			"total_count":   summary.TotalCount,
-			"new_count":     summary.NewCount,
-			"updated_count": summary.UpdatedCount,
-			"removed_count": summary.RemovedCount,
+			keyStatus:       model.PixezBookmarkExportStatusSuccess,
+			keyTotalCount:   summary.TotalCount,
+			keyNewCount:     summary.NewCount,
+			keyUpdatedCount: summary.UpdatedCount,
+			keyRemovedCount: summary.RemovedCount,
 			"finished_at":   &now,
-			"updated_at":    now,
+			keyUpdatedAt:    now,
 		}).Error
 }
 

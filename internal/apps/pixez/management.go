@@ -220,10 +220,10 @@ func ListBookmarkExportRuns(c *gin.Context) {
 		return
 	}
 	c.JSON(http.StatusOK, util.OK(gin.H{
-		"items":     items,
-		"total":     total,
-		"page":      page,
-		"page_size": pageSize,
+		keyItems:    items,
+		keyTotal:    total,
+		keyPage:     page,
+		keyPageSize: pageSize,
 	}))
 }
 
@@ -251,10 +251,10 @@ func ListBookmarkIllusts(c *gin.Context) {
 		return
 	}
 	c.JSON(http.StatusOK, util.OK(gin.H{
-		"items":     items,
-		"total":     total,
-		"page":      page,
-		"page_size": pageSize,
+		keyItems:    items,
+		keyTotal:    total,
+		keyPage:     page,
+		keyPageSize: pageSize,
 	}))
 }
 
@@ -282,10 +282,10 @@ func ListBookmarkNovels(c *gin.Context) {
 		return
 	}
 	c.JSON(http.StatusOK, util.OK(gin.H{
-		"items":     items,
-		"total":     total,
-		"page":      page,
-		"page_size": pageSize,
+		keyItems:    items,
+		keyTotal:    total,
+		keyPage:     page,
+		keyPageSize: pageSize,
 	}))
 }
 
@@ -754,11 +754,11 @@ func parseManagementPage(c *gin.Context) (int, int) {
 
 func bookmarkMirrorStatusFromQuery(value string) (int, bool) {
 	switch value {
-	case "success", "succeeded", "done":
+	case statusSuccess, "succeeded", "done":
 		return model.PixezBookmarkMirrorDone, true
-	case "processing", "downloading":
+	case statusProcessing, "downloading":
 		return model.PixezBookmarkMirrorProcessing, true
-	case "failed":
+	case statusFailed:
 		return model.PixezBookmarkMirrorFailed, true
 	case "none", "not_queued":
 		return model.PixezBookmarkMirrorNone, true
@@ -770,11 +770,11 @@ func bookmarkMirrorStatusFromQuery(value string) (int, bool) {
 func bookmarkMirrorStatusText(status int) string {
 	switch status {
 	case model.PixezBookmarkMirrorDone:
-		return "success"
+		return statusSuccess
 	case model.PixezBookmarkMirrorProcessing:
-		return "processing"
+		return statusProcessing
 	case model.PixezBookmarkMirrorFailed:
-		return "failed"
+		return statusFailed
 	default:
 		return "none"
 	}

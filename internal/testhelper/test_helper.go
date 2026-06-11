@@ -18,9 +18,10 @@ import (
 )
 
 const (
-	configTypeSystem = "system"
-	configValueTrue  = "true"
-	configValueFalse = "false"
+	configTypeSystem   = "system"
+	configTypeBusiness = "business"
+	configValueTrue    = "true"
+	configValueFalse   = "false"
 )
 
 // SetupTestEnvironment initializes an in-memory SQLite DB, seeds default configurations,
@@ -133,7 +134,7 @@ func getSeedConfigsPart1() []model.SystemConfig {
 		{
 			Key:         model.ConfigKeyMaxAPIKeysPerUser,
 			Value:       "5",
-			Type:        "business",
+			Type:        configTypeBusiness,
 			Description: "限制每个普通用户可以创建的 API Key 最大数量",
 		},
 		{
@@ -240,19 +241,19 @@ func getSeedConfigsPart2() []model.SystemConfig {
 		{
 			Key:         model.ConfigKeyPixezMirrorDownloadInterval,
 			Value:       "1",
-			Type:        "business",
+			Type:        configTypeBusiness,
 			Description: "Pixiv插画多图下载间隔（秒）",
 		},
 		{
 			Key:         model.ConfigKeyPixezMirrorIllustConcurrency,
 			Value:       "5",
-			Type:        "business",
+			Type:        configTypeBusiness,
 			Description: "Pixiv插画并发镜像限制（同时镜像的最大插画数）",
 		},
 		{
 			Key:         model.ConfigKeyPixezMirrorNovelConcurrency,
 			Value:       "5",
-			Type:        "business",
+			Type:        configTypeBusiness,
 			Description: "Pixiv小说并发镜像限制（同时镜像的最大小说数）",
 		},
 		{

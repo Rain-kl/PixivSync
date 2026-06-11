@@ -29,3 +29,23 @@ const (
 )
 
 const maxBatchMirrorIDs = 500
+
+const (
+	keyItems         = "items"
+	keyTotal         = "total"
+	keyPage          = "page"
+	keyPageSize      = "page_size"
+	keyError         = "error"
+	statusSuccess    = "success"
+	statusProcessing = "processing"
+	statusFailed     = "failed"
+	paramTypeNumber  = "number"
+	paramTypeString  = "string"
+	keyTargetType    = "target_type"
+	labelTargetType  = "目标类型"
+)
+
+const (
+	defaultSQLitePath = "server/pixez-sync.db"
+	defaultMirrorDir  = "server/data/mirror"
+)

@@ -70,10 +70,10 @@ func EnsureMirrorIllustQueued(ctx context.Context, illustID int64, taskID string
 		err := tx.Where("illust_id = ?", illustID).First(&existing).Error
 		if err == nil {
 			updates := map[string]any{
-				"task_id":       taskID,
-				"status":        model.PixezMirrorStatusQueued,
-				"error_message": "",
-				"updated_at":    now,
+				keyTaskID:       taskID,
+				keyStatus:       model.PixezMirrorStatusQueued,
+				keyErrorMessage: "",
+				keyUpdatedAt:    now,
 			}
 			if existing.ImageFilesJSON == "" {
 				updates["image_files_json"] = "[]"
@@ -116,10 +116,10 @@ func EnsureMirrorNovelQueued(ctx context.Context, novelID int64, taskID string) 
 		err := tx.Where("novel_id = ?", novelID).First(&existing).Error
 		if err == nil {
 			updates := map[string]any{
-				"task_id":       taskID,
-				"status":        model.PixezMirrorStatusQueued,
-				"error_message": "",
-				"updated_at":    now,
+				keyTaskID:       taskID,
+				keyStatus:       model.PixezMirrorStatusQueued,
+				keyErrorMessage: "",
+				keyUpdatedAt:    now,
 			}
 			if existing.RequestURLsJSON == "" {
 				updates["request_urls_json"] = "[]"
@@ -199,10 +199,10 @@ func ProcessMirrorIllust(ctx context.Context, client *Client, taskID string, ill
 	}
 
 	if err := updateMirrorIllust(ctx, illustID, map[string]any{
-		"task_id":       taskID,
-		"status":        model.PixezMirrorStatusProcessing,
-		"error_message": "",
-		"updated_at":    time.Now(),
+		keyTaskID:       taskID,
+		keyStatus:       model.PixezMirrorStatusProcessing,
+		keyErrorMessage: "",
+		keyUpdatedAt:    time.Now(),
 	}); err != nil {
 		return fmt.Errorf("mark illust mirror processing: %w", err)
 	}
@@ -271,17 +271,17 @@ func ProcessMirrorIllust(ctx context.Context, client *Client, taskID string, ill
 	}
 
 	updates := map[string]any{
-		"task_id":           taskID,
-		"status":            status,
+		keyTaskID:           taskID,
+		keyStatus:           status,
 		"detail_json":       string(detailBytes),
 		"image_files_json":  mustJSON(files),
 		"request_urls_json": requestURLsJSON,
 		"retry_urls_json":   mustJSON(failedURLs),
-		"error_message":     errMessage,
-		"total_count":       len(imageURLs),
+		keyErrorMessage:     errMessage,
+		keyTotalCount:       len(imageURLs),
 		"success_count":     len(files),
 		"failed_count":      len(failedURLs),
-		"updated_at":        time.Now(),
+		keyUpdatedAt:        time.Now(),
 	}
 	if err := updateMirrorIllust(ctx, illustID, updates); err != nil {
 		return fmt.Errorf("save illust mirror result: %w", err)
@@ -307,10 +307,10 @@ func ProcessMirrorNovel(ctx context.Context, client *Client, taskID string, nove
 	}
 
 	if err := updateMirrorNovel(ctx, novelID, map[string]any{
-		"task_id":       taskID,
-		"status":        model.PixezMirrorStatusProcessing,
-		"error_message": "",
-		"updated_at":    time.Now(),
+		keyTaskID:       taskID,
+		keyStatus:       model.PixezMirrorStatusProcessing,
+		keyErrorMessage: "",
+		keyUpdatedAt:    time.Now(),
 	}); err != nil {
 		return fmt.Errorf("mark novel mirror processing: %w", err)
 	}
@@ -342,8 +342,8 @@ func ProcessMirrorNovel(ctx context.Context, client *Client, taskID string, nove
 	task.AppendLog(ctx, "成功获取小说正文，正在保存至数据库中...")
 
 	updates := map[string]any{
-		"task_id":     taskID,
-		"status":      model.PixezMirrorStatusSuccess,
+		keyTaskID:     taskID,
+		keyStatus:     model.PixezMirrorStatusSuccess,
 		"detail_json": string(detailBytes),
 		"text_json":   string(textBytes),
 		"request_urls_json": mustJSON([]string{
@@ -351,11 +351,11 @@ func ProcessMirrorNovel(ctx context.Context, client *Client, taskID string, nove
 			fmt.Sprintf("https://%s/webview/v2/novel?id=%d", pixivAPIHost, novelID),
 		}),
 		"retry_urls_json": "[]",
-		"error_message":   "",
-		"total_count":     1,
+		keyErrorMessage:   "",
+		keyTotalCount:     1,
 		"success_count":   1,
 		"failed_count":    0,
-		"updated_at":      time.Now(),
+		keyUpdatedAt:      time.Now(),
 	}
 	if err := updateMirrorNovel(ctx, novelID, updates); err != nil {
 		return fmt.Errorf("save novel mirror result: %w", err)
@@ -386,20 +386,20 @@ func updateMirrorNovel(ctx context.Context, novelID int64, updates map[string]an
 
 func markIllustFailed(ctx context.Context, illustID int64, taskID string, err error) {
 	_ = updateMirrorIllust(ctx, illustID, map[string]any{
-		"task_id":       taskID,
-		"status":        model.PixezMirrorStatusFailed,
-		"error_message": err.Error(),
-		"updated_at":    time.Now(),
+		keyTaskID:       taskID,
+		keyStatus:       model.PixezMirrorStatusFailed,
+		keyErrorMessage: err.Error(),
+		keyUpdatedAt:    time.Now(),
 	})
 	updateBookmarkMirrorStatus(ctx, model.PixezMirrorTargetIllust, illustID, model.PixezBookmarkMirrorFailed)
 }
 
 func markNovelFailed(ctx context.Context, novelID int64, taskID string, err error) {
 	_ = updateMirrorNovel(ctx, novelID, map[string]any{
-		"task_id":       taskID,
-		"status":        model.PixezMirrorStatusFailed,
-		"error_message": err.Error(),
-		"updated_at":    time.Now(),
+		keyTaskID:       taskID,
+		keyStatus:       model.PixezMirrorStatusFailed,
+		keyErrorMessage: err.Error(),
+		keyUpdatedAt:    time.Now(),
 	})
 	updateBookmarkMirrorStatus(ctx, model.PixezMirrorTargetNovel, novelID, model.PixezBookmarkMirrorFailed)
 }
@@ -410,11 +410,11 @@ func updateBookmarkMirrorStatus(ctx context.Context, targetType string, targetID
 	case model.PixezMirrorTargetIllust:
 		_ = db.DB(ctx).Model(&model.PixezBookmarkIllust{}).
 			Where("illust_id = ?", targetID).
-			Updates(map[string]any{"mirror_status": status, "updated_at": now}).Error
+			Updates(map[string]any{"mirror_status": status, keyUpdatedAt: now}).Error
 	case model.PixezMirrorTargetNovel:
 		_ = db.DB(ctx).Model(&model.PixezBookmarkNovel{}).
 			Where("novel_id = ?", targetID).
-			Updates(map[string]any{"mirror_status": status, "updated_at": now}).Error
+			Updates(map[string]any{"mirror_status": status, keyUpdatedAt: now}).Error
 	}
 }
 

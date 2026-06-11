@@ -50,8 +50,8 @@ var (
 		Queue:        task.QueueDefault,
 		Retryable:    true,
 		Params: []task.TaskParam{
-			{Name: "target_type", Label: "目标类型", Type: "number", Required: true, Placeholder: "0 或 1", Description: "0 表示插画，1 表示小说"},
-			{Name: "target_id", Label: "资源 ID", Type: "number", Required: true, Placeholder: "123456", Description: "Pixiv 插画或小说 ID"},
+			{Name: keyTargetType, Label: labelTargetType, Type: paramTypeNumber, Required: true, Placeholder: "0 或 1", Description: "0 表示插画，1 表示小说"},
+			{Name: "target_id", Label: "资源 ID", Type: paramTypeNumber, Required: true, Placeholder: "123456", Description: "Pixiv 插画或小说 ID"},
 		},
 	}
 
@@ -66,8 +66,8 @@ var (
 		Queue:        task.QueueDefault,
 		Retryable:    true,
 		Params: []task.TaskParam{
-			{Name: "target_type", Label: "目标类型", Type: "number", Required: false, Placeholder: "0 或 1，留空表示全部", Description: "0 表示插画，1 表示小说，留空表示全部"},
-			{Name: "pixiv_user_id", Label: "Pixiv 用户 ID", Type: "string", Required: false, Placeholder: "留空表示全部账号", Description: "只导出指定 Pixiv 用户时填写"},
+			{Name: keyTargetType, Label: labelTargetType, Type: paramTypeNumber, Required: false, Placeholder: "0 或 1，留空表示全部", Description: "0 表示插画，1 表示小说，留空表示全部"},
+			{Name: "pixiv_user_id", Label: "Pixiv 用户 ID", Type: paramTypeString, Required: false, Placeholder: "留空表示全部账号", Description: "只导出指定 Pixiv 用户时填写"},
 		},
 	}
 
@@ -82,8 +82,8 @@ var (
 		Queue:        task.QueueDefault,
 		Retryable:    true,
 		Params: []task.TaskParam{
-			{Name: "target_type", Label: "目标类型", Type: "number", Required: false, Placeholder: "0 或 1，留空表示全部", Description: "0 表示插画，1 表示小说，留空表示全部"},
-			{Name: "limit", Label: "数量上限", Type: "number", Required: false, Placeholder: "50", Description: "本次最多入队数量"},
+			{Name: keyTargetType, Label: labelTargetType, Type: paramTypeNumber, Required: false, Placeholder: "0 或 1，留空表示全部", Description: "0 表示插画，1 表示小说，留空表示全部"},
+			{Name: "limit", Label: "数量上限", Type: paramTypeNumber, Required: false, Placeholder: "50", Description: "本次最多入队数量"},
 		},
 	}
 
@@ -98,8 +98,8 @@ var (
 		Queue:        task.QueueDefault,
 		Retryable:    false,
 		Params: []task.TaskParam{
-			{Name: "sqlite_path", Label: "旧 SQLite 路径", Type: "string", Required: false, Placeholder: "server/pixez-sync.db", Description: "旧 PixEz Sync SQLite 文件"},
-			{Name: "mirror_dir", Label: "旧镜像目录", Type: "string", Required: false, Placeholder: "server/data/mirror", Description: "旧插画镜像文件目录"},
+			{Name: "sqlite_path", Label: "旧 SQLite 路径", Type: paramTypeString, Required: false, Placeholder: defaultSQLitePath, Description: "旧 PixEz Sync SQLite 文件"},
+			{Name: "mirror_dir", Label: "旧镜像目录", Type: paramTypeString, Required: false, Placeholder: defaultMirrorDir, Description: "旧插画镜像文件目录"},
 			{Name: "dry_run", Label: "只预览", Type: "boolean", Required: false, Placeholder: "false", Description: "是否只统计不写入"},
 		},
 	}
@@ -331,8 +331,8 @@ type ImportLegacyServerTaskHandler struct{}
 // ValidatePayload validates legacy import payloads.
 func (h *ImportLegacyServerTaskHandler) ValidatePayload(payload []byte) ([]byte, error) {
 	req := pixezsvc.ImportLegacyRequest{
-		SQLitePath: "server/pixez-sync.db",
-		MirrorDir:  "server/data/mirror",
+		SQLitePath: defaultSQLitePath,
+		MirrorDir:  defaultMirrorDir,
 	}
 	if len(payload) > 0 {
 		if err := json.Unmarshal(payload, &req); err != nil {
@@ -342,10 +342,10 @@ func (h *ImportLegacyServerTaskHandler) ValidatePayload(payload []byte) ([]byte,
 	req.SQLitePath = strings.TrimSpace(req.SQLitePath)
 	req.MirrorDir = strings.TrimSpace(req.MirrorDir)
 	if req.SQLitePath == "" {
-		req.SQLitePath = "server/pixez-sync.db"
+		req.SQLitePath = defaultSQLitePath
 	}
 	if req.MirrorDir == "" {
-		req.MirrorDir = "server/data/mirror"
+		req.MirrorDir = defaultMirrorDir
 	}
 	return json.Marshal(req)
 }
