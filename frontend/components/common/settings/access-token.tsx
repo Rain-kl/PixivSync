@@ -206,10 +206,14 @@ export function AccessTokenMain() {
                   <div className="space-y-1">
                     <div className="flex items-center gap-2">
                       <span className="font-semibold text-sm text-foreground">{token.name}</span>
-                      {token.is_admin && (
+                      {token.is_admin ? (
                         <Badge variant="outline" className="text-[10px] px-1.5 py-0 h-4 border-rose-500/40 text-rose-500 bg-rose-500/5 font-semibold">
                           <Shield className="size-2.5 mr-0.5" />
                           管理员
+                        </Badge>
+                      ) : (
+                        <Badge variant="outline" className="text-[10px] px-1.5 py-0 h-4 border-border/50 text-muted-foreground bg-muted/10 font-semibold">
+                          用户令牌
                         </Badge>
                       )}
                     </div>
@@ -219,7 +223,6 @@ export function AccessTokenMain() {
                       </div>
                       <div className="flex flex-wrap gap-x-4 gap-y-0.5 pt-1">
                         <span>创建于: {formatDate(token.created_at)}</span>
-                        <span>最后使用: {formatDate(token.last_used_at)}</span>
                       </div>
                     </div>
                   </div>

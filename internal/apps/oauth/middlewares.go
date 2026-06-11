@@ -6,7 +6,6 @@ package oauth
 
 import (
 	"net/http"
-	"time"
 
 	"github.com/Rain-kl/Wavelet/internal/common"
 	"github.com/Rain-kl/Wavelet/internal/db"
@@ -56,9 +55,6 @@ func LoginRequired() gin.HandlerFunc {
 					authenticated = true
 					tokenAuth = true
 					tokenAdmin = tokenRecord.IsAdmin
-					// update token last used time
-					now := time.Now()
-					db.DB(ctx).Model(&tokenRecord).Update("last_used_at", &now)
 				}
 			}
 		}

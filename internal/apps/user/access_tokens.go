@@ -203,7 +203,6 @@ func RotateAccessToken(c *gin.Context) {
 
 	tokenRecord.TokenHash = newTokenHash
 	tokenRecord.MaskedToken = newMaskedToken
-	tokenRecord.LastUsedAt = nil // 轮换后重置使用时间
 
 	if err := db.DB(ctx).Save(&tokenRecord).Error; err != nil {
 		c.JSON(http.StatusOK, util.Err(err.Error()))

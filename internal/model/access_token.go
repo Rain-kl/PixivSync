@@ -20,15 +20,14 @@ const (
 
 // AccessToken 个人访问令牌实体
 type AccessToken struct {
-	ID          uint64     `json:"id" gorm:"primaryKey;autoIncrement"`
-	UserID      uint64     `json:"user_id" gorm:"index;not null"`
-	Name        string     `json:"name" gorm:"size:128;not null"`
-	TokenHash   string     `json:"-" gorm:"size:64;uniqueIndex;not null"`
-	MaskedToken string     `json:"masked_token" gorm:"size:64;not null"`
-	IsAdmin     bool       `json:"is_admin" gorm:"default:false"`
-	LastUsedAt  *time.Time `json:"last_used_at"`
-	CreatedAt   time.Time  `json:"created_at" gorm:"autoCreateTime"`
-	UpdatedAt   time.Time  `json:"updated_at" gorm:"autoUpdateTime"`
+	ID          uint64    `json:"id" gorm:"primaryKey;autoIncrement"`
+	UserID      uint64    `json:"user_id" gorm:"index;not null"`
+	Name        string    `json:"name" gorm:"size:128;not null"`
+	TokenHash   string    `json:"-" gorm:"size:64;uniqueIndex;not null"`
+	MaskedToken string    `json:"masked_token" gorm:"size:64;not null"`
+	IsAdmin     bool      `json:"is_admin" gorm:"default:false"`
+	CreatedAt   time.Time `json:"created_at" gorm:"autoCreateTime"`
+	UpdatedAt   time.Time `json:"updated_at" gorm:"autoUpdateTime"`
 }
 
 // GenerateTokenString 生成加密安全的随机 Token 值

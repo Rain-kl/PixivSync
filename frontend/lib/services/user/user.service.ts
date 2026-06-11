@@ -6,7 +6,6 @@ export interface AccessToken {
   name: string;
   masked_token: string;
   is_admin: boolean;
-  last_used_at?: string;
   created_at: string;
   updated_at: string;
 }

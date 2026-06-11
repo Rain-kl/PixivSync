@@ -205,7 +205,6 @@ export const apiSections: PolicySection[] = [
       "name": "my-dev-key",
       "masked_token": "at_628d...29c9",
       "is_admin": false,
-      "last_used_at": null,
       "created_at": "2026-06-07T21:30:00+08:00"
     }
   }
@@ -219,7 +218,7 @@ export const apiSections: PolicySection[] = [
 
         <h3 id="3-4-rotate-token" className="text-base md:text-lg font-semibold text-foreground mt-6 mb-2">3.4 轮换令牌密钥</h3>
         <p><strong>接口：</strong>POST <code className="bg-muted px-1.5 py-0.5 rounded text-xs font-mono">/api/v1/user/access-tokens/:id/rotate</code></p>
-        <p><strong>说明：</strong>轮换指定令牌的物理密钥值。系统将废弃原有密钥，返回新生成的明文 Token，并将 `last_used_at` 置空，令牌名称与 ID 保持一致。</p>
+        <p><strong>说明：</strong>轮换指定令牌的物理密钥值。系统将废弃原有密钥，返回新生成的明文 Token，令牌名称与 ID 保持一致。</p>
       </div>
     ),
     children: [
