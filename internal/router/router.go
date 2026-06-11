@@ -257,6 +257,9 @@ func registerRoutes(r *gin.Engine) {
 				adminRouter.PUT("/users/:id/status", admin_user.UpdateUserStatus)
 				adminRouter.DELETE("/users/:id", admin_user.DeleteUser)
 
+				// Uploads
+				adminRouter.GET("/uploads/types", upload.GetDistinctUploadTypes)
+
 				// System Config
 				adminRouter.POST("/system-configs", system_config.CreateSystemConfig)
 				adminRouter.GET("/system-configs", system_config.ListSystemConfigs)

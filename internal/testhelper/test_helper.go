@@ -244,6 +244,12 @@ func seedDefaultConfigs(t *testing.T, tx *gorm.DB) {
 			Type:        "business",
 			Description: "Pixiv小说并发镜像限制（同时镜像的最大小说数）",
 		},
+		{
+			Key:         model.ConfigKeyFileAccessWhitelist,
+			Value:       `["avatar"]`,
+			Type:        "system",
+			Description: "免登录访问的文件业务类型白名单",
+		},
 	}
 
 	if err := tx.Create(&defaultConfigs).Error; err != nil {
@@ -267,6 +273,7 @@ func seedDefaultConfigs(t *testing.T, tx *gorm.DB) {
 		model.ConfigKeyPixezMirrorDownloadInterval:      {},
 		model.ConfigKeyPixezMirrorIllustConcurrency:     {},
 		model.ConfigKeyPixezMirrorNovelConcurrency:      {},
+		model.ConfigKeyFileAccessWhitelist:              {},
 	}
 	keys := make([]string, 0, len(publicKeys))
 	for key := range publicKeys {

@@ -1,9 +1,11 @@
 "use client"
 
-import {useMutation, useQueryClient, type UseQueryResult} from "@tanstack/react-query"
-import {Globe, Search} from "lucide-react"
+import {useMemo} from "react"
+import {useMutation, useQuery, useQueryClient, type UseQueryResult} from "@tanstack/react-query"
+import {KeyRound, ShieldAlert, X} from "lucide-react"
 import {Card, CardContent, CardDescription, CardHeader, CardTitle} from "@/components/ui/card"
-import {Switch} from "@/components/ui/switch"
+import {Badge} from "@/components/ui/badge"
+import {Select, SelectContent, SelectItem, SelectTrigger, SelectValue} from "@/components/ui/select"
 import {AdminService} from "@/lib/services"
 import type {SystemConfig} from "@/lib/services/admin"
 import {TemplatesManager} from "./templates"
@@ -18,65 +20,147 @@ interface OperationTabProps {
 export function OperationTab({ configs, systemConfigsQuery }: OperationTabProps) {
   const queryClient = useQueryClient()
 
-  const updateConfigMutation = useMutation({
-    mutationFn: async ({ key, value }: { key: string; value: boolean }) => {
-      const config = configs[key]
+  const uploadTypesQuery = useQuery({
+    queryKey: ["admin", "upload-types"],
+    queryFn: () => AdminService.listUploadTypes(),
+  })
+
+  const updateWhitelistMutation = useMutation({
+    mutationFn: async (newValue: string) => {
+      const config = configs["file_access_whitelist"]
       if (!config) {
-        throw new Error(`缺少配置项: ${key}`)
+        throw new Error("缺少配置项: file_access_whitelist")
       }
-      await AdminService.updateSystemConfig(key, {
-        value: value ? "true" : "false",
+      await AdminService.updateSystemConfig("file_access_whitelist", {
+        value: newValue,
         description: config.description,
       })
     },
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ["admin", "system-configs"] })
       await queryClient.invalidateQueries({ queryKey: ["public-config"] })
-      toast.success("运营配置已更新")
+      toast.success("文件访问白名单已更新")
     },
     onError: (error: Error) => {
-      toast.error(error.message || "更新配置失败")
+      toast.error(error.message || "更新白名单失败")
     },
   })
 
-  const indexingEnabled = configs["search_engine_indexing_enabled"]?.value === "true"
+  const whitelistConfig = configs["file_access_whitelist"]
+  const currentWhitelist = useMemo<string[]>(() => {
+    if (!whitelistConfig?.value) return ["avatar"]
+    try {
+      const parsed = JSON.parse(whitelistConfig.value)
+      if (Array.isArray(parsed)) return parsed
+    } catch {
+      // 降级支持逗号分隔解析
+      return whitelistConfig.value.split(",").map(s => s.trim()).filter(Boolean)
+    }
+    return ["avatar"]
+  }, [whitelistConfig?.value])
+
+  const handleAddType = (type: string) => {
+    if (!type || currentWhitelist.includes(type)) return
+    const newWhitelist = [...currentWhitelist, type]
+    updateWhitelistMutation.mutate(JSON.stringify(newWhitelist))
+  }
+
+  const handleRemoveType = (typeToRemove: string) => {
+    const newWhitelist = currentWhitelist.filter(t => t !== typeToRemove)
+    updateWhitelistMutation.mutate(JSON.stringify(newWhitelist))
+  }
+
+  const availableTypes = useMemo(() => {
+    const types = uploadTypesQuery.data ?? []
+    return types.map(t => {
+      let label = t
+      if (t === "avatar") label = "头像 (avatar)"
+      else if (t === "attachment") label = "附件 (attachment)"
+      else if (t === "doc") label = "文档 (doc)"
+      else if (t === "generic") label = "通用 (generic)"
+      return { value: t, label }
+    })
+  }, [uploadTypesQuery.data])
 
   return (
     <div className="space-y-6">
       {/* PixEz 抓取限制 */}
       <PixEzRateLimitForm />
 
-      {/* 搜索引擎检索设置 */}
+
+      {/* 文件访问白名单设置 */}
       <Card className="border border-dashed shadow-sm">
         <CardHeader className="border-b border-dashed pb-4">
           <div className="flex items-center gap-2">
             <div className="p-1.5 rounded-lg bg-indigo-500/10 text-indigo-500">
-              <Globe className="size-4" />
+              <KeyRound className="size-4" />
             </div>
             <div>
-              <CardTitle className="text-base font-semibold">SEO 与搜索引擎检索</CardTitle>
-              <CardDescription className="text-xs">配置站点是否允许被搜索引擎抓取和检索</CardDescription>
+              <CardTitle className="text-base font-semibold">文件访问权限控制</CardTitle>
+              <CardDescription className="text-xs">配置免登录直接访问的文件业务类型。不在白名单内的文件将要求登录鉴权。</CardDescription>
             </div>
           </div>
         </CardHeader>
-        <CardContent className="pt-6">
-          <div className="flex items-center justify-between gap-4 rounded-xl border border-dashed p-4 bg-card hover:bg-muted/10 hover:border-indigo-500/30 transition-all duration-300 shadow-sm">
-            <div className="space-y-1">
-              <div className="flex items-center gap-2">
-                <Search className="size-4 text-indigo-500" />
-                <span className="font-medium text-sm text-foreground">允许被搜索引擎检索</span>
-              </div>
-              <p className="text-xs text-muted-foreground leading-relaxed pr-2">
-                默认关闭。关闭后系统将自动下发 noindex 指令并限制 robots.txt，禁止搜索引擎爬虫抓取本站页面。
-              </p>
+        <CardContent className="pt-6 space-y-4">
+          <div className="flex flex-col gap-4">
+            <div className="flex items-center gap-3">
+              <span className="text-sm font-medium text-muted-foreground">添加免鉴权类型:</span>
+              <Select
+                value=""
+                onValueChange={handleAddType}
+                disabled={updateWhitelistMutation.isPending || systemConfigsQuery.isPending || uploadTypesQuery.isPending}
+              >
+                <SelectTrigger className="w-[200px]" size="sm">
+                  <SelectValue placeholder="选择业务类型..." />
+                </SelectTrigger>
+                <SelectContent>
+                  {availableTypes
+                    .filter(t => !currentWhitelist.includes(t.value))
+                    .map(t => (
+                      <SelectItem key={t.value} value={t.value}>
+                        {t.label}
+                      </SelectItem>
+                    ))}
+                  {availableTypes.filter(t => !currentWhitelist.includes(t.value)).length === 0 && (
+                    <div className="text-xs text-muted-foreground p-2 text-center">所有类型已添加</div>
+                  )}
+                </SelectContent>
+              </Select>
             </div>
-            <Switch
-              checked={indexingEnabled}
-              disabled={updateConfigMutation.isPending || systemConfigsQuery.isPending}
-              onCheckedChange={(checked) =>
-                updateConfigMutation.mutate({ key: "search_engine_indexing_enabled", value: checked })
-              }
-            />
+
+            {/* 当前白名单列表 */}
+            <div className="rounded-xl border border-dashed p-4 bg-card hover:bg-muted/10 hover:border-indigo-500/30 transition-all duration-300 shadow-sm space-y-3">
+              <div className="flex items-center gap-2">
+                <ShieldAlert className="size-4 text-indigo-500" />
+                <span className="font-medium text-sm text-foreground">当前免鉴权列表</span>
+              </div>
+
+              {currentWhitelist.length > 0 ? (
+                <div className="flex flex-wrap gap-2">
+                  {currentWhitelist.map(type => (
+                    <Badge
+                      key={type}
+                      variant="secondary"
+                      className="px-2.5 py-1 text-xs gap-1.5 flex items-center bg-indigo-500/10 text-indigo-700 dark:text-indigo-300 dark:bg-indigo-500/20 border border-indigo-500/20"
+                    >
+                      {availableTypes.find(t => t.value === type)?.label || type}
+                      <button
+                        type="button"
+                        onClick={() => handleRemoveType(type)}
+                        disabled={updateWhitelistMutation.isPending || systemConfigsQuery.isPending}
+                        className="rounded-full outline-hidden hover:bg-indigo-500/20 p-0.5 text-indigo-600 dark:text-indigo-400 cursor-pointer disabled:cursor-not-allowed"
+                      >
+                        <X className="size-3" />
+                      </button>
+                    </Badge>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-xs text-muted-foreground">
+                  白名单已空，所有类型文件的访问都将需要登录。
+                </p>
+              )}
+            </div>
           </div>
         </CardContent>
       </Card>

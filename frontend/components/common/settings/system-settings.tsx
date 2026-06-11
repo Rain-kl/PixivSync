@@ -2,7 +2,7 @@
 
 import {useEffect, useMemo} from "react"
 import {useQuery} from "@tanstack/react-query"
-import {Loader2} from "lucide-react"
+import {Loader2, Settings} from "lucide-react"
 import {useRouter} from "next/navigation"
 import {motion} from "motion/react"
 
@@ -61,14 +61,21 @@ export function SystemSettingsMain() {
   }
 
   return (
+
     <motion.div
       initial={{ opacity: 0, y: 15 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.35, ease: "easeOut" }}
       className="py-6 space-y-6 w-full"
     >
+      <div className="flex items-center gap-2">
+        <Settings className="size-5 text-muted-foreground" />
+        <div>
+          <h1 className="text-2xl font-semibold tracking-tight">系统设置</h1>
+        </div>
+      </div>
       <Tabs defaultValue="security" className="w-full">
-        <TabsList variant={'line'} className="w-full">
+        <TabsList variant="line" className="w-fit inline-flex gap-8">
           <TabsTrigger value="security" className="px-0 pb-2 text-xs font-semibold">
             安全设置
           </TabsTrigger>

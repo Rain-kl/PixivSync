@@ -134,6 +134,14 @@ export class AdminService extends BaseService {
     return this.post<{ success: boolean; log: string; error: string }>('/system-configs/smtp/test', request);
   }
 
+  /**
+   * 获取所有已存在的文件业务类型及默认内置类型列表
+   * @returns 业务类型列表
+   */
+  static async listUploadTypes(): Promise<string[]> {
+    return this.get<string[]>('/uploads/types');
+  }
+
 
 
   // ==================== 认证源管理 ====================

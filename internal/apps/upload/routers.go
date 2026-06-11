@@ -19,6 +19,7 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -576,4 +577,29 @@ func saveUploadRecord(ctx context.Context, upload *model.Upload, storageDriver, 
 		return ErrSaveUploadRecordFailed
 	}
 	return ""
+}
+
+// GetDistinctUploadTypes 获取数据库中所有已存在的文件业务类型
+// @Summary 获取文件业务类型列表
+// @Description 返回数据库中所有已上传文件实际拥有的业务类型列表
+// @Tags admin
+// @Produce json
+// @Security SessionCookie
+// @Success 200 {object} util.ResponseAny{data=[]string} "业务类型列表"
+// @Failure 401 {object} util.ResponseAny "未登录"
+// @Failure 403 {object} util.ResponseAny "无管理员权限"
+// @Failure 500 {object} util.ResponseAny "内部错误"
+// @Router /api/v1/admin/uploads/types [get]
+func GetDistinctUploadTypes(c *gin.Context) {
+	var dbTypes []string
+	if err := db.DB(c.Request.Context()).Model(&model.Upload{}).
+		Where("type IS NOT NULL AND type != ''").
+		Distinct().
+		Pluck("type", &dbTypes).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, util.Err(err.Error()))
+		return
+	}
+
+	sort.Strings(dbTypes)
+	c.JSON(http.StatusOK, util.OK(dbTypes))
 }
