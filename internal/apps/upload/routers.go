@@ -364,7 +364,7 @@ func ListMyFiles(c *gin.Context) {
 		Where("user_id = ? AND status != ?", currUser.ID, model.UploadStatusDeleted)
 
 	if req.Keyword != "" {
-		query = query.Where("file_name ILIKE ?", "%"+req.Keyword+"%")
+		query = query.Where("LOWER(file_name) LIKE ?", "%"+strings.ToLower(req.Keyword)+"%")
 	}
 	if req.Type != "" {
 		query = query.Where("type = ?", req.Type)

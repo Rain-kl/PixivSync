@@ -79,7 +79,7 @@ export class UploadService extends BaseService {
     if (keyword) params.keyword = keyword
     if (type) params.type = type
     if (extension) params.extension = extension
-    return this.get<ListUploadsResponse>('/my', { params })
+    return this.get<ListUploadsResponse>('/my', params)
   }
 
   /**

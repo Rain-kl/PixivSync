@@ -45,6 +45,7 @@ func setupTestRouter(authUser *model.User) *gin.Engine {
 	})
 
 	uploadGroup.POST("", UploadFile)
+	uploadGroup.GET("/my", ListMyFiles)
 	uploadGroup.GET("/download/:id", DownloadFile)
 	uploadGroup.POST("/download/batch", BatchDownloadFiles)
 	return r
@@ -383,6 +384,125 @@ func TestDownloadFile(t *testing.T) {
 
 		if w.Code != http.StatusNotFound {
 			t.Errorf("expected status 404, got %d", w.Code)
+		}
+	})
+}
+
+func TestListMyFiles(t *testing.T) {
+	dbConn, _, cleanup := testhelper.SetupTestEnvironment(t)
+	defer cleanup()
+
+	authUser := &model.User{ID: 1001, Username: "test_user"}
+	router := setupTestRouter(authUser)
+
+	uploads := []model.Upload{
+		{
+			ID:            2101,
+			UserID:        authUser.ID,
+			FileName:      "first-report.txt",
+			FilePath:      "uploads/first-report.txt",
+			FileSize:      10,
+			MimeType:      "text/plain",
+			Extension:     "txt",
+			StorageDriver: "local",
+			Status:        model.UploadStatusUsed,
+		},
+		{
+			ID:            2102,
+			UserID:        authUser.ID,
+			FileName:      "Second-Photo.PNG",
+			FilePath:      "uploads/second-photo.png",
+			FileSize:      20,
+			MimeType:      "image/png",
+			Extension:     "png",
+			StorageDriver: "local",
+			Status:        model.UploadStatusUsed,
+		},
+		{
+			ID:            2103,
+			UserID:        authUser.ID,
+			FileName:      "third-notes.md",
+			FilePath:      "uploads/third-notes.md",
+			FileSize:      30,
+			MimeType:      "text/markdown",
+			Extension:     "md",
+			StorageDriver: "local",
+			Status:        model.UploadStatusUsed,
+		},
+		{
+			ID:            2104,
+			UserID:        2002,
+			FileName:      "other-user.txt",
+			FilePath:      "uploads/other-user.txt",
+			FileSize:      40,
+			MimeType:      "text/plain",
+			Extension:     "txt",
+			StorageDriver: "local",
+			Status:        model.UploadStatusUsed,
+		},
+	}
+	for i := range uploads {
+		if err := dbConn.Create(&uploads[i]).Error; err != nil {
+			t.Fatalf("failed to create upload %d: %v", uploads[i].ID, err)
+		}
+	}
+
+	t.Run("returns requested page", func(t *testing.T) {
+		req, _ := http.NewRequest("GET", "/api/v1/upload/my?page=2&page_size=2", nil)
+		w := httptest.NewRecorder()
+		router.ServeHTTP(w, req)
+
+		var resp testResponse
+		if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
+			t.Fatalf("failed to parse response: %v", err)
+		}
+		if resp.ErrorMsg != "" {
+			t.Fatalf("ListMyFiles() error = %q, want empty", resp.ErrorMsg)
+		}
+
+		var got listMyFilesResponse
+		if err := json.Unmarshal(resp.Data, &got); err != nil {
+			t.Fatalf("failed to parse list response: %v", err)
+		}
+		if got.Page != 2 {
+			t.Errorf("ListMyFiles(page=2).Page = %d, want 2", got.Page)
+		}
+		if got.PageSize != 2 {
+			t.Errorf("ListMyFiles(page_size=2).PageSize = %d, want 2", got.PageSize)
+		}
+		if got.Total != 3 {
+			t.Errorf("ListMyFiles().Total = %d, want 3", got.Total)
+		}
+		if len(got.Items) != 1 {
+			t.Fatalf("ListMyFiles(page=2, page_size=2) returned %d items, want 1", len(got.Items))
+		}
+	})
+
+	t.Run("filters filename case insensitively", func(t *testing.T) {
+		req, _ := http.NewRequest("GET", "/api/v1/upload/my?keyword=photo", nil)
+		w := httptest.NewRecorder()
+		router.ServeHTTP(w, req)
+
+		var resp testResponse
+		if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
+			t.Fatalf("failed to parse response: %v", err)
+		}
+		if resp.ErrorMsg != "" {
+			t.Fatalf("ListMyFiles(keyword=photo) error = %q, want empty", resp.ErrorMsg)
+		}
+
+		var got listMyFilesResponse
+		if err := json.Unmarshal(resp.Data, &got); err != nil {
+			t.Fatalf("failed to parse list response: %v", err)
+		}
+		if got.Total != 1 {
+			t.Errorf("ListMyFiles(keyword=photo).Total = %d, want 1", got.Total)
+		}
+		if len(got.Items) != 1 {
+			t.Fatalf("ListMyFiles(keyword=photo) returned %d items, want 1", len(got.Items))
+		}
+		if got.Items[0].FileName != "Second-Photo.PNG" {
+			t.Errorf("ListMyFiles(keyword=photo).Items[0].FileName = %q, want %q", got.Items[0].FileName, "Second-Photo.PNG")
 		}
 	})
 }
