@@ -11,27 +11,27 @@ import (
 //
 //nolint:revive // TaskParam 保留完整名称以避免与通用 Param 混淆
 type TaskParam struct {
-	Name        string `json:"Name"`        // 参数键名
-	Label       string `json:"Label"`       // 显示名称
-	Type        string `json:"Type"`        // 类型：string, text, number, boolean
-	Required    bool   `json:"Required"`    // 是否必填
-	Placeholder string `json:"Placeholder"` // 占位符
-	Description string `json:"Description"` // 描述
+	Name        string `json:"name"`        // 参数键名
+	Label       string `json:"label"`       // 显示名称
+	Type        string `json:"type"`        // 类型：string, text, number, boolean
+	Required    bool   `json:"required"`    // 是否必填
+	Placeholder string `json:"placeholder"` // 占位符
+	Description string `json:"description"` // 描述
 }
 
 // TaskMeta 任务元数据
 //
 //nolint:revive // TaskMeta 保留完整名称以避免与通用 Meta 混淆
 type TaskMeta struct {
-	Type         string
-	AsynqTask    string
-	Name         string
-	Description  string
-	SupportsTime bool
-	MaxRetry     int
-	Queue        string
-	Retryable    bool // 是否支持手动重试
-	Params       []TaskParam
+	Type         string      `json:"type"`
+	AsynqTask    string      `json:"asynq_task"`
+	Name         string      `json:"name"`
+	Description  string      `json:"description"`
+	SupportsTime bool        `json:"supports_time"`
+	MaxRetry     int         `json:"max_retry"`
+	Queue        string      `json:"queue"`
+	Retryable    bool        `json:"retryable"` // 是否支持手动重试
+	Params       []TaskParam `json:"params,omitempty"`
 }
 
 var (
