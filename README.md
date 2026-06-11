@@ -102,10 +102,6 @@ password: 12345678
 4. 地址示例：`https://pixez.example.com`。
 5. 粘贴 AccessToken。
 
-Flutter custom 层应把 Wavelet envelope 解包集中保留在 sync API service 内：`error_msg == ""` 表示接口成功。`/mirror/**` 是 Pixiv 形态响应，不参与 envelope 解包。
-
-
-
 ## 系统架构
 
 ```text
@@ -124,7 +120,6 @@ internal/service/pixez
   |-- sync-data 备份与 hash 对比
   |-- 插画 / 小说镜像处理
   |-- 收藏导出与 removed 状态追踪
-  |-- 旧 SQLite 与镜像文件导入
   |
   v
 GORM models + goose migrations + uploads + task_executions
@@ -186,9 +181,6 @@ PixEz 任务接入 Wavelet Admin 任务体系：
 | `pixez_mirror` | `pixez:mirror` | 镜像单个插画或小说 |
 | `pixez_export_bookmarks` | `pixez:export_bookmarks` | 导出收藏 read-model 并维护 removed 状态 |
 | `pixez_auto_enqueue_bookmark_mirrors` | `pixez:auto_enqueue_bookmark_mirrors` | 扫描未镜像或失败的收藏条目并批量入队 |
-| `pixez_import_legacy_server` | `pixez:import_legacy_server` | 导入旧 PixEz sync SQLite 数据与镜像文件 |
-
-`task_executions` 记录执行状态、日志、重试信息和失败原因。默认收藏自动入队镜像调度为 `*/10 * * * *`。
 
 ## 本地源码开发
 
@@ -243,3 +235,13 @@ make build-embedded
 ## License
 
 This project is licensed under the [GNU Affero General Public License v3.0](LICENSE).
+
+## Star History
+
+<a href="https://www.star-history.com/?repos=Rain-kl%2FPixezSync&type=date&legend=top-left">
+ <picture>
+   <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/chart?repos=Rain-kl/PixezSync&type=date&theme=dark&legend=bottom-right" />
+   <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/chart?repos=Rain-kl/PixezSync&type=date&legend=bottom-right" />
+   <img alt="Star History Chart" src="https://api.star-history.com/chart?repos=Rain-kl/PixezSync&type=date&legend=bottom-right" />
+ </picture>
+</a>
