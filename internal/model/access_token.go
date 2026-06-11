@@ -30,6 +30,11 @@ type AccessToken struct {
 	UpdatedAt   time.Time `json:"updated_at" gorm:"autoUpdateTime"`
 }
 
+// TableName 表名
+func (AccessToken) TableName() string {
+	return "w_access_tokens"
+}
+
 // GenerateTokenString 生成加密安全的随机 Token 值
 func GenerateTokenString() (string, error) {
 	bytes := make([]byte, tokenByteLength)

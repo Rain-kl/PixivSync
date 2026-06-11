@@ -29,6 +29,11 @@ type Template struct {
 	UpdatedAt   time.Time `json:"updated_at" gorm:"autoUpdateTime;index"`
 }
 
+// TableName 表名
+func (Template) TableName() string {
+	return "w_templates"
+}
+
 // Normalize 规范化模板字段
 func (t *Template) Normalize() {
 	t.Key = strings.TrimSpace(t.Key)

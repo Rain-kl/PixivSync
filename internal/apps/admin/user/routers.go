@@ -107,7 +107,7 @@ func ListUsers(c *gin.Context) {
 	var users []user
 	var total int64
 
-	query := db.DB(c.Request.Context()).Table("users")
+	query := db.DB(c.Request.Context()).Model(&model.User{})
 
 	username := strings.TrimSpace(req.Username)
 
@@ -217,7 +217,7 @@ func UpdateUserStatus(c *gin.Context) {
 		IsAdmin bool   `gorm:"column:is_admin"`
 	}
 	if err := db.DB(c.Request.Context()).
-		Table("users").
+		Model(&model.User{}).
 		Select("id, is_admin").
 		Where("id = ?", id).
 		First(&targetUser).Error; err != nil {
@@ -235,7 +235,7 @@ func UpdateUserStatus(c *gin.Context) {
 	}
 
 	if err := db.DB(c.Request.Context()).
-		Table("users").
+		Model(&model.User{}).
 		Where("id = ?", id).
 		Update("is_active", req.IsActive).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, util.Err(updateUserFailed))
@@ -276,7 +276,7 @@ func DeleteUser(c *gin.Context) {
 		IsAdmin bool   `gorm:"column:is_admin"`
 	}
 	if err := db.DB(c.Request.Context()).
-		Table("users").
+		Model(&model.User{}).
 		Select("id, is_admin").
 		Where("id = ?", id).
 		First(&targetUser).Error; err != nil {
@@ -354,7 +354,7 @@ func CreateUser(c *gin.Context) {
 
 	ctx := c.Request.Context()
 	var count int64
-	if err := db.DB(ctx).Table("users").Where("username = ?", req.Username).Count(&count).Error; err != nil {
+	if err := db.DB(ctx).Model(&model.User{}).Where("username = ?", req.Username).Count(&count).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, util.Err(err.Error()))
 		return
 	}

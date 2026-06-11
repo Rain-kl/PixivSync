@@ -62,6 +62,11 @@ type User struct {
 	UpdatedAt   time.Time `json:"updated_at" gorm:"autoUpdateTime;index"`
 }
 
+// TableName 表名
+func (User) TableName() string {
+	return "w_users"
+}
+
 // SetPassword 设置明文密码
 func (u *User) SetPassword(password string) error {
 	u.Password = password

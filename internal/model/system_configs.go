@@ -71,6 +71,11 @@ type SystemConfig struct {
 	CreatedAt   time.Time `json:"created_at" gorm:"autoCreateTime"`
 }
 
+// TableName 表名
+func (SystemConfig) TableName() string {
+	return "w_system_configs"
+}
+
 // GetByKey 通过 key 查询配置（带 Redis 缓存）
 func (sc *SystemConfig) GetByKey(ctx context.Context, key string) error {
 	if db.Redis != nil {

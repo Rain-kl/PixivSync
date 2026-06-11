@@ -219,7 +219,7 @@ func buildAccessLogFilters(ctx context.Context, c *gin.Context) ([]string, []int
 func fetchAccessLogDetails(ctx context.Context, whereClause string, args []interface{}, pageSize int, offset int) ([]accessLogItem, error) {
 	dataQuery := fmt.Sprintf(`
 		SELECT id, user_id, path, method, ip, user_agent, headers, status, latency, created_at
-		FROM user_access_logs
+		FROM w_user_access_logs
 		%s
 		ORDER BY created_at DESC, id DESC
 		LIMIT ? OFFSET ?
@@ -325,7 +325,7 @@ func GetAccessLogs(c *gin.Context) {
 
 	// 4. 查询日志总数
 	var total uint64
-	countQuery := fmt.Sprintf("SELECT count() FROM user_access_logs %s", whereClause)
+	countQuery := fmt.Sprintf("SELECT count() FROM w_user_access_logs %s", whereClause)
 	if err := db.ChConn.QueryRow(c.Request.Context(), countQuery, args...).Scan(&total); err != nil {
 		c.JSON(http.StatusInternalServerError, util.Err("查询 ClickHouse 日志统计失败: "+err.Error()))
 		return
@@ -412,7 +412,7 @@ func GetLogsAnalytics(c *gin.Context) {
 func queryAccessTrend(ctx context.Context, startTime time.Time) []trendItem {
 	trendRows, err := db.ChConn.Query(ctx, `
 		SELECT toDate(created_at) as date, count() as count
-		FROM user_access_logs
+		FROM w_user_access_logs
 		WHERE created_at >= ?
 		GROUP BY date
 		ORDER BY date ASC
@@ -451,7 +451,7 @@ func queryAccessTrend(ctx context.Context, startTime time.Time) []trendItem {
 func queryBrowserDistribution(ctx context.Context, startTime time.Time) []browserItem {
 	uaRows, err := db.ChConn.Query(ctx, `
 		SELECT user_agent, count() as count
-		FROM user_access_logs
+		FROM w_user_access_logs
 		WHERE created_at >= ?
 		GROUP BY user_agent
 	`, startTime)
@@ -486,7 +486,7 @@ func queryBrowserDistribution(ctx context.Context, startTime time.Time) []browse
 func queryTopActiveUsers(ctx context.Context, startTime time.Time) []topUserItem {
 	userRows, err := db.ChConn.Query(ctx, `
 		SELECT user_id, count() as count
-		FROM user_access_logs
+		FROM w_user_access_logs
 		WHERE created_at >= ? AND user_id > 0
 		GROUP BY user_id
 		ORDER BY count DESC

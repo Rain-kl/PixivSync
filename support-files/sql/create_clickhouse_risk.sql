@@ -2,7 +2,7 @@ CREATE DATABASE IF NOT EXISTS wavelet;
 
 USE wavelet;
 
-CREATE TABLE IF NOT EXISTS user_access_logs
+CREATE TABLE IF NOT EXISTS w_user_access_logs
 (
     id          UInt64,
     user_id     UInt64,

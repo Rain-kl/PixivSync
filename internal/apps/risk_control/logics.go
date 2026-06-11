@@ -68,7 +68,7 @@ func startBatchWorker() {
 		}
 
 		ctx := context.Background()
-		b, err := db.ChConn.PrepareBatch(ctx, "INSERT INTO user_access_logs (id, user_id, path, method, ip, user_agent, headers, status, latency, created_at)")
+		b, err := db.ChConn.PrepareBatch(ctx, "INSERT INTO w_user_access_logs (id, user_id, path, method, ip, user_agent, headers, status, latency, created_at)")
 		if err != nil {
 			logger.ErrorF(ctx, "[RiskControl] Prepare ClickHouse batch failed: %v", err)
 			batch = nil

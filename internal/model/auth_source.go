@@ -38,6 +38,11 @@ type AuthSource struct {
 	ClientSecretConfigured bool      `json:"client_secret_configured" gorm:"-"`
 }
 
+// TableName 表名
+func (AuthSource) TableName() string {
+	return "w_auth_sources"
+}
+
 // ExternalAccount 外部账号绑定实体
 type ExternalAccount struct {
 	ID               uint64    `json:"id" gorm:"primaryKey"`
@@ -48,6 +53,11 @@ type ExternalAccount struct {
 	Email            string    `json:"email" gorm:"size:255"`
 	CreatedAt        time.Time `json:"created_at"`
 	UpdatedAt        time.Time `json:"updated_at"`
+}
+
+// TableName 表名
+func (ExternalAccount) TableName() string {
+	return "w_external_accounts"
 }
 
 // ExternalAccountView 外部帐号绑定视图（脱敏展示用）

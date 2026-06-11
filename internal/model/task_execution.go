@@ -49,7 +49,7 @@ type TaskExecution struct {
 
 // TableName 表名
 func (TaskExecution) TableName() string {
-	return "task_executions"
+	return "w_task_executions"
 }
 
 // CreateTaskExecution 创建任务执行记录

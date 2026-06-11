@@ -338,5 +338,5 @@ func TestListTaskExecutionsDefaultPaging(t *testing.T) {
 
 func TestTaskExecutionTableName(t *testing.T) {
 	execution := TaskExecution{}
-	assert.Equal(t, "task_executions", execution.TableName())
+	assert.Equal(t, "w_task_executions", execution.TableName())
 }

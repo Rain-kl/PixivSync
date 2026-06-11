@@ -47,3 +47,8 @@ type Upload struct {
 	CreatedAt     time.Time      `json:"created_at" gorm:"autoCreateTime"`
 	UpdatedAt     time.Time      `json:"updated_at" gorm:"autoUpdateTime"`
 }
+
+// TableName 表名
+func (Upload) TableName() string {
+	return "w_uploads"
+}

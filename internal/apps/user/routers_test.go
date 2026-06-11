@@ -185,7 +185,7 @@ func TestLoginRequiresPasswordChangeForInitialPlaintextAdmin(t *testing.T) {
 	)
 	now := time.Now()
 	if err := dbConn.Exec(
-		`INSERT INTO users (id, username, password, nickname, is_active, is_admin, last_login_at, created_at, updated_at)
+		`INSERT INTO w_users (id, username, password, nickname, is_active, is_admin, last_login_at, created_at, updated_at)
 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 		adminID,
 		adminUsername,

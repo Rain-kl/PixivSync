@@ -24,7 +24,7 @@ type Schedule struct {
 
 // TableName 表名
 func (Schedule) TableName() string {
-	return "schedules"
+	return "w_schedules"
 }
 
 // CreateSchedule 创建定时任务
