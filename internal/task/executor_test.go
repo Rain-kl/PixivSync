@@ -15,6 +15,7 @@ import (
 	"github.com/hibiken/asynq"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"go.opentelemetry.io/otel/trace"
 )
 
 // mockHandler 用于测试的模拟任务处理器
@@ -207,6 +208,43 @@ func TestProcessTaskFailure(t *testing.T) {
 	found, err := model.GetTaskExecutionByTaskID(ctx, "process_fail_001")
 	require.NoError(t, err)
 	assert.Contains(t, found.Log, "开始执行任务")
+}
+
+func TestCompleteTaskExecutionFlushesLog(t *testing.T) {
+	cleanup := setupTest(t)
+	defer cleanup()
+	ctx := context.Background()
+
+	execution := &model.TaskExecution{
+		TaskID:      "complete_flush_001",
+		TaskType:    testTaskType,
+		TaskName:    "测试任务",
+		Status:      model.TaskExecutionStatusRunning,
+		TriggeredBy: "manual",
+	}
+	err := model.CreateTaskExecution(ctx, execution)
+	require.NoError(t, err)
+
+	ctx = withTaskID(ctx, execution.TaskID)
+	AppendLog(ctx, "任务执行中的日志")
+
+	finishTime := time.Now()
+	completeTaskExecution(
+		ctx,
+		execution,
+		asynq.NewTask(testTaskType, nil),
+		100*time.Millisecond,
+		finishTime,
+		&TaskResult{Message: "处理完成"},
+		nil,
+		trace.SpanFromContext(ctx),
+	)
+
+	found, err := model.GetTaskExecutionByTaskID(ctx, execution.TaskID)
+	require.NoError(t, err)
+	assert.Equal(t, model.TaskExecutionStatusSucceeded, found.Status)
+	assert.Contains(t, found.Log, "任务执行中的日志")
+	assert.Contains(t, found.Log, "任务执行成功")
 }
 
 func TestRetryTask(t *testing.T) {

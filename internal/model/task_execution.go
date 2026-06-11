@@ -6,12 +6,14 @@ package model
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/Rain-kl/Wavelet/internal/db"
 	"github.com/Rain-kl/Wavelet/internal/db/idgen"
-	"gorm.io/gorm"
+	"github.com/redis/go-redis/v9"
 )
 
 // TaskExecutionStatus 任务执行状态
@@ -23,6 +25,10 @@ const (
 	TaskExecutionStatusRunning   TaskExecutionStatus = "running"
 	TaskExecutionStatusSucceeded TaskExecutionStatus = "succeeded"
 	TaskExecutionStatusFailed    TaskExecutionStatus = "failed"
+
+	taskExecutionLogRedisKeyPrefix = "task:execution:log:"
+	taskExecutionLogExpiration     = 24 * time.Hour
+	taskExecutionLogMaxLines       = 1000
 )
 
 // TaskExecution 任务执行记录
@@ -58,7 +64,7 @@ func CreateTaskExecution(ctx context.Context, execution *TaskExecution) error {
 	return db.DB(ctx).Create(execution).Error
 }
 
-// UpdateTaskExecution 更新任务执行记录，忽略 log 字段以防覆写正在追加的日志
+// UpdateTaskExecution 更新任务执行记录，忽略由 Redis 缓冲和归档流程管理的 log 字段。
 func UpdateTaskExecution(ctx context.Context, execution *TaskExecution) error {
 	return db.DB(ctx).Omit("log").Save(execution).Error
 }
@@ -67,6 +73,9 @@ func UpdateTaskExecution(ctx context.Context, execution *TaskExecution) error {
 func GetTaskExecutionByTaskID(ctx context.Context, taskID string) (*TaskExecution, error) {
 	var execution TaskExecution
 	if err := db.DB(ctx).Where("task_id = ?", taskID).First(&execution).Error; err != nil {
+		return nil, err
+	}
+	if err := loadTaskExecutionLog(ctx, &execution); err != nil {
 		return nil, err
 	}
 	return &execution, nil
@@ -78,16 +87,64 @@ func GetTaskExecutionByID(ctx context.Context, id uint64) (*TaskExecution, error
 	if err := db.DB(ctx).Where("id = ?", id).First(&execution).Error; err != nil {
 		return nil, err
 	}
+	if err := loadTaskExecutionLog(ctx, &execution); err != nil {
+		return nil, err
+	}
 	return &execution, nil
 }
 
-// AppendTaskExecutionLog 追加日志到执行记录
+// AppendTaskExecutionLog 将日志追加到 Redis 缓冲，任务完成后再持久化到数据库。
 func AppendTaskExecutionLog(ctx context.Context, taskID string, logLine string) error {
+	if db.Redis == nil {
+		return errors.New("redis client is not initialized")
+	}
+
 	now := time.Now().Format("15:04:05")
 	line := fmt.Sprintf("[%s] %s\n", now, logLine)
-	return db.DB(ctx).Model(&TaskExecution{}).
+	key := taskExecutionLogRedisKey(taskID)
+
+	_, err := db.Redis.TxPipelined(ctx, func(pipe redis.Pipeliner) error {
+		pipe.RPush(ctx, key, line)
+		pipe.LTrim(ctx, key, -taskExecutionLogMaxLines, -1)
+		pipe.Expire(ctx, key, taskExecutionLogExpiration)
+		return nil
+	})
+	if err != nil {
+		return fmt.Errorf("append task execution log to redis: %w", err)
+	}
+	return nil
+}
+
+// FlushTaskExecutionLog 将 Redis 中的完整任务日志写入数据库，并在成功后清理缓存。
+func FlushTaskExecutionLog(ctx context.Context, taskID string) error {
+	if db.Redis == nil {
+		return errors.New("redis client is not initialized")
+	}
+
+	key := taskExecutionLogRedisKey(taskID)
+	logLines, err := db.Redis.LRange(ctx, key, 0, -1).Result()
+	if err != nil {
+		return fmt.Errorf("get task execution log from redis: %w", err)
+	}
+	if len(logLines) == 0 {
+		return nil
+	}
+	logText := strings.Join(logLines, "")
+
+	result := db.DB(ctx).Model(&TaskExecution{}).
 		Where("task_id = ?", taskID).
-		Update("log", gorm.Expr("COALESCE(log, '') || ?", line)).Error
+		Update("log", logText)
+	if result.Error != nil {
+		return fmt.Errorf("persist task execution log: %w", result.Error)
+	}
+	if result.RowsAffected == 0 {
+		return fmt.Errorf("persist task execution log: task %q not found", taskID)
+	}
+
+	if err := db.Redis.Del(ctx, key).Err(); err != nil {
+		return fmt.Errorf("delete persisted task execution log from redis: %w", err)
+	}
+	return nil
 }
 
 // ListTaskExecutionsRequest 查询任务执行记录列表请求
@@ -126,6 +183,55 @@ func ListTaskExecutions(ctx context.Context, req ListTaskExecutionsRequest) ([]T
 	if err := query.Order("id DESC").Offset(offset).Limit(req.PageSize).Find(&executions).Error; err != nil {
 		return nil, 0, err
 	}
+	if err := loadTaskExecutionLogs(ctx, executions); err != nil {
+		return nil, 0, err
+	}
 
 	return executions, total, nil
+}
+
+func taskExecutionLogRedisKey(taskID string) string {
+	return db.PrefixedKey(taskExecutionLogRedisKeyPrefix + taskID)
+}
+
+func loadTaskExecutionLog(ctx context.Context, execution *TaskExecution) error {
+	if db.Redis == nil {
+		return nil
+	}
+
+	logLines, err := db.Redis.LRange(ctx, taskExecutionLogRedisKey(execution.TaskID), 0, -1).Result()
+	if err != nil {
+		return fmt.Errorf("get task execution log from redis: %w", err)
+	}
+	if len(logLines) == 0 {
+		return nil
+	}
+
+	execution.Log = strings.Join(logLines, "")
+	return nil
+}
+
+func loadTaskExecutionLogs(ctx context.Context, executions []TaskExecution) error {
+	if db.Redis == nil || len(executions) == 0 {
+		return nil
+	}
+
+	commands := make([]*redis.StringSliceCmd, len(executions))
+	_, err := db.Redis.Pipelined(ctx, func(pipe redis.Pipeliner) error {
+		for i := range executions {
+			commands[i] = pipe.LRange(ctx, taskExecutionLogRedisKey(executions[i].TaskID), 0, -1)
+		}
+		return nil
+	})
+	if err != nil {
+		return fmt.Errorf("get task execution logs from redis: %w", err)
+	}
+
+	for i := range executions {
+		logLines := commands[i].Val()
+		if len(logLines) > 0 {
+			executions[i].Log = strings.Join(logLines, "")
+		}
+	}
+	return nil
 }

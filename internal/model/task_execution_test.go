@@ -6,11 +6,14 @@ package model
 
 import (
 	"context"
+	"fmt"
 	"testing"
 	"time"
 
 	"github.com/Rain-kl/Wavelet/internal/db"
+	"github.com/alicebob/miniredis/v2"
 	"github.com/glebarez/sqlite"
+	"github.com/redis/go-redis/v9"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"gorm.io/gorm"
@@ -25,10 +28,18 @@ func setupTaskExecutionTestEnvironment(t *testing.T) func() {
 	err = sqliteDB.AutoMigrate(&TaskExecution{})
 	require.NoError(t, err)
 
+	miniRedis, err := miniredis.Run()
+	require.NoError(t, err)
+	redisClient := redis.NewClient(&redis.Options{Addr: miniRedis.Addr()})
+
 	db.SetDB(sqliteDB)
+	db.Redis = redisClient
 
 	return func() {
+		require.NoError(t, redisClient.Close())
+		miniRedis.Close()
 		db.SetDB(nil)
+		db.Redis = nil
 	}
 }
 
@@ -188,7 +199,7 @@ func TestUpdateTaskExecutionFailed(t *testing.T) {
 	assert.Equal(t, int64(200), found.Duration)
 }
 
-func TestUpdateTaskExecutionDoesNotOverwriteLog(t *testing.T) {
+func TestUpdateTaskExecutionDoesNotPersistBufferedLog(t *testing.T) {
 	cleanup := setupTaskExecutionTestEnvironment(t)
 	defer cleanup()
 	ctx := context.Background()
@@ -203,23 +214,25 @@ func TestUpdateTaskExecutionDoesNotOverwriteLog(t *testing.T) {
 	err := CreateTaskExecution(ctx, execution)
 	require.NoError(t, err)
 
-	// In a real execution, logs are appended to the DB asynchronously via AppendTaskExecutionLog
+	// 运行中的日志仅缓存在 Redis。
 	err = AppendTaskExecutionLog(ctx, "test_omit_log_001", "第一条执行日志")
 	require.NoError(t, err)
 
-	// The local struct still has empty Log because it was not reloaded
 	assert.Empty(t, execution.Log)
 
-	// Now complete/update the execution (e.g. status, duration)
 	execution.Status = TaskExecutionStatusSucceeded
 	execution.Duration = 100
 	err = UpdateTaskExecution(ctx, execution)
 	require.NoError(t, err)
 
-	// Get the updated execution record and check that the Log was NOT overwritten/wiped
+	var persisted TaskExecution
+	err = db.DB(ctx).Where("task_id = ?", "test_omit_log_001").First(&persisted).Error
+	require.NoError(t, err)
+	assert.Equal(t, TaskExecutionStatusSucceeded, persisted.Status)
+	assert.Empty(t, persisted.Log)
+
 	found, err := GetTaskExecutionByTaskID(ctx, "test_omit_log_001")
 	require.NoError(t, err)
-	assert.Equal(t, TaskExecutionStatusSucceeded, found.Status)
 	assert.Contains(t, found.Log, "第一条执行日志")
 }
 
@@ -248,12 +261,51 @@ func TestAppendTaskExecutionLog(t *testing.T) {
 	err = AppendTaskExecutionLog(ctx, "test_log_001", "清理完成，共删除 42 个文件")
 	require.NoError(t, err)
 
-	// 验证日志内容
+	// 读取时优先返回 Redis 中的在途日志。
 	found, err := GetTaskExecutionByTaskID(ctx, "test_log_001")
 	require.NoError(t, err)
 	assert.Contains(t, found.Log, "开始扫描未使用上传文件")
 	assert.Contains(t, found.Log, "本批次找到 42 个待清理文件")
 	assert.Contains(t, found.Log, "清理完成，共删除 42 个文件")
+
+	var persisted TaskExecution
+	err = db.DB(ctx).Where("task_id = ?", "test_log_001").First(&persisted).Error
+	require.NoError(t, err)
+	assert.Empty(t, persisted.Log)
+
+	err = FlushTaskExecutionLog(ctx, "test_log_001")
+	require.NoError(t, err)
+
+	err = db.DB(ctx).Where("task_id = ?", "test_log_001").First(&persisted).Error
+	require.NoError(t, err)
+	assert.Contains(t, persisted.Log, "开始扫描未使用上传文件")
+
+	exists, err := db.Redis.Exists(ctx, taskExecutionLogRedisKey("test_log_001")).Result()
+	require.NoError(t, err)
+	assert.Zero(t, exists)
+}
+
+func TestAppendTaskExecutionLogLimitsLinesAndRefreshesTTL(t *testing.T) {
+	cleanup := setupTaskExecutionTestEnvironment(t)
+	defer cleanup()
+	ctx := context.Background()
+
+	const taskID = "limited_log_001"
+	for i := 0; i < taskExecutionLogMaxLines+5; i++ {
+		err := AppendTaskExecutionLog(ctx, taskID, fmt.Sprintf("日志-%04d", i))
+		require.NoError(t, err)
+	}
+
+	key := taskExecutionLogRedisKey(taskID)
+	logLines, err := db.Redis.LRange(ctx, key, 0, -1).Result()
+	require.NoError(t, err)
+	assert.Len(t, logLines, taskExecutionLogMaxLines)
+	assert.Contains(t, logLines[0], "日志-0005")
+	assert.Contains(t, logLines[len(logLines)-1], "日志-1004")
+
+	ttl, err := db.Redis.TTL(ctx, key).Result()
+	require.NoError(t, err)
+	assert.Equal(t, taskExecutionLogExpiration, ttl)
 }
 
 func TestAppendTaskExecutionLogNonExistent(t *testing.T) {
@@ -261,10 +313,36 @@ func TestAppendTaskExecutionLogNonExistent(t *testing.T) {
 	defer cleanup()
 	ctx := context.Background()
 
-	// 对不存在的 TaskID 追加日志不应报错（COALESCE 处理空值）
+	// Redis 缓冲不依赖数据库记录是否已经创建。
 	err := AppendTaskExecutionLog(ctx, "nonexistent_task", "测试日志")
-	// SQLite 下 COALESCE + || 操作不应报错
 	assert.NoError(t, err)
+
+	err = FlushTaskExecutionLog(ctx, "nonexistent_task")
+	assert.Error(t, err)
+}
+
+func TestGetTaskExecutionLogPrefersRedis(t *testing.T) {
+	cleanup := setupTaskExecutionTestEnvironment(t)
+	defer cleanup()
+	ctx := context.Background()
+
+	execution := &TaskExecution{
+		TaskID:      "redis_priority_001",
+		TaskType:    "upload:cleanup_unused",
+		TaskName:    "清理未使用上传",
+		Status:      TaskExecutionStatusRunning,
+		Log:         "数据库旧日志",
+		TriggeredBy: "manual",
+	}
+	err := CreateTaskExecution(ctx, execution)
+	require.NoError(t, err)
+	err = AppendTaskExecutionLog(ctx, execution.TaskID, "Redis 最新日志")
+	require.NoError(t, err)
+
+	found, err := GetTaskExecutionByID(ctx, execution.ID)
+	require.NoError(t, err)
+	assert.Contains(t, found.Log, "Redis 最新日志")
+	assert.NotContains(t, found.Log, "数据库旧日志")
 }
 
 func TestListTaskExecutions(t *testing.T) {
@@ -284,12 +362,19 @@ func TestListTaskExecutions(t *testing.T) {
 		err := CreateTaskExecution(ctx, r)
 		require.NoError(t, err)
 	}
+	err := AppendTaskExecutionLog(ctx, "list_004", "运行中的 Redis 日志")
+	require.NoError(t, err)
 
 	// 查询全部（分页）
 	items, total, err := ListTaskExecutions(ctx, ListTaskExecutionsRequest{Page: 1, PageSize: 10})
 	require.NoError(t, err)
 	assert.Equal(t, int64(5), total)
 	assert.Len(t, items, 5)
+	for _, item := range items {
+		if item.TaskID == "list_004" {
+			assert.Contains(t, item.Log, "运行中的 Redis 日志")
+		}
+	}
 
 	// 按状态筛选：failed
 	items, total, err = ListTaskExecutions(ctx, ListTaskExecutionsRequest{Status: "failed", Page: 1, PageSize: 10})

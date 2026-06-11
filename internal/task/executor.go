@@ -131,7 +131,9 @@ func DispatchTask(ctx context.Context, taskType string, payload []byte, triggere
 		return "", fmt.Errorf(errTaskEnqueueFailed, err)
 	}
 
-	_ = model.AppendTaskExecutionLog(ctx, taskID, fmt.Sprintf("[系统] 任务已成功入队，等待调度执行 (队列: %s, 最大重试次数: %d)", meta.Queue, meta.MaxRetry))
+	if err := model.AppendTaskExecutionLog(ctx, taskID, fmt.Sprintf("[系统] 任务已成功入队，等待调度执行 (队列: %s, 最大重试次数: %d)", meta.Queue, meta.MaxRetry)); err != nil {
+		logger.ErrorF(ctx, "[TaskExecutor] 追加入队日志失败 taskID=%s: %v", taskID, err)
+	}
 
 	return taskID, nil
 }
@@ -192,7 +194,9 @@ func RetryTask(ctx context.Context, id uint64) (string, error) {
 		return "", fmt.Errorf(errRetryTaskEnqueueFailed, err)
 	}
 
-	_ = model.AppendTaskExecutionLog(ctx, newTaskID, fmt.Sprintf("[系统] 手动触发重试，已重新创建任务并入队 (原任务ID: %s, 重试次数: %d/%d)", execution.TaskID, execution.RetryCount+1, execution.MaxRetry))
+	if err := model.AppendTaskExecutionLog(ctx, newTaskID, fmt.Sprintf("[系统] 手动触发重试，已重新创建任务并入队 (原任务ID: %s, 重试次数: %d/%d)", execution.TaskID, execution.RetryCount+1, execution.MaxRetry)); err != nil {
+		logger.ErrorF(ctx, "[TaskExecutor] 追加重试日志失败 taskID=%s: %v", newTaskID, err)
+	}
 
 	return newTaskID, nil
 }
@@ -314,6 +318,24 @@ func completeTaskExecution(ctx context.Context, execution *model.TaskExecution, 
 	if err := model.UpdateTaskExecution(ctx, execution); err != nil {
 		logger.ErrorF(ctx, "[TaskExecutor] 更新执行记录失败 taskID=%s: %v", execution.TaskID, err)
 	}
+	if shouldFlushTaskExecutionLog(ctx, execErr) {
+		if err := model.FlushTaskExecutionLog(ctx, execution.TaskID); err != nil {
+			logger.ErrorF(ctx, "[TaskExecutor] 持久化任务日志失败 taskID=%s: %v", execution.TaskID, err)
+		}
+	}
+}
+
+func shouldFlushTaskExecutionLog(ctx context.Context, execErr error) bool {
+	if execErr == nil {
+		return true
+	}
+
+	retryCount, hasRetryCount := asynq.GetRetryCount(ctx)
+	maxRetry, hasMaxRetry := asynq.GetMaxRetry(ctx)
+	if !hasRetryCount || !hasMaxRetry {
+		return true
+	}
+	return retryCount >= maxRetry
 }
 
 func handleFailedTask(ctx context.Context, execution *model.TaskExecution, t *asynq.Task, duration time.Duration, execErr error, span trace.Span) {

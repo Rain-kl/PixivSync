@@ -1,139 +1,103 @@
 ---
 name: "new-async-task"
-description: "项目专用：当新增或修改 Asynq 异步任务、后台任务、定时任务、任务元数据、TaskHandler、TaskParam、PayloadValidator、AppendLog、任务重试、任务执行记录或 Admin 任务 API 时必须使用。本技能按项目约束指导常量定义、处理器实现、统一注册、Worker 路由、Cron 配置、Swagger、测试和 code-check 验证。"
+description: "Wavelet 项目专用：新增或修改 Asynq 异步任务、后台任务、定时任务、任务元数据、TaskHandler、TaskParam、PayloadValidator、AppendLog、任务重试、任务执行记录或 Admin 任务 API 时必须使用。"
 ---
 
 # 异步任务开发
 
-本技能只覆盖  Asynq 任务工作流。开始前先读仓库根目录 `AGENTS.md`，并遵守其中的项目级规则：HTTP 路由只在 `internal/router/router.go` 注册、API 变更后运行 `make swagger`、提交前运行 `make code-check`、不要删除 `frontend/node_modules`、`internal/util/` 不引入框架依赖。
+开始前阅读根目录 `AGENTS.md`。只修改任务相关链路，遵守项目路由、日志、数据库迁移和质量门禁要求。
 
-## 先定位真实链路
+## 开始前
 
-新增或修改任务前，先快速查看这些文件，确认当前实现没有漂移：
+按任务范围检查当前实现：
 
-- `internal/task/handler.go`: `TaskHandler`、`TaskResult`、可选 `PayloadValidator`。
-- `internal/task/constants.go`: 框架通用常量，如 `QueueDefault` 和 `DefaultMaxRetry`。
-- `internal/task/meta.go`: 框架任务元数据结构体（TaskParam、TaskMeta）及全局动态注册与查询接口。
-- `internal/task/executor.go`: `RegisterHandler`、`ValidateAndNormalizePayload`、`DispatchTask`、`RetryTask`、`ProcessTask`、`AppendLog`。
-- `internal/task/handlers/register.go`: 内置 handler 和元数据的统一注册点，Admin API 和 Worker 都依赖它。
-- `internal/task/worker/worker.go`: Asynq mux 动态路由分发和队列配置。
-- `internal/task/scheduler/scheduler.go`: Cron 调度。
-- `internal/apps/admin/task/routers.go`: Admin 下发、查询、详情、重试 API。
-- 现有参考：`internal/apps/upload/tasks.go`（无参数任务）、`internal/apps/user/tasks.go`（带参数任务）。
+- `internal/task/handler.go`：`TaskHandler`、`TaskResult`、`PayloadValidator`
+- `internal/task/meta.go`：`TaskMeta`、`TaskParam`
+- `internal/task/executor.go`：下发、执行、日志、重试
+- `internal/task/handlers/register.go`：Handler 和元数据注册
+- `internal/task/worker/worker.go`：Worker 路由和队列
+- `internal/task/scheduler/scheduler.go`：定时调度
+- `internal/apps/admin/task/routers.go`：Admin 任务 API
+- `internal/model/task_execution.go`：执行记录和日志持久化
 
-当前任务执行链路：
+需要模板时阅读 [references/CODE-EXAMPLES.md](references/CODE-EXAMPLES.md)。
 
-```text
-Admin dispatch -> ValidateAndNormalizePayload -> DispatchTask
-  -> Asynq Redis queue -> worker mux -> ProcessTask
-  -> registered TaskHandler.Execute -> TaskExecution status/log/result
-```
+## 实现要求
 
-## 修改检查清单
+### 任务定义
 
-按任务影响面选择对应步骤。不要只改其中一条链路。
+- 在 `internal/apps/<module>/tasks.go` 定义任务类型、Admin 任务类型和 `TaskMeta`。
+- Asynq 任务类型使用 `<module>:<action>` 格式。
+- 完整设置 `Type`、`AsynqTask`、`Name`、`Description`、`MaxRetry`、`Queue`、`Retryable`。
+- 有参数任务必须定义 payload struct。
+- `TaskParam.Name` 必须与 payload JSON tag 一致。
+- `TaskParam` 只描述前端表单，不代替服务端校验。
 
-> 需要可复制的代码模板时，阅读 [references/CODE-EXAMPLES.md](references/CODE-EXAMPLES.md)。那里包含任务常量、无参数 handler、带参数 `PayloadValidator`、统一注册、Worker 路由、Cron 配置和测试示例。
+### Handler
 
-1. 定义任务元数据与常量。
-   - 业务包常量与元数据：在对应业务模块的 `internal/apps/<module>/tasks.go` 中定义 Asynq 任务类型常量（如 `CleanupUnusedUploadsTask = "upload:cleanup_unused"`）和 Admin 任务类型常量（如 `TaskTypeCleanupUploads = "cleanup_unused_uploads"`）。
-   - 在同一 `tasks.go` 文件中定义该任务的 `TaskMeta` 元数据变量（如 `CleanupUnusedUploadsMeta = task.TaskMeta{...}`），配置 `Type`、`AsynqTask`、`Name`、`Description`、`MaxRetry`、`Queue`、`Retryable` 等字段。
-   - 有参数任务在 `Params` 中描述前端表单字段。`TaskParam.Name` 必须与 payload JSON tag 对齐。
+- Handler 必须实现 `task.TaskHandler`。
+- 有参数任务必须实现 `task.PayloadValidator`，负责校验和标准化 Admin 下发参数。
+- `Execute` 必须再次解析 payload；不要假设入口一定经过 Admin 校验。
+- 成功返回 `&task.TaskResult{Message: ..., Detail: ...}`。
+- 失败返回 error，由任务框架处理状态和重试。
+- 不要吞掉关键错误。
+- 复杂 SQL 放到 `internal/model/` 或 `internal/service/`。
+- 新增 Go 文件后检查许可证头，必要时运行 `make license`。
 
-2. 实现 handler。
-   - 优先放在对应业务模块的 `internal/apps/<module>/tasks.go`。
-   - handler 必须实现 `task.TaskHandler`。
-   - 带参数任务定义 payload struct，并实现 `task.PayloadValidator` 做服务端校验和标准化。
-   - `Execute` 中仍要解析 payload，因为 Scheduler、重试或其他入口不一定经过 Admin 校验。
-   - 不要在 handler 中写复杂 SQL；复杂查询放到 `internal/model/` 或 `internal/service/`。
-   - 新增 Go 文件后检查 license header；必要时运行 `make license`。
+### 注册
 
-3. 统一注册 handler 与元数据。
-   - 在 `internal/task/handlers/register.go` 导入业务模块，调用 `task.RegisterHandler(asynqTaskType, handler)` 注册处理器。
-   - 同时，在该文件中调用 `task.RegisterTaskMeta(meta)` 注册刚才在业务模块中定义的任务元数据。
-   - 这里是 Admin 校验、元数据获取和 Worker 执行共同依赖的注册点。
+- 在 `internal/task/handlers/register.go` 同时注册 Handler 和 `TaskMeta`。
+- 不要在其他位置单独注册任务。
 
-4. 如需 Cron 调度，系统默认定时任务必须通过 SQL 迁移（goose）初始化。
-   - 确保任务已正确注册并载入全局元数据池中。
-   - 在 `internal/db/migrator/goose/postgres` 和 `sqlite` 下编写 migration 脚本，使用 `INSERT INTO schedules` 语句初始化任务，指定 `task_type` 和 `cron` 等字段。必须妥善处理冲突（如 `ON CONFLICT DO NOTHING`）以支持幂等。
+## 日志要求
 
-5. 如改动 Admin API。
-   - handler 放在 `internal/apps/admin/<module>/` 或现有 Admin task 模块内。
-   - 路由只在 `internal/router/router.go` 注册。
-   - 响应保持 `{ "error_msg": "", "data": ... }`，分页保持 `{ "total": 0, "results": [] }`。
-   - 补完整 Swagger 注释并运行 `make swagger`。
+- 在 `TaskHandler.Execute` 中使用 `task.AppendLog(ctx, format, args...)`。
+- 记录任务开始、参数摘要、批次进度、关键状态、可继续错误和完成摘要。
+- 批量处理按批次记录；禁止为大循环中的每条数据写日志。
+- 不要直接修改任务日志的 Redis key 或 `w_task_executions.log`。
 
-## Handler 模式
+日志框架约束：
 
-约定：
+- 执行状态实时写入数据库：`pending`、`running`、`succeeded`、`failed`。
+- 实时日志写入 Redis，每个任务最多保留最近 1000 行。
+- Redis 日志 TTL 为 24 小时，每次追加时刷新。
+- 查询时优先返回 Redis 日志，Redis 不存在时读取数据库。
+- 任务成功或自动重试耗尽后，将日志写入数据库并删除 Redis 缓冲。
+- 自动重试期间保留同一 taskID 的 Redis 日志。
 
-- `ValidatePayload` 是 Admin 下发时的服务端校验入口，返回值会作为标准化 payload 存库和入队。
-- `TaskParam` 只是前端表单元数据，不代替服务端校验。
-- 成功返回 `&task.TaskResult{Message: "...", Detail: "..."}`；失败返回 `nil, fmt.Errorf("...")`，由 `ProcessTask` 标记失败并交给 Asynq 重试。
-- 错误要返回给框架，不在 handler 内吞掉；可继续的单条失败可用 `AppendLog` 记录后继续处理。
+## 重试要求
 
-> 在新增无参数任务、带参数任务或 `PayloadValidator` 时，阅读 [references/CODE-EXAMPLES.md](references/CODE-EXAMPLES.md) 的 Handler 示例。
+- Handler 返回 error 以触发 Asynq 自动重试。
+- 不要在 Handler 内自行实现重复重试循环。
+- Admin 手动重试只允许：
+  - 原任务状态为 `failed`
+  - `Retryable=true`
+  - `RetryCount < MaxRetry`
+- 修改重试行为时同时检查：
+  - `internal/task/executor.go`
+  - `internal/model/task_execution.go`
+  - `internal/apps/admin/task/routers.go`
+  - 前端任务执行列表
 
-## AppendLog 规则
+## 定时任务
 
-在 `TaskHandler.Execute` 内用 `task.AppendLog(ctx, format, args...)` 写任务日志。
+- 默认定时任务必须通过 Goose SQL 迁移写入 `schedules`。
+- PostgreSQL 和 SQLite 迁移必须同时提供。
+- 初始化 SQL 必须幂等。
+- 涉及迁移时使用 `database-migration` skill。
 
-- 任务开始、参数摘要、批次进度、关键状态、可继续错误、完成摘要适合记录。
-- 避免对大循环中的每条记录都写日志；每次 `AppendLog` 都可能触发一次数据库更新。
-- 如果上下文中没有 taskID，`AppendLog` 会降级为普通应用日志，不应额外兜底报错。
+## Admin API
 
-## 重试规则
+- Handler 放在现有 Admin task 模块或 `internal/apps/admin/<module>/`。
+- 路由只在 `internal/router/router.go` 注册。
+- 响应保持 `{ "error_msg": "", "data": ... }`。
+- 分页数据保持 `{ "total": 0, "results": [] }`。
+- Swagger 注释必须完整；API 变化后运行 `make swagger`。
 
-该项目有两层重试：
+## 前端
 
-- Asynq 自动重试：`ProcessTask` 返回 error 后按入队的 `MaxRetry` 处理。
-- Admin 手动重试：`POST /api/v1/admin/tasks/executions/:id/retry` 创建新的 `TaskExecution`，要求原任务状态为 failed、`Retryable=true`、`RetryCount < MaxRetry`。
-
-修改重试语义时同时检查 `internal/task/executor.go`、`internal/model/task_execution.go`、`internal/apps/admin/task/routers.go` 和前端任务执行列表。
-
-## Frontend/Admin 任务 UI
-
-只有任务元数据变化时，通常不需要写新页面；现有 Admin UI 会根据 `DispatchableTasks` 和 `Params` 动态渲染。
-
-若确实要改前端：
-
-- 读 shadcn skill。
-- 业务组件优先放在 `frontend/components/common/admin/`。
-- API 访问走 `frontend/lib/services/` 的 service class 和 `services` export。
+- 仅任务元数据变化时，优先复用现有动态任务表单，不新增页面。
+- API 调用必须通过 `frontend/lib/services/`。
+- 修改 shadcn/ui 时使用 `shadcn` skill。
 - 不使用 `any`。
-- 页面根容器保持 `w-full`，不要加页面级 `max-w-*`。
-
-## 验证
-
-根据改动范围运行最小有效验证，最后提交前必须运行项目门禁。
-
-- Handler 单测：覆盖成功、失败、日志关键路径；带参数任务覆盖 `ValidatePayload` 成功、空 payload、非法 JSON、缺失必填、标准化。
-- Admin dispatch 单测：合法 payload 返回成功，非法 payload 返回 400 且错误清晰。
-- Retry 单测：failed 且可重试能创建新执行记录；非 failed、`Retryable=false`、超过 `MaxRetry` 都拒绝。
-- 目标包测试示例：
-
-```bash
-go test ./internal/task ./internal/apps/admin/task ./internal/apps/<module>
-```
-
-- API 改动后：
-
-```bash
-make swagger
-```
-
-- 提交前：
-
-```bash
-make code-check
-```
-
-如涉及前端或整体构建，补跑 `make build-test`。测试中需要 Redis/Asynq 时，可用现有测试模式或 `miniredis`；不要为了测试便利把 `internal/task` 反向塞进通用 util/testhelper，避免 import cycle。
-
-## 相关 Skills
-
-- Go 错误处理：在设计 handler 返回错误、包装底层错误或避免“记录并返回”时，参见 [go-error-handling](../go-error-handling/SKILL.md)。
-- Go 测试：在编写 handler、dispatch 或 retry 单测时，参见 [go-testing](../go-testing/SKILL.md)。
-- Go context：在任务业务逻辑传播取消、超时或 request scoped 值时，参见 [go-context](../go-context/SKILL.md)。
-- Go logging：在决定任务日志、应用日志和日志级别边界时，参见 [go-logging](../go-logging/SKILL.md)。
-- shadcn：在修改 Admin 任务 UI 时，参见 [shadcn](../shadcn/SKILL.md)。
+- 页面根容器使用 `w-full`，不添加页面级 `max-w-*`。
