@@ -1,5 +1,6 @@
 "use client"
 
+import Image from "next/image"
 import Link from "next/link"
 import {ExternalLink, ImageIcon, RotateCcw} from "lucide-react"
 import {useQuery} from "@tanstack/react-query"
@@ -25,6 +26,7 @@ import type {
 import {
   formatPixEzDateTime,
   formatPixEzFileSize,
+  formatPixEzNumber,
   mirrorImageURL,
   pixezMirrorStatusLabel,
   pixezTargetLabel,
@@ -32,6 +34,59 @@ import {
 
 type MirrorItem = PixezMirroredIllust | PixezMirroredNovel
 type MirrorDetail = PixezMirroredIllustDetail | PixezMirroredNovelDetail
+
+interface OriginalTag {
+  name?: string
+  translated_name?: string | null
+}
+
+interface OriginalWork {
+  caption?: string
+  height?: number
+  image_urls?: {
+    large?: string
+    medium?: string
+  }
+  meta_pages?: Array<{
+    image_urls?: {
+      large?: string
+      original?: string
+    }
+  }>
+  meta_single_page?: {
+    original_image_url?: string
+  }
+  page_count?: number
+  tags?: OriginalTag[]
+  text_length?: number
+  total_bookmarks?: number
+  total_view?: number
+  width?: number
+}
+
+interface OriginalDetailPayload {
+  illust?: OriginalWork
+  novel?: OriginalWork
+}
+
+function parseOriginalWork(value: unknown, target: PixezMirrorTarget): OriginalWork | null {
+  if (!value) return null
+
+  let parsed: unknown = value
+  if (typeof value === "string") {
+    try {
+      parsed = JSON.parse(value) as unknown
+    } catch {
+      return null
+    }
+  }
+  if (typeof parsed !== "object" || parsed === null) return null
+
+  const payload = parsed as OriginalDetailPayload
+  const work = target === "illust" ? payload.illust : payload.novel
+  if (work && typeof work === "object") return work
+  return parsed as OriginalWork
+}
 
 function itemID(target: PixezMirrorTarget, item: MirrorItem | null) {
   if (!item) return 0
@@ -99,18 +154,37 @@ export function MirrorDetailDrawer({
   })
   const detail = detailQuery.data
   const mirror = detail?.mirror
+  const originalWork = detail
+    ? parseOriginalWork(
+      isIllustDetail(detail) ? detail.illust_json : detail.novel_json,
+      target,
+    )
+    : null
+  const previewImages = (() => {
+    if (target !== "illust" || !originalWork) return []
+    if (originalWork.meta_pages?.length) {
+      return originalWork.meta_pages
+        .map((page) => page.image_urls?.large || page.image_urls?.original || "")
+        .filter(Boolean)
+    }
+    const previewURL = originalWork.image_urls?.large
+      || originalWork.image_urls?.medium
+      || originalWork.meta_single_page?.original_image_url
+    return previewURL ? [previewURL] : []
+  })()
+  const tags = originalWork?.tags ?? []
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent className="w-full p-0 sm:max-w-[760px]">
-        <SheetHeader className="border-b">
-          <SheetTitle>{detailTitle(target, detail, item)}</SheetTitle>
+      <SheetContent className="flex h-full w-full flex-col border-l bg-background p-0 sm:max-w-[760px]">
+        <SheetHeader className="flex-none border-b px-6 py-4">
+          <SheetTitle className="line-clamp-1">{detailTitle(target, detail, item)}</SheetTitle>
           <SheetDescription>
             {pixezTargetLabel(target)} · {detailAuthor(detail, item)} · {id || "-"}
           </SheetDescription>
         </SheetHeader>
 
-        <div className="flex-1 overflow-y-auto px-4 pb-4">
+        <div className="flex-1 overflow-y-auto px-6 pb-6">
           {detailQuery.isLoading ? (
             <div className="py-4">
               <LoadingStateWithBorder icon={ImageIcon} description="加载镜像详情中..." />
@@ -166,6 +240,111 @@ export function MirrorDetailDrawer({
                   </Button>
                 )}
               </div>
+
+              <Separator />
+
+              <div className="flex flex-col gap-4">
+                <h3 className="text-sm font-semibold">原始作品信息</h3>
+
+                <div className="flex flex-wrap gap-x-6 gap-y-2 text-xs text-muted-foreground">
+                  <div>
+                    浏览数:{" "}
+                    <span className="font-mono font-medium text-foreground">
+                      {formatPixEzNumber(originalWork?.total_view)}
+                    </span>
+                  </div>
+                  <div>
+                    收藏数:{" "}
+                    <span className="font-mono font-medium text-foreground">
+                      {formatPixEzNumber(originalWork?.total_bookmarks)}
+                    </span>
+                  </div>
+                  {target === "illust" && (
+                    <>
+                      <div>
+                        尺寸:{" "}
+                        <span className="font-mono font-medium text-foreground">
+                          {originalWork?.width ?? "-"} × {originalWork?.height ?? "-"}
+                        </span>
+                      </div>
+                      <div>
+                        图片页数:{" "}
+                        <span className="font-mono font-medium text-foreground">
+                          {originalWork?.page_count ?? detail.item.total_count}
+                        </span>
+                      </div>
+                    </>
+                  )}
+                  {target === "novel" && (
+                    <div>
+                      字数:{" "}
+                      <span className="font-mono font-medium text-foreground">
+                        {formatPixEzNumber(originalWork?.text_length)}
+                      </span>
+                    </div>
+                  )}
+                </div>
+
+                {originalWork?.caption && (
+                  <div className="flex flex-col gap-2">
+                    <span className="text-xs font-medium text-muted-foreground">作品描述</span>
+                    <div
+                      className="max-h-[160px] select-text overflow-y-auto break-words rounded-md border bg-muted/20 p-3 text-sm leading-relaxed"
+                      dangerouslySetInnerHTML={{__html: originalWork.caption}}
+                    />
+                  </div>
+                )}
+
+                {tags.length > 0 && (
+                  <div className="flex flex-col gap-2">
+                    <span className="text-xs font-medium text-muted-foreground">作品标签</span>
+                    <div className="flex flex-wrap gap-1.5">
+                      {tags.map((tag, index) => (
+                        <div
+                          key={`${tag.name ?? "tag"}-${index}`}
+                          className="inline-flex select-text flex-col rounded border bg-muted/60 px-2 py-1 text-xs"
+                        >
+                          <span className="font-medium">{tag.name || "-"}</span>
+                          {tag.translated_name && (
+                            <span className="mt-0.5 text-[10px] text-muted-foreground">
+                              {tag.translated_name}
+                            </span>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {target === "illust" && previewImages.length > 0 && (
+                <>
+                  <Separator />
+                  <div className="flex flex-col gap-3">
+                    <h3 className="text-sm font-semibold">图片预览 ({previewImages.length} 页)</h3>
+                    <div className="grid gap-4 sm:grid-cols-2">
+                      {previewImages.map((url, index) => (
+                        <div
+                          key={`${url}-${index}`}
+                          className="group relative flex aspect-[3/4] items-center justify-center overflow-hidden rounded-md border bg-muted transition-colors hover:border-primary/50"
+                        >
+                          <Image
+                            src={mirrorImageURL(url)}
+                            alt={`${detail.item.title} 第 ${index + 1} 页`}
+                            fill
+                            unoptimized
+                            sizes="(min-width: 640px) 50vw, 100vw"
+                            className="pointer-events-none object-contain"
+                          />
+                          <span className="absolute bottom-2 right-2 rounded bg-black/60 px-2 py-0.5 font-mono text-[11px] text-white">
+                            {index + 1} / {previewImages.length}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </>
+              )}
 
               <Separator />
 
@@ -251,7 +430,7 @@ export function MirrorDetailDrawer({
           )}
         </div>
 
-        <SheetFooter className="border-t">
+        <SheetFooter className="flex-none border-t px-6 py-4">
           <Button variant="outline" onClick={() => detailQuery.refetch()} disabled={!item || detailQuery.isFetching}>
             {detailQuery.isFetching ? <Spinner /> : <RotateCcw />}
             刷新详情
