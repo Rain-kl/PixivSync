@@ -43,8 +43,8 @@ func ValidateS3Key(key string) error {
 }
 
 // CompressImageToWebP decodes an image from srcReader and encodes it into WebP format
-// using the specified quality level (low -> 60, medium -> 75, high -> 85).
-func CompressImageToWebP(srcReader io.Reader, qualityLevel string) ([]byte, error) {
+// using the specified quality (low -> 60, medium -> 75, high -> 85).
+func CompressImageToWebP(srcReader io.Reader, quality string) ([]byte, error) {
 	// Decode the image
 	img, format, err := image.Decode(srcReader)
 	if err != nil {
@@ -52,22 +52,22 @@ func CompressImageToWebP(srcReader io.Reader, qualityLevel string) ([]byte, erro
 	}
 
 	// Determine quality
-	var quality float32
-	switch strings.ToLower(qualityLevel) {
-	case "low":
-		quality = 60
-	case "medium":
-		quality = 75
-	case "high", "":
-		quality = 85
+	var qualityScore float32
+	switch strings.ToLower(quality) {
+	case imageQualityLow:
+		qualityScore = 60
+	case imageQualityMedium:
+		qualityScore = 75
+	case imageQualityHigh, "":
+		qualityScore = 85
 	default:
-		quality = 85
+		qualityScore = 85
 	}
 
 	// Encode to WebP
 	var buf bytes.Buffer
 	err = webp.Encode(&buf, img, &webp.EncoderOptions{
-		Quality: quality,
+		Quality: qualityScore,
 		Method:  4, // Default method
 	})
 	if err != nil {

@@ -17,6 +17,12 @@ import (
 	"gorm.io/gorm"
 )
 
+const (
+	configTypeSystem = "system"
+	configValueTrue  = "true"
+	configValueFalse = "false"
+)
+
 // SetupTestEnvironment initializes an in-memory SQLite DB, seeds default configurations,
 // starts miniredis, and overrides the global db/Redis clients. It returns a cleanup function.
 func SetupTestEnvironment(t *testing.T) (*gorm.DB, *miniredis.Miniredis, func()) {
@@ -91,37 +97,37 @@ func getSeedConfigsPart1() []model.SystemConfig {
 		{
 			Key:         model.ConfigKeyUploadAllowedExtensions,
 			Value:       "jpg,png,webp",
-			Type:        "system",
+			Type:        configTypeSystem,
 			Description: "允许上传的图片扩展名（逗号分隔）",
 		},
 		{
 			Key:         model.ConfigKeySiteName,
 			Value:       "Wavelet",
-			Type:        "system",
+			Type:        configTypeSystem,
 			Description: "系统平台的展示名称",
 		},
 		{
 			Key:         model.ConfigKeyPasswordLoginEnabled,
-			Value:       "true",
-			Type:        "system",
+			Value:       configValueTrue,
+			Type:        configTypeSystem,
 			Description: "是否允许使用账号密码登录",
 		},
 		{
 			Key:         model.ConfigKeyRegistrationEnabled,
-			Value:       "true",
-			Type:        "system",
+			Value:       configValueTrue,
+			Type:        configTypeSystem,
 			Description: "控制普通用户是否可以自主注册（true/false）",
 		},
 		{
 			Key:         model.ConfigKeyPasswordRegisterEnabled,
-			Value:       "true",
-			Type:        "system",
+			Value:       configValueTrue,
+			Type:        configTypeSystem,
 			Description: "是否允许通过密码创建本地账号",
 		},
 		{
 			Key:         model.ConfigKeyOIDCLoginEnabled,
-			Value:       "true",
-			Type:        "system",
+			Value:       configValueTrue,
+			Type:        configTypeSystem,
 			Description: "是否允许使用第三方 OIDC 认证源登录",
 		},
 		{
@@ -132,44 +138,44 @@ func getSeedConfigsPart1() []model.SystemConfig {
 		},
 		{
 			Key:         model.ConfigKeyCapLoginEnabled,
-			Value:       "false",
-			Type:        "system",
+			Value:       configValueFalse,
+			Type:        configTypeSystem,
 			Description: "是否启用登录人机验证（true/false）",
 		},
 		{
 			Key:         model.ConfigKeyCapAutoSolve,
-			Value:       "true",
-			Type:        "system",
+			Value:       configValueTrue,
+			Type:        configTypeSystem,
 			Description: "打开页面后是否自动开始计算，关闭则需用户手动点击触发",
 		},
 		{
 			Key:         model.ConfigKeyCapChallengeCount,
 			Value:       "1",
-			Type:        "system",
+			Type:        configTypeSystem,
 			Description: "客户端需求解的 PoW 难题总数，默认 1，推荐 1～5",
 		},
 		{
 			Key:         model.ConfigKeyCapChallengeSize,
 			Value:       "32",
-			Type:        "system",
+			Type:        configTypeSystem,
 			Description: "人机验证盐值长度",
 		},
 		{
 			Key:         model.ConfigKeyCapChallengeDifficulty,
 			Value:       "4",
-			Type:        "system",
+			Type:        configTypeSystem,
 			Description: "人机验证 PoW 难度（目标前缀长度）",
 		},
 		{
 			Key:         model.ConfigKeyCapChallengeTTL,
 			Value:       "600",
-			Type:        "system",
+			Type:        configTypeSystem,
 			Description: "人机验证难题有效时间（秒）",
 		},
 		{
 			Key:         model.ConfigKeyCapTokenTTL,
 			Value:       "1200",
-			Type:        "system",
+			Type:        configTypeSystem,
 			Description: "人机验证兑换凭证有效时间（秒）",
 		},
 	}
@@ -180,55 +186,55 @@ func getSeedConfigsPart2() []model.SystemConfig {
 		{
 			Key:         model.ConfigKeyServerAddress,
 			Value:       "",
-			Type:        "system",
+			Type:        configTypeSystem,
 			Description: "服务器地址（用于跨域源控制，不设定则允许任意源）",
 		},
 		{
 			Key:         model.ConfigKeySMTPHost,
 			Value:       "",
-			Type:        "system",
+			Type:        configTypeSystem,
 			Description: "SMTP 服务器地址（例如 smtp.example.com）",
 		},
 		{
 			Key:         model.ConfigKeySMTPPort,
 			Value:       "587",
-			Type:        "system",
+			Type:        configTypeSystem,
 			Description: "SMTP 端口（例如 587 或 465）",
 		},
 		{
 			Key:         model.ConfigKeySMTPUsername,
 			Value:       "",
-			Type:        "system",
+			Type:        configTypeSystem,
 			Description: "SMTP 账户（如 sender@example.com）",
 		},
 		{
 			Key:         model.ConfigKeySMTPPassword,
 			Value:       "",
-			Type:        "system",
+			Type:        configTypeSystem,
 			Description: "SMTP 访问凭证（授权码/密码）",
 		},
 		{
 			Key:         model.ConfigKeyEmailLoginVerificationEnabled,
-			Value:       "false",
-			Type:        "system",
+			Value:       configValueFalse,
+			Type:        configTypeSystem,
 			Description: "是否开启邮箱登录验证（true/false）",
 		},
 		{
 			Key:         model.ConfigKeyEmailRegisterVerificationEnabled,
-			Value:       "false",
-			Type:        "system",
+			Value:       configValueFalse,
+			Type:        configTypeSystem,
 			Description: "是否开启邮箱注册验证（true/false）",
 		},
 		{
 			Key:         model.ConfigKeyMenuDisplayConfig,
 			Value:       "{}",
-			Type:        "system",
+			Type:        configTypeSystem,
 			Description: "目录显示配置（JSON 字符串，格式为 {url: enabled}）",
 		},
 		{
 			Key:         model.ConfigKeySearchEngineIndexingEnabled,
-			Value:       "false",
-			Type:        "system",
+			Value:       configValueFalse,
+			Type:        configTypeSystem,
 			Description: "是否允许搜索引擎检索",
 		},
 		{
@@ -252,25 +258,25 @@ func getSeedConfigsPart2() []model.SystemConfig {
 		{
 			Key:         model.ConfigKeyFileAccessWhitelist,
 			Value:       `["avatar"]`,
-			Type:        "system",
+			Type:        configTypeSystem,
 			Description: "免登录访问的文件业务类型白名单",
 		},
 		{
 			Key:         model.ConfigKeyDiskCacheMaxSizeMB,
 			Value:       "100",
-			Type:        "system",
+			Type:        configTypeSystem,
 			Description: "磁盘缓存最大空间大小 (MB)",
 		},
 		{
 			Key:         model.ConfigKeyDiskCacheTTLMinutes,
 			Value:       "60",
-			Type:        "system",
+			Type:        configTypeSystem,
 			Description: "磁盘缓存默认有效期 (分钟)",
 		},
 		{
 			Key:         model.ConfigKeyDiskCacheLRUEnabled,
-			Value:       "true",
-			Type:        "system",
+			Value:       configValueTrue,
+			Type:        configTypeSystem,
 			Description: "是否启用 LRU 淘汰机制",
 		},
 	}

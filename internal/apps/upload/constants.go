@@ -8,4 +8,9 @@ const (
 	detectContentBytes = 512              // http.DetectContentType 需要的最小字节数
 	uploadDirPerm      = 0755             // 上传目录权限
 	uploadFilePerm     = 0644             // 上传文件权限
+	imageQualityLow    = "low"
+	imageQualityMedium = "medium"
+	imageQualityHigh   = "high"
+	imageQualityOrigin = "origin"
+	storageDriverLocal = "local"
 )

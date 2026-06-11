@@ -16,6 +16,8 @@ import (
 	"gorm.io/gorm"
 )
 
+const maskedConfigValue = "******"
+
 // CreateSystemConfigRequest 创建系统配置请求
 type CreateSystemConfigRequest struct {
 	Key         string `json:"key" binding:"required,max=64"`
@@ -117,7 +119,7 @@ func ListSystemConfigs(c *gin.Context) {
 
 	for i := range configs {
 		if configs[i].Key == model.ConfigKeySMTPPassword && configs[i].Value != "" {
-			configs[i].Value = "******"
+			configs[i].Value = maskedConfigValue
 		}
 	}
 
@@ -149,7 +151,7 @@ func GetSystemConfig(c *gin.Context) {
 	}
 
 	if config.Key == model.ConfigKeySMTPPassword && config.Value != "" {
-		config.Value = "******"
+		config.Value = maskedConfigValue
 	}
 
 	c.JSON(http.StatusOK, util.OK(config))
@@ -200,7 +202,7 @@ func UpdateSystemConfig(c *gin.Context) {
 			updates["visibility"] = *req.Visibility
 			config.Visibility = *req.Visibility
 		}
-		if key != model.ConfigKeySMTPPassword || req.Value != "******" {
+		if key != model.ConfigKeySMTPPassword || req.Value != maskedConfigValue {
 			updates["value"] = req.Value
 			config.Value = req.Value
 		}
@@ -256,7 +258,7 @@ func TestSMTP(c *gin.Context) {
 	}
 
 	password := req.SMTPPassword
-	if password == "******" {
+	if password == maskedConfigValue {
 		var sc model.SystemConfig
 		if err := sc.GetByKey(c.Request.Context(), model.ConfigKeySMTPPassword); err == nil {
 			password = sc.Value

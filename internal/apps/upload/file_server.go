@@ -33,8 +33,7 @@ import (
 // @Tags upload
 // @Produce octet-stream
 // @Param id path string true "文件 ID"
-// @Param compress query string false "是否启用压缩 (传任意非空值代表启用，非图片文件将被忽略)"
-// @Param level query string false "压缩质量等级 (low, medium, high)，默认为 high"
+// @Param quality query string false "图片质量 (low, medium, high, origin)，默认为 origin"
 // @Success 200 {file} file "成功获取文件内容"
 // @Failure 400 {object} util.ResponseAny "文件 ID 格式错误"
 // @Failure 401 {object} util.ResponseAny "未登录"
@@ -89,22 +88,16 @@ func getUploadRecordByID(c *gin.Context) (*model.Upload, error) {
 
 // ServeUpload 将已存在的文件内容读取并流式响应给客户端，支持本地和 S3/CDN 驱动，并可选支持 WebP 图片压缩与本地缓存。
 func ServeUpload(c *gin.Context, upload *model.Upload) {
-	compressStr := c.Query("compress")
+	quality := normalizeImageQuality(c.Query("quality"))
 	isImage := strings.HasPrefix(strings.ToLower(upload.MimeType), "image/") || isImageExtension(strings.ToLower(upload.Extension))
 
-	if compressStr == "" || !isImage {
+	if quality == imageQualityOrigin || !isImage {
 		serveOriginal(c, upload)
 		return
 	}
 
-	// Map level parameter to standard options
-	level := strings.ToLower(c.Query("level"))
-	if level != "low" && level != "medium" && level != "high" {
-		level = "high"
-	}
-
 	cache := diskcache.GetGlobalCache()
-	cacheKey := imageCompressionCacheKey(upload, level)
+	cacheKey := imageCompressionCacheKey(upload, quality)
 	if webpBytes, err := cache.Get(cacheKey); err == nil {
 		c.Data(http.StatusOK, "image/webp", webpBytes)
 		return
@@ -121,7 +114,7 @@ func ServeUpload(c *gin.Context, upload *model.Upload) {
 	}
 
 	// Compress to WebP
-	webpBytes, err := CompressImageToWebP(bytes.NewReader(origBytes), level)
+	webpBytes, err := CompressImageToWebP(bytes.NewReader(origBytes), quality)
 	if err != nil {
 		logger.ErrorF(c.Request.Context(), "failed to compress image to WebP: %v", err)
 		serveOriginal(c, upload)
@@ -136,20 +129,29 @@ func ServeUpload(c *gin.Context, upload *model.Upload) {
 	c.Data(http.StatusOK, "image/webp", webpBytes)
 }
 
-func imageCompressionCacheKey(upload *model.Upload, level string) string {
+func imageCompressionCacheKey(upload *model.Upload, quality string) string {
 	return fmt.Sprintf(
 		"upload_webp_v1_%d_%d_%d_%s_%s",
 		upload.ID,
 		upload.UpdatedAt.UnixNano(),
 		upload.FileSize,
 		upload.Hash,
-		level,
+		quality,
 	)
+}
+
+func normalizeImageQuality(quality string) string {
+	switch strings.ToLower(quality) {
+	case imageQualityLow, imageQualityMedium, imageQualityHigh:
+		return strings.ToLower(quality)
+	default:
+		return imageQualityOrigin
+	}
 }
 
 // serveOriginal 原始文件的流式响应逻辑
 func serveOriginal(c *gin.Context, upload *model.Upload) {
-	if upload.StorageDriver == "local" || (upload.StorageDriver == "" && !storage.IsEnabled()) {
+	if upload.StorageDriver == storageDriverLocal || (upload.StorageDriver == "" && !storage.IsEnabled()) {
 		c.File(upload.FilePath)
 		return
 	}
@@ -176,7 +178,7 @@ func serveOriginal(c *gin.Context, upload *model.Upload) {
 
 // getOriginalFileBytes 获取原始文件所有字节
 func getOriginalFileBytes(ctx context.Context, upload *model.Upload) ([]byte, error) {
-	if upload.StorageDriver == "local" || (upload.StorageDriver == "" && !storage.IsEnabled()) {
+	if upload.StorageDriver == storageDriverLocal || (upload.StorageDriver == "" && !storage.IsEnabled()) {
 		return os.ReadFile(upload.FilePath)
 	}
 

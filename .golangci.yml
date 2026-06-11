@@ -17,6 +17,7 @@ linters:
     # 代码坏味道
     - dupl          # 重复代码
     - mnd           # 魔法数字
+    - goconst       # 不必要的字符串常量
     - cyclop        # 包/函数复杂度
     - nestif        # if 嵌套太深
     - maintidx      # 维护性指数

@@ -279,8 +279,8 @@ func TestImageCompression(t *testing.T) {
 		}
 	})
 
-	t.Run("serve compressed WebP file with compress=true", func(t *testing.T) {
-		req, _ := http.NewRequest("GET", "/f/3001?compress=true&level=medium", nil)
+	t.Run("serve compressed WebP file with medium quality", func(t *testing.T) {
+		req, _ := http.NewRequest("GET", "/f/3001?quality=medium", nil)
 		w := httptest.NewRecorder()
 		r.ServeHTTP(w, req)
 
@@ -292,7 +292,7 @@ func TestImageCompression(t *testing.T) {
 			t.Errorf("expected Content-Type image/webp, got %s", w.Header().Get("Content-Type"))
 		}
 
-		cacheKey := imageCompressionCacheKey(&uploadRecord, "medium")
+		cacheKey := imageCompressionCacheKey(&uploadRecord, imageQualityMedium)
 		cachedBytes, err := cache.Get(cacheKey)
 		if err != nil {
 			t.Fatalf("disk cache Get(%q) returned error: %v", cacheKey, err)
@@ -320,17 +320,43 @@ func TestImageCompression(t *testing.T) {
 		}
 	})
 
-	t.Run("serve compressed with default quality high", func(t *testing.T) {
-		req, _ := http.NewRequest("GET", "/f/3001?compress=true", nil)
+	t.Run("serve original file with origin quality", func(t *testing.T) {
+		req, _ := http.NewRequest("GET", "/f/3001?quality=origin", nil)
 		w := httptest.NewRecorder()
 		r.ServeHTTP(w, req)
 
 		if w.Code != http.StatusOK {
 			t.Fatalf("expected status 200, got %d", w.Code)
 		}
-		cacheKey := imageCompressionCacheKey(&uploadRecord, "high")
-		if _, err := cache.Get(cacheKey); err != nil {
-			t.Errorf("disk cache Get(%q) returned error: %v", cacheKey, err)
+		if w.Header().Get("Content-Type") != "image/png" {
+			t.Errorf("expected Content-Type image/png, got %s", w.Header().Get("Content-Type"))
+		}
+		if !bytes.Equal(w.Body.Bytes(), pngBuf.Bytes()) {
+			t.Errorf("origin-quality response differs from original image")
 		}
 	})
+}
+
+func TestNormalizeImageQuality(t *testing.T) {
+	tests := []struct {
+		name    string
+		quality string
+		want    string
+	}{
+		{name: imageQualityLow, quality: imageQualityLow, want: imageQualityLow},
+		{name: imageQualityMedium, quality: imageQualityMedium, want: imageQualityMedium},
+		{name: imageQualityHigh, quality: imageQualityHigh, want: imageQualityHigh},
+		{name: "origin", quality: "origin", want: "origin"},
+		{name: "uppercase", quality: "LOW", want: imageQualityLow},
+		{name: "empty", quality: "", want: "origin"},
+		{name: "invalid", quality: "maximum", want: "origin"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := normalizeImageQuality(tt.quality); got != tt.want {
+				t.Errorf("normalizeImageQuality(%q) = %q, want %q", tt.quality, got, tt.want)
+			}
+		})
+	}
 }

@@ -2,14 +2,21 @@ import {BaseService} from '../core/base.service'
 import type {ListUploadsResponse, Upload, UploadImageResponse} from './types'
 import type {InternalAxiosRequestConfig} from 'axios'
 
+export type ImageQuality = 'low' | 'medium' | 'high' | 'origin'
+
 /**
  * 根据上传ID构造文件访问URL
  * @param id - 上传记录ID
+ * @param quality - 图片质量
  * @returns 文件访问URL
  */
-export function getFileUrl(id: string | number | null | undefined): string | null {
+export function getFileUrl(
+  id: string | number | null | undefined,
+  quality: ImageQuality = 'origin'
+): string | null {
   if (!id) return null
-  return `/f/${id}`
+  if (quality === 'origin') return `/f/${id}`
+  return `/f/${id}?quality=${quality}`
 }
 
 /**

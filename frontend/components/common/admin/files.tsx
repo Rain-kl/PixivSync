@@ -35,7 +35,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
 import {Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle,} from "@/components/ui/sheet"
-import {formatFileSize, UploadService} from "@/lib/services/upload/upload.service"
+import {formatFileSize, getFileUrl, UploadService} from "@/lib/services/upload/upload.service"
 import type {Upload as UploadRecord} from "@/lib/services/upload/types"
 
 /* ─── 工具函数 ─────────────────────────────────────────── */
@@ -310,7 +310,7 @@ export function FilesMain() {
                         {file.mime_type.startsWith("image/") ? (
                           // eslint-disable-next-line @next/next/no-img-element
                           <img
-                            src={`/f/${file.id}`}
+                            src={getFileUrl(file.id, "low") ?? undefined}
                             alt={file.file_name}
                             className="size-full object-cover"
                             onError={(e) => {
@@ -426,7 +426,7 @@ export function FilesMain() {
                 {detailTarget.mime_type.startsWith("image/") ? (
                   // eslint-disable-next-line @next/next/no-img-element
                   <img
-                    src={`/f/${detailTarget.id}`}
+                    src={getFileUrl(detailTarget.id, "low") ?? undefined}
                     alt={detailTarget.file_name}
                     className="max-h-full max-w-full object-contain rounded-lg shadow-sm"
                   />
