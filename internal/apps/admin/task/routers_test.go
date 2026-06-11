@@ -89,14 +89,20 @@ func TestListTaskTypes(t *testing.T) {
 	}
 
 	foundCleanup := false
+	foundWarmImageCache := false
 	for _, m := range taskMetas {
 		if m.Type == upload.TaskTypeCleanupUploads {
 			foundCleanup = true
-			break
+		}
+		if m.Type == upload.TaskTypeWarmImageCache {
+			foundWarmImageCache = true
 		}
 	}
 	if !foundCleanup {
 		t.Errorf("expected task type %s to be listed", upload.TaskTypeCleanupUploads)
+	}
+	if !foundWarmImageCache {
+		t.Errorf("expected task type %s to be listed", upload.TaskTypeWarmImageCache)
 	}
 }
 

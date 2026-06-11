@@ -96,37 +96,51 @@ func ServeUpload(c *gin.Context, upload *model.Upload) {
 		return
 	}
 
+	webpBytes, _, err := ensureCompressedImageCache(c.Request.Context(), upload, quality)
+	if err != nil {
+		if len(webpBytes) > 0 {
+			logger.WarnF(c.Request.Context(), "failed to cache compressed image: %v", err)
+			c.Data(http.StatusOK, "image/webp", webpBytes)
+			return
+		}
+		logger.ErrorF(c.Request.Context(), "failed to prepare compressed image cache: %v", err)
+		serveOriginal(c, upload)
+		return
+	}
+
+	c.Data(http.StatusOK, "image/webp", webpBytes)
+}
+
+func ensureCompressedImageCache(
+	ctx context.Context,
+	upload *model.Upload,
+	quality string,
+) ([]byte, bool, error) {
 	cache := diskcache.GetGlobalCache()
 	cacheKey := imageCompressionCacheKey(upload, quality)
-	if webpBytes, err := cache.Get(cacheKey); err == nil {
-		c.Data(http.StatusOK, "image/webp", webpBytes)
-		return
-	} else if !errors.Is(err, diskcache.ErrCacheMiss) {
-		logger.WarnF(c.Request.Context(), "failed to read compressed image cache: %v", err)
+	webpBytes, err := cache.Get(cacheKey)
+	if err == nil {
+		return webpBytes, true, nil
+	}
+	if !errors.Is(err, diskcache.ErrCacheMiss) {
+		return nil, false, fmt.Errorf("read compressed image cache: %w", err)
 	}
 
-	// Cache miss: retrieve original file content
-	origBytes, err := getOriginalFileBytes(c.Request.Context(), upload)
+	origBytes, err := getOriginalFileBytes(ctx, upload)
 	if err != nil {
-		logger.ErrorF(c.Request.Context(), "failed to retrieve original file bytes for compression: %v", err)
-		serveOriginal(c, upload)
-		return
+		return nil, false, fmt.Errorf("read original image: %w", err)
 	}
 
-	// Compress to WebP
-	webpBytes, err := CompressImageToWebP(bytes.NewReader(origBytes), quality)
+	webpBytes, err = CompressImageToWebP(bytes.NewReader(origBytes), quality)
 	if err != nil {
-		logger.ErrorF(c.Request.Context(), "failed to compress image to WebP: %v", err)
-		serveOriginal(c, upload)
-		return
+		return nil, false, fmt.Errorf("compress image to WebP: %w", err)
 	}
 
 	if err := cache.Set(cacheKey, webpBytes, diskcache.NoExpiration); err != nil {
-		logger.WarnF(c.Request.Context(), "failed to cache compressed image: %v", err)
+		return webpBytes, false, fmt.Errorf("write compressed image cache: %w", err)
 	}
 
-	// Serve compressed WebP
-	c.Data(http.StatusOK, "image/webp", webpBytes)
+	return webpBytes, false, nil
 }
 
 func imageCompressionCacheKey(upload *model.Upload, quality string) string {

@@ -5,12 +5,20 @@
 package upload
 
 import (
+	"bytes"
 	"context"
+	"encoding/json"
+	"image"
+	"image/color"
+	"image/png"
 	"io"
+	"os"
+	"path/filepath"
 	"testing"
 	"time"
 
 	"github.com/Rain-kl/Wavelet/internal/db"
+	"github.com/Rain-kl/Wavelet/internal/diskcache"
 	"github.com/Rain-kl/Wavelet/internal/model"
 	"github.com/Rain-kl/Wavelet/internal/storage"
 	"github.com/Rain-kl/Wavelet/internal/task"
@@ -124,4 +132,189 @@ func TestCleanupUnusedUploadsHandler_ExecuteNoFiles(t *testing.T) {
 func TestCleanupUnusedUploadsHandler_ImplementsTaskHandler(t *testing.T) {
 	// 编译期验证 CleanupUnusedUploadsHandler 实现了 TaskHandler 接口
 	var _ task.TaskHandler = (*CleanupUnusedUploadsHandler)(nil)
+}
+
+func TestWarmImageCacheHandlerValidatePayload(t *testing.T) {
+	tests := []struct {
+		name        string
+		payload     []byte
+		wantQuality string
+		wantErr     bool
+	}{
+		{
+			name:        "normalizes quality",
+			payload:     []byte(`{"quality":" HIGH "}`),
+			wantQuality: imageQualityHigh,
+		},
+		{
+			name:    "empty payload",
+			wantErr: true,
+		},
+		{
+			name:    "invalid json",
+			payload: []byte(`{`),
+			wantErr: true,
+		},
+		{
+			name:    "origin is not a compressed quality",
+			payload: []byte(`{"quality":"origin"}`),
+			wantErr: true,
+		},
+		{
+			name:    "unsupported quality",
+			payload: []byte(`{"quality":"maximum"}`),
+			wantErr: true,
+		},
+	}
+
+	handler := &WarmImageCacheHandler{}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			gotPayload, err := handler.ValidatePayload(tt.payload)
+			if gotErr := err != nil; gotErr != tt.wantErr {
+				t.Fatalf("ValidatePayload(%s) error = %v, want error presence = %t", tt.payload, err, tt.wantErr)
+			}
+			if tt.wantErr {
+				return
+			}
+
+			var got WarmImageCachePayload
+			if err := json.Unmarshal(gotPayload, &got); err != nil {
+				t.Fatalf("json.Unmarshal(%s) returned error: %v", gotPayload, err)
+			}
+			if got.Quality != tt.wantQuality {
+				t.Errorf("ValidatePayload(%s).Quality = %q, want %q", tt.payload, got.Quality, tt.wantQuality)
+			}
+		})
+	}
+}
+
+func TestWarmImageCacheHandlerExecute(t *testing.T) {
+	dbConn, _, cleanup := testhelper.SetupTestEnvironment(t)
+	defer cleanup()
+
+	cache := diskcache.GetGlobalCache()
+	if err := cache.Clear(); err != nil {
+		t.Fatalf("Clear() before test returned error: %v", err)
+	}
+	t.Cleanup(func() {
+		if err := cache.Clear(); err != nil {
+			t.Errorf("Clear() after test returned error: %v", err)
+		}
+	})
+
+	testDir := t.TempDir()
+	firstPath := filepath.Join(testDir, "first.png")
+	secondPath := filepath.Join(testDir, "second.jpg")
+	writeTaskTestPNG(t, firstPath, color.RGBA{R: 255, A: 255})
+	writeTaskTestPNG(t, secondPath, color.RGBA{G: 255, A: 255})
+
+	records := []model.Upload{
+		{
+			ID:            4101,
+			UserID:        1001,
+			FileName:      "first.png",
+			FilePath:      firstPath,
+			MimeType:      "image/png",
+			Extension:     "png",
+			StorageDriver: storageDriverLocal,
+			Status:        model.UploadStatusUsed,
+		},
+		{
+			ID:            4102,
+			UserID:        1001,
+			FileName:      "second.jpg",
+			FilePath:      secondPath,
+			MimeType:      "application/octet-stream",
+			Extension:     "jpg",
+			StorageDriver: storageDriverLocal,
+			Status:        model.UploadStatusPending,
+		},
+		{
+			ID:            4103,
+			UserID:        1001,
+			FileName:      "notes.txt",
+			FilePath:      filepath.Join(testDir, "notes.txt"),
+			MimeType:      "text/plain",
+			Extension:     "txt",
+			StorageDriver: storageDriverLocal,
+			Status:        model.UploadStatusUsed,
+		},
+		{
+			ID:            4104,
+			UserID:        1001,
+			FileName:      "deleted.png",
+			FilePath:      firstPath,
+			MimeType:      "image/png",
+			Extension:     "png",
+			StorageDriver: storageDriverLocal,
+			Status:        model.UploadStatusDeleted,
+		},
+	}
+	for i := range records {
+		if info, err := os.Stat(records[i].FilePath); err == nil {
+			records[i].FileSize = info.Size()
+		}
+		if err := dbConn.Create(&records[i]).Error; err != nil {
+			t.Fatalf("failed to create upload %d: %v", records[i].ID, err)
+		}
+	}
+
+	handler := &WarmImageCacheHandler{}
+	payload := []byte(`{"quality":"low"}`)
+
+	result, err := handler.Execute(context.Background(), payload)
+	if err != nil {
+		t.Fatalf("Execute(%s) returned error: %v", payload, err)
+	}
+	if result == nil {
+		t.Fatal("Execute() result = nil, want non-nil")
+	}
+	if result.Message != "图片缓存预热完成，共处理 2 张，生成 2 张，命中 0 张，失败 0 张" {
+		t.Errorf("Execute() message = %q, want generated summary", result.Message)
+	}
+
+	for i := range records[:2] {
+		key := imageCompressionCacheKey(&records[i], imageQualityLow)
+		got, err := cache.Get(key)
+		if err != nil {
+			t.Errorf("cache.Get(%q) returned error: %v", key, err)
+			continue
+		}
+		if len(got) == 0 {
+			t.Errorf("cache.Get(%q) returned empty WebP data", key)
+		}
+	}
+
+	secondResult, err := handler.Execute(context.Background(), payload)
+	if err != nil {
+		t.Fatalf("second Execute(%s) returned error: %v", payload, err)
+	}
+	if secondResult.Message != "图片缓存预热完成，共处理 2 张，生成 0 张，命中 2 张，失败 0 张" {
+		t.Errorf("second Execute() message = %q, want cache-hit summary", secondResult.Message)
+	}
+}
+
+func TestWarmImageCacheHandlerImplementsTaskInterfaces(t *testing.T) {
+	var _ task.TaskHandler = (*WarmImageCacheHandler)(nil)
+	var _ task.PayloadValidator = (*WarmImageCacheHandler)(nil)
+}
+
+func writeTaskTestPNG(t *testing.T, path string, fill color.RGBA) {
+	t.Helper()
+
+	img := image.NewRGBA(image.Rect(0, 0, 2, 2))
+	for y := 0; y < 2; y++ {
+		for x := 0; x < 2; x++ {
+			img.Set(x, y, fill)
+		}
+	}
+
+	var buf bytes.Buffer
+	if err := png.Encode(&buf, img); err != nil {
+		t.Fatalf("png.Encode() returned error: %v", err)
+	}
+	if err := os.WriteFile(path, buf.Bytes(), 0o600); err != nil {
+		t.Fatalf("os.WriteFile(%q) returned error: %v", path, err)
+	}
 }
