@@ -72,6 +72,13 @@ export interface PixezBookmarkQuery {
   work_status?: "active" | "visible" | "muted" | "unavailable" | "removed" | "all"
 }
 
+export interface PixezMirrorQuery {
+  page?: number
+  page_size?: number
+  q?: string
+  status?: PixezMirrorStatusText | "all"
+}
+
 export interface PixezIllustBookmark {
   id: number
   pixiv_user_id: string
@@ -148,13 +155,81 @@ export interface PixezMirrorDetail {
   updated_at: string
 }
 
+export interface PixezMirroredIllust {
+  illust_id: number
+  title: string
+  type: string
+  user_id: number
+  user_name: string
+  cover_url: string
+  page_count: number
+  width: number
+  height: number
+  sanity_level: number
+  x_restrict: number
+  total_bookmarks: number
+  visible: boolean
+  is_muted: boolean
+  task_id: string
+  status: string
+  status_text: PixezMirrorStatusText
+  total_count: number
+  success_count: number
+  failed_count: number
+  error_message: string
+  created_at: string
+  updated_at: string
+}
+
+export interface PixezMirroredNovel {
+  novel_id: number
+  title: string
+  caption: string
+  user_id: number
+  user_name: string
+  cover_url: string
+  text_length: number
+  x_restrict: number
+  total_bookmarks: number
+  is_original: boolean
+  is_muted: boolean
+  series_id?: number | null
+  series_title?: string | null
+  task_id: string
+  status: string
+  status_text: PixezMirrorStatusText
+  total_count: number
+  success_count: number
+  failed_count: number
+  error_message: string
+  created_at: string
+  updated_at: string
+}
+
+export interface PixezMirroredIllustDetail {
+  item: PixezMirroredIllust
+  mirror: PixezMirrorDetail
+  image_files: PixezMirrorImageFile[]
+  request_urls: string[]
+  retry_urls: string[]
+  illust_json?: unknown
+}
+
+export interface PixezMirroredNovelDetail {
+  item: PixezMirroredNovel
+  mirror: PixezMirrorDetail
+  request_urls: string[]
+  retry_urls: string[]
+  novel_json?: unknown
+}
+
 export interface PixezIllustBookmarkDetail {
   item: PixezIllustBookmark
   mirror: PixezMirrorDetail | null
   image_files: PixezMirrorImageFile[]
   request_urls: string[]
   retry_urls: string[]
-  illust_json?: any
+  illust_json?: unknown
 }
 
 export interface PixezNovelBookmarkDetail {
@@ -162,7 +237,7 @@ export interface PixezNovelBookmarkDetail {
   mirror: PixezMirrorDetail | null
   request_urls: string[]
   retry_urls: string[]
-  novel_json?: any
+  novel_json?: unknown
 }
 
 export interface PixezNovelTextPreview {

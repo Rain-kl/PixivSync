@@ -59,6 +59,10 @@ func setupPixezTestRouter() *gin.Engine {
 	group.GET("/users/:pixiv_user_id/bookmarks/illust/removed", ListRemovedBookmarkIllusts)
 	group.GET("/illusts/:illust_id/mirror", CheckIllustMirror)
 	group.POST("/illusts/mirror/batch", BatchCheckIllustMirror)
+	group.GET("/mirror/illusts", ListMirroredIllusts)
+	group.GET("/mirror/illusts/:illust_id/detail", GetMirroredIllustManagementDetail)
+	group.GET("/mirror/novels", ListMirroredNovels)
+	group.GET("/mirror/novels/:novel_id/detail", GetMirroredNovelManagementDetail)
 
 	mirrorGroup := r.Group("/mirror")
 	mirrorGroup.Use(oauth.LoginRequired())
@@ -542,6 +546,136 @@ func TestPixezMirrorAPIReturnsEnvelope(t *testing.T) {
 	}
 	if status["status"] != model.PixezMirrorStatusSuccess || status["mirrored"] != true {
 		t.Fatalf("unexpected mirror status: %+v", status)
+	}
+}
+
+func TestMirrorManagementIncludesNonBookmarkMirrors(t *testing.T) {
+	_, _, cleanup := testhelper.SetupTestEnvironment(t)
+	defer cleanup()
+
+	ctx := context.Background()
+	now := time.Now()
+	records := []model.PixezMirrorIllust{
+		{
+			IllustID:        501,
+			TaskID:          "bookmark-triggered",
+			Status:          model.PixezMirrorStatusSuccess,
+			DetailJSON:      `{"illust":{"id":501,"title":"Bookmarked","user":{"id":601,"name":"Artist A"},"image_urls":{"square_medium":"https://i.pximg.net/501.jpg"},"page_count":1,"visible":true}}`,
+			ImageFilesJSON:  "[]",
+			RequestURLsJSON: "[]",
+			RetryURLsJSON:   "[]",
+			TotalCount:      1,
+			SuccessCount:    1,
+			CreatedAt:       now,
+			UpdatedAt:       now,
+		},
+		{
+			IllustID:        502,
+			TaskID:          "manual-triggered",
+			Status:          model.PixezMirrorStatusSuccess,
+			DetailJSON:      `{"illust":{"id":502,"title":"Manual Mirror","user":{"id":602,"name":"Artist B"},"image_urls":{"square_medium":"https://i.pximg.net/502.jpg"},"page_count":1,"visible":true}}`,
+			ImageFilesJSON:  "[]",
+			RequestURLsJSON: "[]",
+			RetryURLsJSON:   "[]",
+			TotalCount:      1,
+			SuccessCount:    1,
+			CreatedAt:       now,
+			UpdatedAt:       now,
+		},
+	}
+	if err := db.DB(ctx).Create(&records).Error; err != nil {
+		t.Fatalf("seed mirror records failed: %v", err)
+	}
+	if err := db.DB(ctx).Create(&model.PixezBookmarkIllust{
+		PixivUserID:     "123",
+		Restrict:        "public",
+		IllustID:        501,
+		Title:           "Bookmarked",
+		IllustJSON:      records[0].DetailJSON,
+		LastExportRunID: "run-1",
+		LastSeenAt:      now,
+	}).Error; err != nil {
+		t.Fatalf("seed bookmark record failed: %v", err)
+	}
+
+	router := setupPixezTestRouter()
+	auth := authHeader(t, "pixez-mirror-management")
+	w := performJSON(router, http.MethodGet, "/api/pixez/mirror/illusts", nil, auth)
+	resp := decodeResponse(t, w)
+	if resp.ErrorMsg != "" {
+		t.Fatalf("list mirror records error_msg = %q", resp.ErrorMsg)
+	}
+	var list struct {
+		Items []pixezMirroredIllustDTO `json:"items"`
+		Total int64                    `json:"total"`
+	}
+	if err := json.Unmarshal(resp.Data, &list); err != nil {
+		t.Fatalf("decode mirror list failed: %v", err)
+	}
+	if got, want := list.Total, int64(2); got != want {
+		t.Errorf("ListMirroredIllusts().Total = %d, want %d", got, want)
+	}
+
+	w = performJSON(router, http.MethodGet, "/api/pixez/mirror/illusts/502/detail", nil, auth)
+	resp = decodeResponse(t, w)
+	if resp.ErrorMsg != "" {
+		t.Fatalf("get manual mirror detail error_msg = %q", resp.ErrorMsg)
+	}
+	var detail pixezMirroredIllustDetailDTO
+	if err := json.Unmarshal(resp.Data, &detail); err != nil {
+		t.Fatalf("decode manual mirror detail failed: %v", err)
+	}
+	if got, want := detail.Item.Title, "Manual Mirror"; got != want {
+		t.Errorf("GetMirroredIllustManagementDetail().Item.Title = %q, want %q", got, want)
+	}
+
+	novel := model.PixezMirrorNovel{
+		NovelID:         701,
+		TaskID:          "automatic-triggered",
+		Status:          model.PixezMirrorStatusSuccess,
+		DetailJSON:      `{"novel":{"id":701,"title":"Automatic Novel","user":{"id":801,"name":"Writer"},"image_urls":{"medium":"https://i.pximg.net/701.jpg"},"text_length":2048,"x_restrict":1,"is_original":true,"visible":true}}`,
+		TextJSON:        `{"text":"mirrored novel"}`,
+		RequestURLsJSON: "[]",
+		RetryURLsJSON:   "[]",
+		TotalCount:      1,
+		SuccessCount:    1,
+		CreatedAt:       now,
+		UpdatedAt:       now,
+	}
+	if err := db.DB(ctx).Create(&novel).Error; err != nil {
+		t.Fatalf("seed non-bookmark novel mirror failed: %v", err)
+	}
+
+	w = performJSON(router, http.MethodGet, "/api/pixez/mirror/novels", nil, auth)
+	resp = decodeResponse(t, w)
+	if resp.ErrorMsg != "" {
+		t.Fatalf("list novel mirror records error_msg = %q", resp.ErrorMsg)
+	}
+	var novelList struct {
+		Items []pixezMirroredNovelDTO `json:"items"`
+		Total int64                   `json:"total"`
+	}
+	if err := json.Unmarshal(resp.Data, &novelList); err != nil {
+		t.Fatalf("decode novel mirror list failed: %v", err)
+	}
+	if got, want := novelList.Total, int64(1); got != want {
+		t.Errorf("ListMirroredNovels().Total = %d, want %d", got, want)
+	}
+
+	w = performJSON(router, http.MethodGet, "/api/pixez/mirror/novels/701/detail", nil, auth)
+	resp = decodeResponse(t, w)
+	if resp.ErrorMsg != "" {
+		t.Fatalf("get automatic novel mirror detail error_msg = %q", resp.ErrorMsg)
+	}
+	var novelDetail pixezMirroredNovelDetailDTO
+	if err := json.Unmarshal(resp.Data, &novelDetail); err != nil {
+		t.Fatalf("decode automatic novel mirror detail failed: %v", err)
+	}
+	if got, want := novelDetail.Item.Title, "Automatic Novel"; got != want {
+		t.Errorf("GetMirroredNovelManagementDetail().Item.Title = %q, want %q", got, want)
+	}
+	if !novelDetail.Item.IsOriginal || novelDetail.Item.XRestrict != 1 {
+		t.Errorf("GetMirroredNovelManagementDetail().Item metadata = %+v, want original R-18 novel", novelDetail.Item)
 	}
 }
 

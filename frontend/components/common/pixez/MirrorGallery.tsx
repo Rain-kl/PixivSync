@@ -12,26 +12,26 @@ import {Card, CardContent, CardFooter} from "@/components/ui/card"
 import {EmptyStateWithBorder} from "@/components/layout/empty"
 import {LoadingStateWithBorder} from "@/components/layout/loading"
 import {PixezService} from "@/lib/services"
-import type {PixezIllustBookmark, PixezMirrorTarget, PixezNovelBookmark} from "@/lib/services"
+import type {PixezMirrorTarget, PixezMirroredIllust, PixezMirroredNovel} from "@/lib/services"
 
 import {formatPixEzNumber, mirrorImageURL, pixezMirrorStatusLabel} from "./pixez-format"
 import {MirrorDetailDrawer} from "./MirrorDetailDrawer"
 import {MirrorPreviewDialog} from "./MirrorPreviewDialog"
 
-type MirrorItem = PixezIllustBookmark | PixezNovelBookmark
+type MirrorItem = PixezMirroredIllust | PixezMirroredNovel
 
 function itemID(target: PixezMirrorTarget, item: MirrorItem) {
   return target === "illust"
-    ? (item as PixezIllustBookmark).illust_id
-    : (item as PixezNovelBookmark).novel_id
+    ? (item as PixezMirroredIllust).illust_id
+    : (item as PixezMirroredNovel).novel_id
 }
 
 function itemMeta(target: PixezMirrorTarget, item: MirrorItem) {
   if (target === "illust") {
-    const illust = item as PixezIllustBookmark
+    const illust = item as PixezMirroredIllust
     return `${illust.page_count || 1} 页 · ${illust.width || "-"}x${illust.height || "-"}`
   }
-  const novel = item as PixezNovelBookmark
+  const novel = item as PixezMirroredNovel
   return `${formatPixEzNumber(novel.text_length)} 字${novel.series_title ? ` · ${novel.series_title}` : ""}`
 }
 
@@ -39,13 +39,6 @@ function statusVariant(status: string) {
   if (status === "failed") return "destructive"
   if (status === "success") return "secondary"
   return "outline"
-}
-
-function workStatus(item: MirrorItem) {
-  if (item.removed) return "已移除"
-  if (item.is_muted) return "已屏蔽"
-  if (!item.visible) return "不可见"
-  return "可见"
 }
 
 export function MirrorGallery({
@@ -143,11 +136,11 @@ export function MirrorGallery({
                   </div>
                 )}
                 <div className="absolute left-2 top-2 flex flex-wrap gap-1">
-                  <Badge variant={statusVariant(item.mirror_status_text)}>
-                    {pixezMirrorStatusLabel(item.mirror_status_text)}
+                  <Badge variant={statusVariant(item.status_text)}>
+                    {pixezMirrorStatusLabel(item.status_text)}
                   </Badge>
-                  {item.mirror_status_text === "failed" && (
-                    <Badge variant="outline">重试 {item.mirror_retry_count}</Badge>
+                  {item.status_text === "failed" && (
+                    <Badge variant="outline">失败 {item.failed_count}</Badge>
                   )}
                 </div>
               </button>
@@ -160,7 +153,7 @@ export function MirrorGallery({
                 </div>
                 <div className="flex items-center justify-between gap-2 text-[11px] text-muted-foreground">
                   <span className="truncate">{itemMeta(target, item)}</span>
-                  <Badge variant="outline">{workStatus(item)}</Badge>
+                  <Badge variant="outline">{item.success_count}/{item.total_count}</Badge>
                 </div>
               </CardContent>
               <CardFooter className="flex gap-2 border-t px-3 py-2">

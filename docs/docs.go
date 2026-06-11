@@ -443,6 +443,228 @@ const docTemplate = `{
                 }
             }
         },
+        "/api/pixez/mirror/illusts": {
+            "get": {
+                "security": [
+                    {
+                        "SessionCookie": []
+                    }
+                ],
+                "description": "Returns all illustration mirror read-models, including bookmark, automatic, and manual mirror requests.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "pixez"
+                ],
+                "summary": "List PixEz mirrored illustrations",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Search by illustration ID, title, or artist",
+                        "name": "q",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Mirror status: success, processing, failed",
+                        "name": "status",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "default": 1,
+                        "description": "Page number",
+                        "name": "page",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "default": 24,
+                        "description": "Page size",
+                        "name": "page_size",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/util.ResponseAny"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "object"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                }
+            }
+        },
+        "/api/pixez/mirror/illusts/{illust_id}/detail": {
+            "get": {
+                "security": [
+                    {
+                        "SessionCookie": []
+                    }
+                ],
+                "description": "Returns illustration metadata and mirror diagnostics without requiring a bookmark record.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "pixez"
+                ],
+                "summary": "Get PixEz mirrored illustration detail",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "Pixiv illustration ID",
+                        "name": "illust_id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/util.ResponseAny"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "object"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                }
+            }
+        },
+        "/api/pixez/mirror/novels": {
+            "get": {
+                "security": [
+                    {
+                        "SessionCookie": []
+                    }
+                ],
+                "description": "Returns all novel mirror read-models, including bookmark, automatic, and manual mirror requests.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "pixez"
+                ],
+                "summary": "List PixEz mirrored novels",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Search by novel ID, title, or author",
+                        "name": "q",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Mirror status: success, processing, failed",
+                        "name": "status",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "default": 1,
+                        "description": "Page number",
+                        "name": "page",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "default": 24,
+                        "description": "Page size",
+                        "name": "page_size",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/util.ResponseAny"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "object"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                }
+            }
+        },
+        "/api/pixez/mirror/novels/{novel_id}/detail": {
+            "get": {
+                "security": [
+                    {
+                        "SessionCookie": []
+                    }
+                ],
+                "description": "Returns novel metadata and mirror diagnostics without requiring a bookmark record.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "pixez"
+                ],
+                "summary": "Get PixEz mirrored novel detail",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "Pixiv novel ID",
+                        "name": "novel_id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/util.ResponseAny"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "object"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                }
+            }
+        },
         "/api/pixez/ping": {
             "get": {
                 "security": [
@@ -5218,9 +5440,6 @@ const docTemplate = `{
                 },
                 "is_admin": {
                     "type": "boolean"
-                },
-                "last_used_at": {
-                    "type": "string"
                 },
                 "masked_token": {
                     "type": "string"

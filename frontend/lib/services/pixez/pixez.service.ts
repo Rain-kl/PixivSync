@@ -7,6 +7,11 @@ import type {
   PixezIllustBookmark,
   PixezIllustBookmarkDetail,
   PixezMirrorStatus,
+  PixezMirrorQuery,
+  PixezMirroredIllust,
+  PixezMirroredIllustDetail,
+  PixezMirroredNovel,
+  PixezMirroredNovelDetail,
   PixezNovelBookmark,
   PixezNovelBookmarkDetail,
   PixezNovelTextPreview,
@@ -14,6 +19,17 @@ import type {
 } from "./types"
 
 function cleanParams(params: PixezBookmarkQuery): Record<string, unknown> {
+  const cleaned: Record<string, unknown> = {}
+
+  Object.entries(params).forEach(([key, value]) => {
+    if (value === undefined || value === "" || value === "all") return
+    cleaned[key] = value
+  })
+
+  return cleaned
+}
+
+function cleanMirrorParams(params: PixezMirrorQuery): Record<string, unknown> {
   const cleaned: Record<string, unknown> = {}
 
   Object.entries(params).forEach(([key, value]) => {
@@ -87,6 +103,32 @@ export class PixezService extends BaseService {
     return this.rawGet<PixezNovelTextPreview>("/mirror/webview/v2/novel", {
       novel_id: novelID,
     })
+  }
+
+  static async listMirroredIllusts(
+    params: PixezMirrorQuery = {},
+  ): Promise<PixezPaginatedResponse<PixezMirroredIllust>> {
+    return this.get<PixezPaginatedResponse<PixezMirroredIllust>>(
+      "/mirror/illusts",
+      cleanMirrorParams(params),
+    )
+  }
+
+  static async listMirroredNovels(
+    params: PixezMirrorQuery = {},
+  ): Promise<PixezPaginatedResponse<PixezMirroredNovel>> {
+    return this.get<PixezPaginatedResponse<PixezMirroredNovel>>(
+      "/mirror/novels",
+      cleanMirrorParams(params),
+    )
+  }
+
+  static async getMirroredIllustDetail(illustID: number): Promise<PixezMirroredIllustDetail> {
+    return this.get<PixezMirroredIllustDetail>(`/mirror/illusts/${illustID}/detail`)
+  }
+
+  static async getMirroredNovelDetail(novelID: number): Promise<PixezMirroredNovelDetail> {
+    return this.get<PixezMirroredNovelDetail>(`/mirror/novels/${novelID}/detail`)
   }
 
   static async mirrorIllust(illustID: number): Promise<PixezMirrorStatus> {

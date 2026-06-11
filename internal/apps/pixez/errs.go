@@ -17,6 +17,7 @@ const (
 	errFetchHashesFailed           = "failed to fetch sync data hashes"
 	errDispatchMirrorTaskFailed    = "failed to dispatch mirror task"
 	errQueryMirrorStatusFailed     = "failed to query mirror status"
+	errFetchMirrorDetailFailed     = "failed to fetch mirror detail"
 	errTooManyMirrorIDs            = "mirror ID list must not exceed 500 items"
 	errDeleteMirrorFailed          = "failed to delete mirror record"
 	errFetchRemovedBookmarksFailed = "failed to fetch removed bookmarks"

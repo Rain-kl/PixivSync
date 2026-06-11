@@ -19,7 +19,7 @@ import {Tabs, TabsList, TabsTrigger} from "@/components/ui/tabs"
 import {ErrorInline} from "@/components/layout/error"
 import type {PixezBookmarkQuery, PixezMirrorStatusText, PixezMirrorTarget} from "@/lib/services"
 
-import {usePixEzMirrors} from "./api/usePixEzMirrors"
+import {usePixEzBookmarks} from "./api/usePixEzBookmarks"
 import {usePixEzAccounts} from "./api/usePixEzAccounts"
 import {BookmarkGallery} from "./BookmarkGallery"
 
@@ -49,7 +49,7 @@ export function PixEzBookmarks() {
     pixiv_user_id: accountFilter === "all" ? undefined : accountFilter,
   }), [mirrorStatus, page, query, workStatus, accountFilter])
 
-  const bookmarksQuery = usePixEzMirrors(target, params)
+  const bookmarksQuery = usePixEzBookmarks(target, params)
   const items = bookmarksQuery.data?.items ?? []
 
   const resetPage = () => setPage(1)

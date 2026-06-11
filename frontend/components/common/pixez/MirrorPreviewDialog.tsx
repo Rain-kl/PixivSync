@@ -32,6 +32,10 @@ import type {
   PixezIllustBookmark,
   PixezIllustBookmarkDetail,
   PixezMirrorTarget,
+  PixezMirroredIllust,
+  PixezMirroredIllustDetail,
+  PixezMirroredNovel,
+  PixezMirroredNovelDetail,
   PixezNovelBookmark,
   PixezNovelBookmarkDetail,
   PixezNovelTextPreview,
@@ -39,14 +43,26 @@ import type {
 
 import {formatPixEzFileSize, formatPixEzNumber, mirrorImageURL, pixezTargetLabel} from "./pixez-format"
 
-type MirrorItem = PixezIllustBookmark | PixezNovelBookmark
-type MirrorDetail = PixezIllustBookmarkDetail | PixezNovelBookmarkDetail
+type MirrorItem =
+  | PixezIllustBookmark
+  | PixezNovelBookmark
+  | PixezMirroredIllust
+  | PixezMirroredNovel
+type MirrorDetail =
+  | PixezIllustBookmarkDetail
+  | PixezNovelBookmarkDetail
+  | PixezMirroredIllustDetail
+  | PixezMirroredNovelDetail
 
 function itemID(target: PixezMirrorTarget, item: MirrorItem | null) {
   if (!item) return 0
   return target === "illust"
-    ? (item as PixezIllustBookmark).illust_id
-    : (item as PixezNovelBookmark).novel_id
+    ? (item as PixezIllustBookmark | PixezMirroredIllust).illust_id
+    : (item as PixezNovelBookmark | PixezMirroredNovel).novel_id
+}
+
+function isMirrorItem(item: MirrorItem | null) {
+  return !!item && "status_text" in item
 }
 
 function previewTitle(target: PixezMirrorTarget, detail: MirrorDetail | undefined, item: MirrorItem | null) {
@@ -66,7 +82,9 @@ function originalURL(target: PixezMirrorTarget, id: number) {
   return `https://www.pixiv.net/novel/show.php?id=${id}`
 }
 
-function isIllustDetail(detail: MirrorDetail | undefined): detail is PixezIllustBookmarkDetail {
+function isIllustDetail(
+  detail: MirrorDetail | undefined,
+): detail is PixezIllustBookmarkDetail | PixezMirroredIllustDetail {
   return !!detail && "image_files" in detail
 }
 
@@ -74,7 +92,11 @@ function mirrorNovelTextURL(id: number) {
   return `/mirror/webview/v2/novel?novel_id=${id}`
 }
 
-function IllustPreview({detail}: {detail: PixezIllustBookmarkDetail}) {
+function IllustPreview({
+  detail,
+}: {
+  detail: PixezIllustBookmarkDetail | PixezMirroredIllustDetail
+}) {
   if (detail.image_files.length === 0) {
     return <EmptyStateWithBorder icon={ImageIcon} description="暂无可预览的镜像图片页" />
   }
@@ -151,7 +173,7 @@ function NovelPreview({
   textError,
   onRetryText,
 }: {
-  detail: PixezNovelBookmarkDetail
+  detail: PixezNovelBookmarkDetail | PixezMirroredNovelDetail
   text: PixezNovelTextPreview | undefined
   textLoading: boolean
   textError: Error | null
@@ -231,11 +253,19 @@ export function MirrorPreviewDialog({
   onOpenChange: (open: boolean) => void
 }) {
   const id = itemID(target, item)
+  const mirrorItem = isMirrorItem(item)
   const detailQuery = useQuery<MirrorDetail>({
-    queryKey: ["pixez", "mirror-preview-detail", target, id],
-    queryFn: () => target === "illust"
-      ? PixezService.getIllustBookmarkDetail(id)
-      : PixezService.getNovelBookmarkDetail(id),
+    queryKey: ["pixez", "mirror-preview-detail", target, id, mirrorItem],
+    queryFn: () => {
+      if (target === "illust") {
+        return mirrorItem
+          ? PixezService.getMirroredIllustDetail(id)
+          : PixezService.getIllustBookmarkDetail(id)
+      }
+      return mirrorItem
+        ? PixezService.getMirroredNovelDetail(id)
+        : PixezService.getNovelBookmarkDetail(id)
+    },
     enabled: open && id > 0,
   })
   const novelTextQuery = useQuery<PixezNovelTextPreview>({

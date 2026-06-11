@@ -17,13 +17,12 @@ import {
 import {Spinner} from "@/components/ui/spinner"
 import {Tabs, TabsList, TabsTrigger} from "@/components/ui/tabs"
 import {ErrorInline} from "@/components/layout/error"
-import type {PixezBookmarkQuery, PixezMirrorStatusText, PixezMirrorTarget} from "@/lib/services"
+import type {PixezMirrorQuery, PixezMirrorStatusText, PixezMirrorTarget} from "@/lib/services"
 
 import {usePixEzMirrors} from "./api/usePixEzMirrors"
 import {MirrorGallery} from "./MirrorGallery"
 
 type MirrorStatusFilter = PixezMirrorStatusText | "all"
-type WorkStatusFilter = NonNullable<PixezBookmarkQuery["work_status"]>
 
 const pageSize = 24
 
@@ -32,15 +31,13 @@ export function PixEzMirrors() {
   const [page, setPage] = useState(1)
   const [query, setQuery] = useState("")
   const [mirrorStatus, setMirrorStatus] = useState<MirrorStatusFilter>("all")
-  const [workStatus, setWorkStatus] = useState<WorkStatusFilter>("active")
 
-  const params = useMemo<PixezBookmarkQuery>(() => ({
+  const params = useMemo<PixezMirrorQuery>(() => ({
     page,
     page_size: pageSize,
     q: query.trim(),
-    mirror_status: mirrorStatus,
-    work_status: workStatus,
-  }), [mirrorStatus, page, query, workStatus])
+    status: mirrorStatus,
+  }), [mirrorStatus, page, query])
 
   const mirrorsQuery = usePixEzMirrors(target, params)
   const items = mirrorsQuery.data?.items ?? []
@@ -77,7 +74,7 @@ export function PixEzMirrors() {
                 </TabsList>
               </Tabs>
 
-              <div className="grid gap-2 sm:grid-cols-[minmax(220px,1fr)_160px_160px_auto] xl:min-w-[760px]">
+              <div className="grid gap-2 sm:grid-cols-[minmax(220px,1fr)_160px_auto] xl:min-w-[590px]">
                 <div className="relative">
                   <Search className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground" />
                   <Input
@@ -107,29 +104,6 @@ export function PixEzMirrors() {
                       <SelectItem value="success">成功</SelectItem>
                       <SelectItem value="processing">下载中</SelectItem>
                       <SelectItem value="failed">失败</SelectItem>
-                      <SelectItem value="none">未入队</SelectItem>
-                    </SelectGroup>
-                  </SelectContent>
-                </Select>
-
-                <Select
-                  value={workStatus}
-                  onValueChange={(value) => {
-                    setWorkStatus(value as WorkStatusFilter)
-                    resetPage()
-                  }}
-                >
-                  <SelectTrigger className="w-full">
-                    <SelectValue placeholder="作品状态" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectGroup>
-                      <SelectItem value="active">当前收藏</SelectItem>
-                      <SelectItem value="visible">可见</SelectItem>
-                      <SelectItem value="muted">已屏蔽</SelectItem>
-                      <SelectItem value="unavailable">不可见</SelectItem>
-                      <SelectItem value="removed">已移除</SelectItem>
-                      <SelectItem value="all">全部作品</SelectItem>
                     </SelectGroup>
                   </SelectContent>
                 </Select>

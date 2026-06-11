@@ -1,5 +1,6 @@
 "use client"
 
+import Image from "next/image"
 import Link from "next/link"
 import {ExternalLink, ImageIcon, RotateCcw} from "lucide-react"
 import {useQuery} from "@tanstack/react-query"
@@ -31,6 +32,45 @@ import {
 
 type BookmarkItem = PixezIllustBookmark | PixezNovelBookmark
 type BookmarkDetail = PixezIllustBookmarkDetail | PixezNovelBookmarkDetail
+
+interface OriginalTag {
+  name?: string
+  translated_name?: string | null
+}
+
+interface OriginalPayload {
+  caption?: string
+  height?: number
+  image_urls?: {
+    large?: string
+    medium?: string
+  }
+  meta_pages?: Array<{
+    image_urls?: {
+      large?: string
+      original?: string
+    }
+  }>
+  page_count?: number
+  tags?: OriginalTag[]
+  text_length?: number
+  total_bookmarks?: number
+  total_view?: number
+  width?: number
+}
+
+function parseOriginalPayload(value: unknown): OriginalPayload | null {
+  if (!value) return null
+  if (typeof value === "string") {
+    try {
+      const parsed: unknown = JSON.parse(value)
+      return typeof parsed === "object" && parsed !== null ? parsed as OriginalPayload : null
+    } catch {
+      return null
+    }
+  }
+  return typeof value === "object" ? value as OriginalPayload : null
+}
 
 function itemID(target: PixezMirrorTarget, item: BookmarkItem | null) {
   if (!item) return 0
@@ -89,20 +129,23 @@ export function BookmarkDetailDrawer({
 
   // Extract original details from raw JSON payload
   const originalIllust = target === "illust" && detail && "illust_json" in detail && detail.illust_json
-    ? (typeof detail.illust_json === "string" ? JSON.parse(detail.illust_json) : detail.illust_json)
+    ? parseOriginalPayload(detail.illust_json)
     : null
 
   const originalNovel = target === "novel" && detail && "novel_json" in detail && detail.novel_json
-    ? (typeof detail.novel_json === "string" ? JSON.parse(detail.novel_json) : detail.novel_json)
+    ? parseOriginalPayload(detail.novel_json)
     : null
 
   // Get preview images: large preview preferred, fallback to medium
   const previewImages = (() => {
     if (!originalIllust) return []
     if (originalIllust.meta_pages && originalIllust.meta_pages.length > 0) {
-      return originalIllust.meta_pages.map((page: any) => page.image_urls?.large || page.image_urls?.original)
+      return originalIllust.meta_pages
+        .map((page) => page.image_urls?.large || page.image_urls?.original || "")
+        .filter(Boolean)
     }
-    return [originalIllust.image_urls?.large || originalIllust.image_urls?.medium]
+    const previewURL = originalIllust.image_urls?.large || originalIllust.image_urls?.medium
+    return previewURL ? [previewURL] : []
   })()
 
   // Get description/caption safely
@@ -219,7 +262,7 @@ export function BookmarkDetailDrawer({
                   <div className="flex flex-col gap-2">
                     <span className="text-xs font-medium text-muted-foreground">作品标签</span>
                     <div className="flex flex-wrap gap-1.5">
-                      {tags.map((tag: any, index: number) => (
+                      {tags.map((tag, index) => (
                         <div key={index} className="inline-flex flex-col px-2 py-1 bg-muted/60 border rounded text-xs select-text">
                           <span className="font-medium">{tag.name}</span>
                           {tag.translated_name && (
@@ -241,11 +284,13 @@ export function BookmarkDetailDrawer({
                     <div className="grid gap-4 sm:grid-cols-2">
                       {previewImages.map((url: string, index: number) => (
                         <div key={index} className="relative overflow-hidden rounded-md border bg-muted aspect-[3/4] flex items-center justify-center group hover:border-primary/50 transition-colors">
-                          <img
+                          <Image
                             src={mirrorImageURL(url)}
                             alt={`Page ${index + 1}`}
-                            className="max-h-full max-w-full object-contain pointer-events-none"
-                            loading="lazy"
+                            fill
+                            unoptimized
+                            sizes="(min-width: 640px) 50vw, 100vw"
+                            className="object-contain pointer-events-none"
                           />
                           <span className="absolute bottom-2 right-2 bg-black/60 text-white px-2 py-0.5 rounded text-[11px] font-mono">
                             {index + 1} / {previewImages.length}

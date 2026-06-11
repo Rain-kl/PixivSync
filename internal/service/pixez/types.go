@@ -113,7 +113,10 @@ type Novel struct {
 	TextLength     int  `json:"text_length"`
 	TotalBookmarks int  `json:"total_bookmarks"`
 	TotalView      int  `json:"total_view"`
+	XRestrict      int  `json:"x_restrict"`
+	IsOriginal     bool `json:"is_original"`
 	IsBookmarked   bool `json:"is_bookmarked"`
+	Visible        bool `json:"visible"`
 	IsMuted        bool `json:"is_muted"`
 	NovelAIType    int  `json:"novel_ai_type"`
 	ImageUrls      struct {

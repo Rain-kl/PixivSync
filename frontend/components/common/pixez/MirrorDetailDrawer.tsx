@@ -15,11 +15,11 @@ import {ErrorInline} from "@/components/layout/error"
 import {LoadingStateWithBorder} from "@/components/layout/loading"
 import {PixezService} from "@/lib/services"
 import type {
-  PixezIllustBookmark,
-  PixezIllustBookmarkDetail,
   PixezMirrorTarget,
-  PixezNovelBookmark,
-  PixezNovelBookmarkDetail,
+  PixezMirroredIllust,
+  PixezMirroredIllustDetail,
+  PixezMirroredNovel,
+  PixezMirroredNovelDetail,
 } from "@/lib/services"
 
 import {
@@ -30,14 +30,14 @@ import {
   pixezTargetLabel,
 } from "./pixez-format"
 
-type MirrorItem = PixezIllustBookmark | PixezNovelBookmark
-type MirrorDetail = PixezIllustBookmarkDetail | PixezNovelBookmarkDetail
+type MirrorItem = PixezMirroredIllust | PixezMirroredNovel
+type MirrorDetail = PixezMirroredIllustDetail | PixezMirroredNovelDetail
 
 function itemID(target: PixezMirrorTarget, item: MirrorItem | null) {
   if (!item) return 0
   return target === "illust"
-    ? (item as PixezIllustBookmark).illust_id
-    : (item as PixezNovelBookmark).novel_id
+    ? (item as PixezMirroredIllust).illust_id
+    : (item as PixezMirroredNovel).novel_id
 }
 
 function originalURL(target: PixezMirrorTarget, id: number) {
@@ -64,7 +64,7 @@ function retryURLs(detail: MirrorDetail | undefined) {
   return detail?.retry_urls ?? []
 }
 
-function isIllustDetail(detail: MirrorDetail | undefined): detail is PixezIllustBookmarkDetail {
+function isIllustDetail(detail: MirrorDetail | undefined): detail is PixezMirroredIllustDetail {
   return !!detail && "image_files" in detail
 }
 
@@ -93,8 +93,8 @@ export function MirrorDetailDrawer({
   const detailQuery = useQuery<MirrorDetail>({
     queryKey: ["pixez", "mirror-detail", target, id],
     queryFn: () => target === "illust"
-      ? PixezService.getIllustBookmarkDetail(id)
-      : PixezService.getNovelBookmarkDetail(id),
+      ? PixezService.getMirroredIllustDetail(id)
+      : PixezService.getMirroredNovelDetail(id),
     enabled: open && id > 0,
   })
   const detail = detailQuery.data
@@ -126,13 +126,11 @@ export function MirrorDetailDrawer({
                   <div className="text-xs text-muted-foreground">镜像状态</div>
                   <div className="mt-2 flex items-center gap-2">
                     <Badge variant={statusVariant(mirror?.status)}>
-                      {pixezMirrorStatusLabel(mirror?.status || detail.item.mirror_status_text)}
+                      {pixezMirrorStatusLabel(mirror?.status || detail.item.status_text)}
                     </Badge>
-                    {mirror && (
-                      <span className="font-mono text-xs text-muted-foreground">
-                        {mirror.success_count}/{mirror.total_count}
-                      </span>
-                    )}
+                    <span className="font-mono text-xs text-muted-foreground">
+                      {mirror?.success_count ?? detail.item.success_count}/{mirror?.total_count ?? detail.item.total_count}
+                    </span>
                   </div>
                 </div>
                 <div className="rounded-md border p-3">
