@@ -86,8 +86,8 @@ func SetupTestEnvironment(t *testing.T) (*gorm.DB, *miniredis.Miniredis, func())
 	return sqliteDB, mr, cleanup
 }
 
-func seedDefaultConfigs(t *testing.T, tx *gorm.DB) {
-	defaultConfigs := []model.SystemConfig{
+func getSeedConfigsPart1() []model.SystemConfig {
+	return []model.SystemConfig{
 		{
 			Key:         model.ConfigKeyUploadAllowedExtensions,
 			Value:       "jpg,png,webp",
@@ -172,6 +172,11 @@ func seedDefaultConfigs(t *testing.T, tx *gorm.DB) {
 			Type:        "system",
 			Description: "人机验证兑换凭证有效时间（秒）",
 		},
+	}
+}
+
+func getSeedConfigsPart2() []model.SystemConfig {
+	return []model.SystemConfig{
 		{
 			Key:         model.ConfigKeyServerAddress,
 			Value:       "",
@@ -250,7 +255,29 @@ func seedDefaultConfigs(t *testing.T, tx *gorm.DB) {
 			Type:        "system",
 			Description: "免登录访问的文件业务类型白名单",
 		},
+		{
+			Key:         model.ConfigKeyDiskCacheMaxSizeMB,
+			Value:       "100",
+			Type:        "system",
+			Description: "磁盘缓存最大空间大小 (MB)",
+		},
+		{
+			Key:         model.ConfigKeyDiskCacheTTLMinutes,
+			Value:       "60",
+			Type:        "system",
+			Description: "磁盘缓存默认有效期 (分钟)",
+		},
+		{
+			Key:         model.ConfigKeyDiskCacheLRUEnabled,
+			Value:       "true",
+			Type:        "system",
+			Description: "是否启用 LRU 淘汰机制",
+		},
 	}
+}
+
+func seedDefaultConfigs(t *testing.T, tx *gorm.DB) {
+	defaultConfigs := append(getSeedConfigsPart1(), getSeedConfigsPart2()...)
 
 	if err := tx.Create(&defaultConfigs).Error; err != nil {
 		t.Fatalf("failed to seed default system configs: %v", err)

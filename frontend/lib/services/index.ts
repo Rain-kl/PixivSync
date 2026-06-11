@@ -118,6 +118,8 @@ export type {
   Schedule,
   CreateScheduleRequest,
   UpdateScheduleRequest,
+  CacheStatus,
+  CacheConfig,
 } from './admin';
 
 // 用户服务

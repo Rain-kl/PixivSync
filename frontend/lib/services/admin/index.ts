@@ -45,4 +45,6 @@ export type {
   Schedule,
   CreateScheduleRequest,
   UpdateScheduleRequest,
+  CacheStatus,
+  CacheConfig,
 } from './types';

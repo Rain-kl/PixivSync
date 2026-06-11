@@ -438,3 +438,36 @@ export interface DatabaseInfo {
   /** 数据库版本字符串 */
   version: string;
 }
+
+// ==================== 缓存管理 ====================
+
+/**
+ * 缓存状态信息
+ */
+export interface CacheStatus {
+  /** 缓存文件总大小（字节） */
+  total_size: number;
+  /** 缓存 Key 数量 */
+  keys_count: number;
+  /** 最大容量限制 (MB) */
+  max_size_mb: number;
+  /** 过期时间 (分钟) */
+  ttl_minutes: number;
+  /** 是否启用 LRU 淘汰 */
+  lru_enabled: boolean;
+  /** 缓存目录基准路径 */
+  base_path: string;
+}
+
+/**
+ * 缓存配置请求参数
+ */
+export interface CacheConfig {
+  /** 最大容量限制 (MB) */
+  max_size_mb: number;
+  /** 过期时间 (分钟) */
+  ttl_minutes: number;
+  /** 是否启用 LRU 淘汰 */
+  lru_enabled: boolean;
+}
+

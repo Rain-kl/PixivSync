@@ -3,6 +3,8 @@ import type {
   AdminUser,
   AuthSource,
   AuthSourceRequest,
+  CacheConfig,
+  CacheStatus,
   CreateScheduleRequest,
   CreateSystemConfigRequest,
   CreateTemplateRequest,
@@ -28,7 +30,7 @@ import type {
   UpdateUserStatusRequest,
 } from './types';
 
-export type { AdminUser } from './types';
+export type { AdminUser, CacheStatus, CacheConfig } from './types';
 
 /**
  * 管理员服务
@@ -505,5 +507,28 @@ export class AdminService extends BaseService {
    */
   static async deleteTemplate(key: string): Promise<void> {
     return this.delete<void>(`/templates/${ key }`);
+  }
+
+  // ==================== 磁盘缓存管理 ====================
+
+  /**
+   * 获取磁盘缓存状态与当前统计数据
+   */
+  static async getCacheStatus(): Promise<CacheStatus> {
+    return this.get<CacheStatus>('/cache/status');
+  }
+
+  /**
+   * 更新磁盘缓存策略配置
+   */
+  static async updateCacheConfig(config: CacheConfig): Promise<void> {
+    return this.post<void>('/cache/config', config);
+  }
+
+  /**
+   * 一键清空所有磁盘缓存数据
+   */
+  static async clearCache(): Promise<void> {
+    return this.post<void>('/cache/clear');
   }
 }
