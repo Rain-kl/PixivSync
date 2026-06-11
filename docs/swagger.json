@@ -1330,6 +1330,167 @@
                 }
             }
         },
+        "/api/v1/admin/cache/clear": {
+            "post": {
+                "security": [
+                    {
+                        "SessionCookie": []
+                    }
+                ],
+                "description": "清除系统磁盘缓存目录中的所有临时文件，并重置缓存容量和 Key 追踪数据",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "admin"
+                ],
+                "summary": "清空缓存",
+                "responses": {
+                    "200": {
+                        "description": "清理成功",
+                        "schema": {
+                            "$ref": "#/definitions/util.ResponseAny"
+                        }
+                    },
+                    "401": {
+                        "description": "未登录",
+                        "schema": {
+                            "$ref": "#/definitions/util.ResponseAny"
+                        }
+                    },
+                    "403": {
+                        "description": "无管理员权限",
+                        "schema": {
+                            "$ref": "#/definitions/util.ResponseAny"
+                        }
+                    },
+                    "500": {
+                        "description": "服务内部错误",
+                        "schema": {
+                            "$ref": "#/definitions/util.ResponseAny"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/admin/cache/config": {
+            "post": {
+                "security": [
+                    {
+                        "SessionCookie": []
+                    }
+                ],
+                "description": "更改磁盘缓存最大容量限制、文件生存时间（TTL）以及是否启用 LRU 淘汰淘汰算法，并进行热更新",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "admin"
+                ],
+                "summary": "更新缓存配置",
+                "parameters": [
+                    {
+                        "description": "缓存配置请求体",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/cache.updateCacheConfigRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "更新成功",
+                        "schema": {
+                            "$ref": "#/definitions/util.ResponseAny"
+                        }
+                    },
+                    "400": {
+                        "description": "参数错误",
+                        "schema": {
+                            "$ref": "#/definitions/util.ResponseAny"
+                        }
+                    },
+                    "401": {
+                        "description": "未登录",
+                        "schema": {
+                            "$ref": "#/definitions/util.ResponseAny"
+                        }
+                    },
+                    "403": {
+                        "description": "无管理员权限",
+                        "schema": {
+                            "$ref": "#/definitions/util.ResponseAny"
+                        }
+                    },
+                    "500": {
+                        "description": "服务内部错误",
+                        "schema": {
+                            "$ref": "#/definitions/util.ResponseAny"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/admin/cache/status": {
+            "get": {
+                "security": [
+                    {
+                        "SessionCookie": []
+                    }
+                ],
+                "description": "获取当前系统磁盘缓存的使用情况（已占用字节、Key 数量等）与策略配置",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "admin"
+                ],
+                "summary": "获取缓存状态",
+                "responses": {
+                    "200": {
+                        "description": "获取成功",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/util.ResponseAny"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/diskcache.Status"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "401": {
+                        "description": "未登录",
+                        "schema": {
+                            "$ref": "#/definitions/util.ResponseAny"
+                        }
+                    },
+                    "403": {
+                        "description": "无管理员权限",
+                        "schema": {
+                            "$ref": "#/definitions/util.ResponseAny"
+                        }
+                    },
+                    "500": {
+                        "description": "内部错误",
+                        "schema": {
+                            "$ref": "#/definitions/util.ResponseAny"
+                        }
+                    }
+                }
+            }
+        },
         "/api/v1/admin/db-export": {
             "get": {
                 "security": [
@@ -3228,6 +3389,64 @@
                 }
             }
         },
+        "/api/v1/admin/uploads/types": {
+            "get": {
+                "security": [
+                    {
+                        "SessionCookie": []
+                    }
+                ],
+                "description": "返回数据库中所有已上传文件实际拥有的业务类型列表",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "admin"
+                ],
+                "summary": "获取文件业务类型列表",
+                "responses": {
+                    "200": {
+                        "description": "业务类型列表",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/util.ResponseAny"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "type": "string"
+                                            }
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "401": {
+                        "description": "未登录",
+                        "schema": {
+                            "$ref": "#/definitions/util.ResponseAny"
+                        }
+                    },
+                    "403": {
+                        "description": "无管理员权限",
+                        "schema": {
+                            "$ref": "#/definitions/util.ResponseAny"
+                        }
+                    },
+                    "500": {
+                        "description": "内部错误",
+                        "schema": {
+                            "$ref": "#/definitions/util.ResponseAny"
+                        }
+                    }
+                }
+            }
+        },
         "/api/v1/admin/users": {
             "get": {
                 "security": [
@@ -4271,6 +4490,12 @@
                         "name": "id",
                         "in": "path",
                         "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "图片质量 (low, medium, high, origin)，默认为 origin",
+                        "name": "quality",
+                        "in": "query"
                     }
                 ],
                 "responses": {
@@ -5045,6 +5270,12 @@
                         "name": "id",
                         "in": "path",
                         "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "图片质量 (low, medium, high, origin)，默认为 origin",
+                        "name": "quality",
+                        "in": "query"
                     }
                 ],
                 "responses": {
@@ -5060,6 +5291,12 @@
                             "$ref": "#/definitions/util.ResponseAny"
                         }
                     },
+                    "401": {
+                        "description": "未登录",
+                        "schema": {
+                            "$ref": "#/definitions/util.ResponseAny"
+                        }
+                    },
                     "404": {
                         "description": "文件未找到",
                         "schema": {
@@ -5070,6 +5307,52 @@
                         "description": "服务内部错误",
                         "schema": {
                             "$ref": "#/definitions/util.ResponseAny"
+                        }
+                    }
+                }
+            }
+        },
+        "/mirror/pximg/{path}": {
+            "get": {
+                "security": [
+                    {
+                        "SessionCookie": []
+                    }
+                ],
+                "description": "Returns the original mirrored image by default, or a cached WebP conversion when quality is low, medium, or high.",
+                "produces": [
+                    "application/octet-stream"
+                ],
+                "tags": [
+                    "pixez"
+                ],
+                "summary": "Get PixEz mirrored image",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Pixiv image path",
+                        "name": "path",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Image quality: low, medium, high, or origin. Defaults to origin.",
+                        "name": "quality",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Mirrored image",
+                        "schema": {
+                            "type": "file"
+                        }
+                    },
+                    "404": {
+                        "description": "Mirror file not found",
+                        "schema": {
+                            "type": "object"
                         }
                     }
                 }
@@ -5134,6 +5417,26 @@
             "properties": {
                 "is_active": {
                     "type": "boolean"
+                }
+            }
+        },
+        "cache.updateCacheConfigRequest": {
+            "type": "object",
+            "required": [
+                "max_size_mb",
+                "ttl_minutes"
+            ],
+            "properties": {
+                "lru_enabled": {
+                    "type": "boolean"
+                },
+                "max_size_mb": {
+                    "type": "integer",
+                    "minimum": 1
+                },
+                "ttl_minutes": {
+                    "type": "integer",
+                    "minimum": 0
                 }
             }
         },
@@ -5268,6 +5571,29 @@
                 "type": {
                     "description": "\"select\" 或 \"exec\"",
                     "type": "string"
+                }
+            }
+        },
+        "diskcache.Status": {
+            "type": "object",
+            "properties": {
+                "base_path": {
+                    "type": "string"
+                },
+                "keys_count": {
+                    "type": "integer"
+                },
+                "lru_enabled": {
+                    "type": "boolean"
+                },
+                "max_size_mb": {
+                    "type": "integer"
+                },
+                "total_size": {
+                    "type": "integer"
+                },
+                "ttl_minutes": {
+                    "type": "integer"
                 }
             }
         },

@@ -26,6 +26,20 @@ definitions:
       is_active:
         type: boolean
     type: object
+  cache.updateCacheConfigRequest:
+    properties:
+      lru_enabled:
+        type: boolean
+      max_size_mb:
+        minimum: 1
+        type: integer
+      ttl_minutes:
+        minimum: 0
+        type: integer
+    required:
+    - max_size_mb
+    - ttl_minutes
+    type: object
   cap.ChallengeResponse:
     properties:
       challenge:
@@ -113,6 +127,21 @@ definitions:
       type:
         description: '"select" 或 "exec"'
         type: string
+    type: object
+  diskcache.Status:
+    properties:
+      base_path:
+        type: string
+      keys_count:
+        type: integer
+      lru_enabled:
+        type: boolean
+      max_size_mb:
+        type: integer
+      total_size:
+        type: integer
+      ttl_minutes:
+        type: integer
     type: object
   logger.LogEntry:
     properties:
@@ -1944,6 +1973,105 @@ paths:
       summary: 切换认证源启用状态
       tags:
       - admin
+  /api/v1/admin/cache/clear:
+    post:
+      description: 清除系统磁盘缓存目录中的所有临时文件，并重置缓存容量和 Key 追踪数据
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: 清理成功
+          schema:
+            $ref: '#/definitions/util.ResponseAny'
+        "401":
+          description: 未登录
+          schema:
+            $ref: '#/definitions/util.ResponseAny'
+        "403":
+          description: 无管理员权限
+          schema:
+            $ref: '#/definitions/util.ResponseAny'
+        "500":
+          description: 服务内部错误
+          schema:
+            $ref: '#/definitions/util.ResponseAny'
+      security:
+      - SessionCookie: []
+      summary: 清空缓存
+      tags:
+      - admin
+  /api/v1/admin/cache/config:
+    post:
+      consumes:
+      - application/json
+      description: 更改磁盘缓存最大容量限制、文件生存时间（TTL）以及是否启用 LRU 淘汰淘汰算法，并进行热更新
+      parameters:
+      - description: 缓存配置请求体
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/cache.updateCacheConfigRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: 更新成功
+          schema:
+            $ref: '#/definitions/util.ResponseAny'
+        "400":
+          description: 参数错误
+          schema:
+            $ref: '#/definitions/util.ResponseAny'
+        "401":
+          description: 未登录
+          schema:
+            $ref: '#/definitions/util.ResponseAny'
+        "403":
+          description: 无管理员权限
+          schema:
+            $ref: '#/definitions/util.ResponseAny'
+        "500":
+          description: 服务内部错误
+          schema:
+            $ref: '#/definitions/util.ResponseAny'
+      security:
+      - SessionCookie: []
+      summary: 更新缓存配置
+      tags:
+      - admin
+  /api/v1/admin/cache/status:
+    get:
+      description: 获取当前系统磁盘缓存的使用情况（已占用字节、Key 数量等）与策略配置
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: 获取成功
+          schema:
+            allOf:
+            - $ref: '#/definitions/util.ResponseAny'
+            - properties:
+                data:
+                  $ref: '#/definitions/diskcache.Status'
+              type: object
+        "401":
+          description: 未登录
+          schema:
+            $ref: '#/definitions/util.ResponseAny'
+        "403":
+          description: 无管理员权限
+          schema:
+            $ref: '#/definitions/util.ResponseAny'
+        "500":
+          description: 内部错误
+          schema:
+            $ref: '#/definitions/util.ResponseAny'
+      security:
+      - SessionCookie: []
+      summary: 获取缓存状态
+      tags:
+      - admin
   /api/v1/admin/db-export:
     get:
       description: SQLite 时直接下载 .db 文件；PostgreSQL 时执行 pg_dump 并流式下载 .sql 文件，需要管理员权限
@@ -3083,6 +3211,40 @@ paths:
       summary: 更新模板
       tags:
       - admin
+  /api/v1/admin/uploads/types:
+    get:
+      description: 返回数据库中所有已上传文件实际拥有的业务类型列表
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: 业务类型列表
+          schema:
+            allOf:
+            - $ref: '#/definitions/util.ResponseAny'
+            - properties:
+                data:
+                  items:
+                    type: string
+                  type: array
+              type: object
+        "401":
+          description: 未登录
+          schema:
+            $ref: '#/definitions/util.ResponseAny'
+        "403":
+          description: 无管理员权限
+          schema:
+            $ref: '#/definitions/util.ResponseAny'
+        "500":
+          description: 内部错误
+          schema:
+            $ref: '#/definitions/util.ResponseAny'
+      security:
+      - SessionCookie: []
+      summary: 获取文件业务类型列表
+      tags:
+      - admin
   /api/v1/admin/users:
     get:
       description: 分页返回用户列表，支持按用户 ID 和用户名筛选，需要管理员权限
@@ -3700,6 +3862,10 @@ paths:
         name: id
         required: true
         type: string
+      - description: 图片质量 (low, medium, high, origin)，默认为 origin
+        in: query
+        name: quality
+        type: string
       produces:
       - application/octet-stream
       responses:
@@ -4166,6 +4332,10 @@ paths:
         name: id
         required: true
         type: string
+      - description: 图片质量 (low, medium, high, origin)，默认为 origin
+        in: query
+        name: quality
+        type: string
       produces:
       - application/octet-stream
       responses:
@@ -4175,6 +4345,10 @@ paths:
             type: file
         "400":
           description: 文件 ID 格式错误
+          schema:
+            $ref: '#/definitions/util.ResponseAny'
+        "401":
+          description: 未登录
           schema:
             $ref: '#/definitions/util.ResponseAny'
         "404":
@@ -4188,6 +4362,36 @@ paths:
       summary: 获取已上传文件
       tags:
       - upload
+  /mirror/pximg/{path}:
+    get:
+      description: Returns the original mirrored image by default, or a cached WebP
+        conversion when quality is low, medium, or high.
+      parameters:
+      - description: Pixiv image path
+        in: path
+        name: path
+        required: true
+        type: string
+      - description: 'Image quality: low, medium, high, or origin. Defaults to origin.'
+        in: query
+        name: quality
+        type: string
+      produces:
+      - application/octet-stream
+      responses:
+        "200":
+          description: Mirrored image
+          schema:
+            type: file
+        "404":
+          description: Mirror file not found
+          schema:
+            type: object
+      security:
+      - SessionCookie: []
+      summary: Get PixEz mirrored image
+      tags:
+      - pixez
   /robots.txt:
     get:
       description: 根据系统配置决定是否允许搜索引擎检索，并返回相应的 robots.txt 文件内容

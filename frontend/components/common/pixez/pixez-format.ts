@@ -65,9 +65,15 @@ export function pixezMirrorStatusLabel(status: PixezMirrorStatusText | string) {
   return status || "-"
 }
 
-export function mirrorImageURL(url: string | undefined) {
+export type PixezImageQuality = "low" | "medium" | "high" | "origin"
+
+export function mirrorImageURL(url: string | undefined, quality: PixezImageQuality = "origin") {
   if (!url) return ""
-  return url
+  const mirrorURL = url
     .replace("https://i.pximg.net", "/mirror/pximg")
     .replace("https://s.pximg.net", "/mirror/pximg")
+  if (quality === "origin") return mirrorURL
+
+  const separator = mirrorURL.includes("?") ? "&" : "?"
+  return `${mirrorURL}${separator}quality=${quality}`
 }

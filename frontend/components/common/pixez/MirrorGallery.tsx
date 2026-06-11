@@ -113,7 +113,7 @@ export function MirrorGallery({
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4">
         {items.map((item) => {
           const id = itemID(target, item)
-          const coverURL = mirrorImageURL(item.cover_url)
+          const coverURL = mirrorImageURL(item.cover_url, "medium")
           return (
             <Card key={`${target}-${id}`} className="overflow-hidden rounded-lg py-0">
               <button

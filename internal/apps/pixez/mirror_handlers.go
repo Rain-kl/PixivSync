@@ -4,17 +4,18 @@
 package pixez
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io"
 	"net/http"
 	"os"
 	"strconv"
 	"strings"
 	"time"
 
+	uploadapp "github.com/Rain-kl/Wavelet/internal/apps/upload"
 	"github.com/Rain-kl/Wavelet/internal/db"
 	"github.com/Rain-kl/Wavelet/internal/logger"
 	"github.com/Rain-kl/Wavelet/internal/model"
@@ -246,26 +247,20 @@ func GetMirroredIllustDetail(c *gin.Context) {
 }
 
 // ServeMirroredImage streams a mirrored pximg file from Upload storage.
+// @Summary Get PixEz mirrored image
+// @Description Returns the original mirrored image by default, or a cached WebP conversion when quality is low, medium, or high.
+// @Tags pixez
+// @Produce octet-stream
+// @Security SessionCookie
+// @Param path path string true "Pixiv image path"
+// @Param quality query string false "Image quality: low, medium, high, or origin. Defaults to origin."
+// @Success 200 {file} file "Mirrored image"
+// @Failure 404 {object} object "Mirror file not found"
+// @Router /mirror/pximg/{path} [get]
 func ServeMirroredImage(c *gin.Context) {
 	upload, err := pixezsvc.FindMirroredImageUpload(c.Request.Context(), c.Param("path"))
 	if err == nil {
-		c.Header("Content-Type", upload.MimeType)
-		c.Header("Content-Length", strconv.FormatInt(upload.FileSize, 10))
-		if upload.StorageDriver == "local" || (upload.StorageDriver == "" && !storage.IsEnabled()) {
-			c.File(upload.FilePath)
-			return
-		}
-		obj, err := storage.GetObjectViaCache(c.Request.Context(), upload.FilePath)
-		if err != nil {
-			c.JSON(http.StatusNotFound, gin.H{"error": "mirror file not found"})
-			return
-		}
-		if obj.CachePath != "" {
-			c.File(obj.CachePath)
-			return
-		}
-		defer func() { _ = obj.Body.Close() }()
-		_, _ = io.Copy(c.Writer, obj.Body)
+		uploadapp.ServeUpload(c, &upload)
 		return
 	}
 
@@ -288,9 +283,29 @@ func ServeMirroredImage(c *gin.Context) {
 		}
 	}
 
+	if quality := c.Query("quality"); isCompressedImageQuality(quality) {
+		webpData, compressErr := uploadapp.CompressImageToWebP(bytes.NewReader(data), quality)
+		if compressErr == nil {
+			c.Header("Content-Type", "image/webp")
+			c.Header("Content-Length", strconv.Itoa(len(webpData)))
+			_, _ = c.Writer.Write(webpData)
+			return
+		}
+		logger.WarnF(c.Request.Context(), "[PixEz] compress proxied mirror image failed path=%s quality=%s: %v", cleanPath, quality, compressErr)
+	}
+
 	c.Header("Content-Type", mimeType)
 	c.Header("Content-Length", strconv.Itoa(len(data)))
 	_, _ = c.Writer.Write(data)
+}
+
+func isCompressedImageQuality(quality string) bool {
+	switch strings.ToLower(quality) {
+	case "low", "medium", "high":
+		return true
+	default:
+		return false
+	}
 }
 
 // GetMirroredNovelDetail returns Pixiv-shape mirrored novel detail.

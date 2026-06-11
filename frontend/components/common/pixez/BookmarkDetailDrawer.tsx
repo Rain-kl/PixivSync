@@ -285,7 +285,7 @@ export function BookmarkDetailDrawer({
                       {previewImages.map((url: string, index: number) => (
                         <div key={index} className="relative overflow-hidden rounded-md border bg-muted aspect-[3/4] flex items-center justify-center group hover:border-primary/50 transition-colors">
                           <Image
-                            src={mirrorImageURL(url)}
+                            src={mirrorImageURL(url, "medium")}
                             alt={`Page ${index + 1}`}
                             fill
                             unoptimized

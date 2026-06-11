@@ -7,14 +7,19 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"image"
+	"image/color"
+	"image/png"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"testing"
 	"time"
 
 	"github.com/Rain-kl/Wavelet/internal/apps/oauth"
 	"github.com/Rain-kl/Wavelet/internal/config"
 	"github.com/Rain-kl/Wavelet/internal/db"
+	"github.com/Rain-kl/Wavelet/internal/diskcache"
 	"github.com/Rain-kl/Wavelet/internal/model"
 	"github.com/Rain-kl/Wavelet/internal/testhelper"
 	"github.com/Rain-kl/Wavelet/internal/util"
@@ -67,6 +72,7 @@ func setupPixezTestRouter() *gin.Engine {
 	mirrorGroup := r.Group("/mirror")
 	mirrorGroup.Use(oauth.LoginRequired())
 	mirrorGroup.GET("/v1/illust/detail", GetMirroredIllustDetail)
+	mirrorGroup.GET("/pximg/*path", ServeMirroredImage)
 	return r
 }
 
@@ -710,4 +716,103 @@ func TestMirrorRouteReturnsPixivShapeWithoutEnvelope(t *testing.T) {
 	if !bytes.Contains(w.Body.Bytes(), []byte(`/mirror/pximg/img-original/img/2026/01/01/00/00/00/123_p0.jpg`)) {
 		t.Fatalf("mirror response did not rewrite pximg URLs: %s", body)
 	}
+}
+
+func TestServeMirroredImageQuality(t *testing.T) {
+	_, _, cleanup := testhelper.SetupTestEnvironment(t)
+	defer cleanup()
+
+	cache := diskcache.GetGlobalCache()
+	if err := cache.Clear(); err != nil {
+		t.Fatalf("clear disk cache before test: %v", err)
+	}
+	t.Cleanup(func() {
+		if err := cache.Clear(); err != nil {
+			t.Errorf("clear disk cache after test: %v", err)
+		}
+		if err := os.RemoveAll("uploads"); err != nil {
+			t.Errorf("remove test upload cache: %v", err)
+		}
+	})
+
+	var imageBytes bytes.Buffer
+	source := image.NewRGBA(image.Rect(0, 0, 8, 8))
+	for y := range 8 {
+		for x := range 8 {
+			source.Set(x, y, color.RGBA{R: uint8(x * 20), G: uint8(y * 20), B: 100, A: 255})
+		}
+	}
+	if err := png.Encode(&imageBytes, source); err != nil {
+		t.Fatalf("encode test image failed: %v", err)
+	}
+	imagePath := t.TempDir() + "/76228932_p0.png"
+	if err := os.WriteFile(imagePath, imageBytes.Bytes(), 0644); err != nil {
+		t.Fatalf("write test image failed: %v", err)
+	}
+
+	ctx := context.Background()
+	upload := model.Upload{
+		ID:            76228932,
+		UserID:        1001,
+		FileName:      "76228932_p0.png",
+		FilePath:      imagePath,
+		FileSize:      int64(imageBytes.Len()),
+		MimeType:      "image/png",
+		Extension:     "png",
+		StorageDriver: "local",
+		Type:          "pixez_mirror",
+		Status:        model.UploadStatusUsed,
+	}
+	if err := db.DB(ctx).Create(&upload).Error; err != nil {
+		t.Fatalf("seed mirror upload failed: %v", err)
+	}
+	files := []model.PixezMirrorImageFile{{
+		PixivURL: "https://i.pximg.net/img-original/img/2019/08/13/06/45/48/76228932_p0.png",
+		Page:     0,
+		UploadID: upload.ID,
+		FileName: upload.FileName,
+	}}
+	if err := db.DB(ctx).Create(&model.PixezMirrorIllust{
+		IllustID:        76228932,
+		Status:          model.PixezMirrorStatusSuccess,
+		ImageFilesJSON:  string(mustMarshalJSON(t, files)),
+		RequestURLsJSON: "[]",
+		RetryURLsJSON:   "[]",
+		SuccessCount:    1,
+		TotalCount:      1,
+	}).Error; err != nil {
+		t.Fatalf("seed mirror record failed: %v", err)
+	}
+
+	router := setupPixezTestRouter()
+	auth := authHeader(t, "pixez-mirror-image-quality")
+	path := "/mirror/pximg/c/360x360_70/img-master/img/2019/08/13/06/45/48/76228932_p0_square1200.png"
+
+	original := performJSON(router, http.MethodGet, path, nil, auth)
+	if original.Code != http.StatusOK {
+		t.Fatalf("ServeMirroredImage(origin) status = %d, want 200", original.Code)
+	}
+	if got, want := original.Header().Get("Content-Type"), "image/png"; got != want {
+		t.Errorf("ServeMirroredImage(origin) Content-Type = %q, want %q", got, want)
+	}
+
+	medium := performJSON(router, http.MethodGet, path+"?quality=medium", nil, auth)
+	if medium.Code != http.StatusOK {
+		t.Fatalf("ServeMirroredImage(medium) status = %d, want 200. Body: %s", medium.Code, medium.Body.String())
+	}
+	if got, want := medium.Header().Get("Content-Type"), "image/webp"; got != want {
+		t.Errorf("ServeMirroredImage(medium) Content-Type = %q, want %q", got, want)
+	}
+	if bytes.Equal(medium.Body.Bytes(), imageBytes.Bytes()) {
+		t.Error("ServeMirroredImage(medium) returned original bytes, want WebP conversion")
+	}
+}
+
+func mustMarshalJSON(t *testing.T, value any) []byte {
+	t.Helper()
+	data, err := json.Marshal(value)
+	if err != nil {
+		t.Fatalf("marshal test JSON failed: %v", err)
+	}
+	return data
 }

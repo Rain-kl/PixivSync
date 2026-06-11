@@ -106,7 +106,7 @@ function IllustPreview({
       <Carousel className="mx-auto w-full max-w-[18rem] sm:max-w-md md:max-w-lg">
         <CarouselContent>
           {detail.image_files.map((file) => {
-            const imageURL = mirrorImageURL(file.pixiv_url)
+            const imageURL = mirrorImageURL(file.pixiv_url, "medium")
             return (
               <CarouselItem key={`${file.pixiv_url}-${file.page}`}>
                 <div className="p-1">
@@ -179,7 +179,7 @@ function NovelPreview({
   textError: Error | null
   onRetryText: () => void
 }) {
-  const coverURL = mirrorImageURL(detail.item.cover_url)
+  const coverURL = mirrorImageURL(detail.item.cover_url, "medium")
   const novelText = text?.text?.trim() ?? ""
 
   return (

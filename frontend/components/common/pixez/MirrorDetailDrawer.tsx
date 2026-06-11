@@ -329,7 +329,7 @@ export function MirrorDetailDrawer({
                           className="group relative flex aspect-[3/4] items-center justify-center overflow-hidden rounded-md border bg-muted transition-colors hover:border-primary/50"
                         >
                           <Image
-                            src={mirrorImageURL(url)}
+                            src={mirrorImageURL(url, "medium")}
                             alt={`${detail.item.title} 第 ${index + 1} 页`}
                             fill
                             unoptimized
