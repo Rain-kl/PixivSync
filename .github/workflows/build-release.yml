@@ -103,30 +103,10 @@ jobs:
         working-directory: ${{ env.FRONTEND_DIR }}
         run: pnpm install --frozen-lockfile
 
-      - name: Stamp frontend package metadata
-        working-directory: ${{ env.FRONTEND_DIR }}
-        shell: bash
-        env:
-          VERSION: ${{ needs.create-release.outputs.version_without_v }}
-          BUILD_DATE: ${{ needs.create-release.outputs.build_date }}
-        run: |
-          set -euo pipefail
-          if [[ -f package.json ]]; then
-            node - <<'NODE'
-          const fs = require('fs');
-          const path = './package.json';
-          const pkg = JSON.parse(fs.readFileSync(path, 'utf8'));
-          if (process.env.VERSION && Object.hasOwn(pkg, 'version')) {
-            pkg.version = process.env.VERSION;
-          }
-          if (process.env.BUILD_DATE && Object.hasOwn(pkg, 'buildDate')) {
-            pkg.buildDate = process.env.BUILD_DATE;
-          }
-          fs.writeFileSync(path, JSON.stringify(pkg, null, 2) + '\n');
-          NODE
-          fi
-
       - name: Build frontend
+        env:
+          NEXT_PUBLIC_APP_VERSION: ${{ needs.create-release.outputs.version }}
+          NEXT_PUBLIC_APP_BUILD_DATE: ${{ needs.create-release.outputs.build_date }}
         run: ${{ env.FRONTEND_BUILD_COMMAND }}
         working-directory: ${{ env.FRONTEND_DIR }}
 

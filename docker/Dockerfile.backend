@@ -5,6 +5,8 @@ ARG ALPINE_VERSION=3.23
 
 FROM golang:${GO_VERSION}-alpine AS builder
 
+ARG VERSION=dev
+
 RUN apk add --no-cache ca-certificates git
 
 WORKDIR /workspace
@@ -16,7 +18,7 @@ COPY . .
 
 RUN CGO_ENABLED=0 GOOS=linux go build \
     -trimpath \
-    -ldflags="-s -w" \
+    -ldflags="-s -w -X github.com/Rain-kl/Wavelet/internal/cmd.Version=${VERSION}" \
     -o /out/wavelet \
     ./main.go
 

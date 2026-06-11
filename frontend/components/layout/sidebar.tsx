@@ -3,7 +3,7 @@
 import * as React from "react"
 import Link from "next/link"
 import {usePathname, useRouter} from "next/navigation"
-import packageJson from "../../package.json"
+import {APP_BUILD_DATE, APP_VERSION} from "@/lib/app-info"
 import {toast} from "sonner"
 import {Button} from "@/components/ui/button"
 import {Spinner} from "@/components/ui/spinner"
@@ -172,7 +172,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
     const displayConfig = parseMenuDisplayConfig(config?.menu_display_config)
     return data.navMain.filter((item) => displayConfig[item.url] !== false)
   }, [config])
-  
+
   const adminFiltered = React.useMemo(() => {
     const displayConfig = parseMenuDisplayConfig(config?.menu_display_config)
     return data.admin.filter((item) => displayConfig[item.url] !== false)
@@ -389,8 +389,8 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
         </SidebarContent>
         <SidebarFooter className="mt-auto px-3 py-3 group-data-[collapsible=icon]:hidden">
           <div className="border-t border-border/60 pt-3 text-[11px] leading-5 text-muted-foreground">
-            <div>Version {packageJson.version}</div>
-            <div>Build At {packageJson.buildDate}</div>
+            <div>Version {APP_VERSION}</div>
+            {APP_BUILD_DATE && <div>Build At {APP_BUILD_DATE}</div>}
           </div>
         </SidebarFooter>
       </Sidebar>

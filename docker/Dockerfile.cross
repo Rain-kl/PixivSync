@@ -29,11 +29,14 @@ ARG ALPINE_VERSION=3.23
 FROM node:${NODE_VERSION}-alpine AS frontend-builder
 
 ARG VERSION=dev
+ARG BUILD_DATE=""
 
 ENV PNPM_HOME="/pnpm"
 ENV PATH="$PNPM_HOME:$PATH"
 ENV NODE_ENV=production
 ENV NEXT_STANDALONE_EXPORT=true
+ENV NEXT_PUBLIC_APP_VERSION=${VERSION}
+ENV NEXT_PUBLIC_APP_BUILD_DATE=${BUILD_DATE}
 
 RUN corepack enable && corepack prepare pnpm@10.10.0 --activate
 
@@ -44,16 +47,6 @@ COPY frontend/package.json frontend/pnpm-lock.yaml ./
 RUN pnpm install --frozen-lockfile
 
 COPY frontend/ ./
-
-# Stamp version into package.json when VERSION is not "dev"
-RUN if [ "$VERSION" != "dev" ]; then \
-      node -e " \
-        const fs = require('fs'); \
-        const pkg = require('./package.json'); \
-        pkg.version = process.env.VERSION.replace(/^v/, ''); \
-        fs.writeFileSync('./package.json', JSON.stringify(pkg, null, 2) + '\n'); \
-      "; \
-    fi
 
 RUN pnpm build:embed
 

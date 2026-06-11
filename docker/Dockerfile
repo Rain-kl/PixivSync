@@ -6,10 +6,15 @@ ARG ALPINE_VERSION=3.23
 
 FROM node:${NODE_VERSION}-alpine AS frontend-builder
 
+ARG VERSION=dev
+ARG BUILD_DATE=""
+
 ENV PNPM_HOME="/pnpm"
 ENV PATH="$PNPM_HOME:$PATH"
 ENV NODE_ENV=production
 ENV NEXT_STANDALONE_EXPORT=true
+ENV NEXT_PUBLIC_APP_VERSION=${VERSION}
+ENV NEXT_PUBLIC_APP_BUILD_DATE=${BUILD_DATE}
 
 RUN corepack enable && corepack prepare pnpm@10.10.0 --activate
 
@@ -19,9 +24,12 @@ COPY frontend/package.json frontend/pnpm-lock.yaml ./
 RUN pnpm install --frozen-lockfile
 
 COPY frontend/ ./
+
 RUN pnpm build:embed
 
 FROM golang:${GO_VERSION}-alpine AS backend-builder
+
+ARG VERSION=dev
 
 RUN apk add --no-cache ca-certificates git
 
@@ -36,7 +44,7 @@ COPY --from=frontend-builder /workspace/frontend/out ./internal/router/dist
 RUN CGO_ENABLED=0 GOOS=linux go build \
     -tags embed_frontend \
     -trimpath \
-    -ldflags="-s -w" \
+    -ldflags="-s -w -X github.com/Rain-kl/Wavelet/internal/cmd.Version=${VERSION}" \
     -o /out/wavelet \
     ./main.go
 

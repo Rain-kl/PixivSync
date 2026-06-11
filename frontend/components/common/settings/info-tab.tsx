@@ -2,6 +2,7 @@
 
 import {Info, Server} from "lucide-react"
 import packageJson from "../../../package.json"
+import {APP_BUILD_DATE, APP_VERSION} from "@/lib/app-info"
 import {apiConfig} from "@/lib/services"
 import {Card, CardContent, CardDescription, CardHeader, CardTitle} from "@/components/ui/card"
 
@@ -36,8 +37,8 @@ export function InfoTab({ systemConfigsLength, authSourcesLength }: InfoTabProps
         </CardHeader>
         <CardContent className="pt-4">
           <InfoRow label="应用名称" value={packageJson.name} />
-          <InfoRow label="版本号" value={packageJson.version} />
-          <InfoRow label="构建时间" value={packageJson.buildDate} />
+          <InfoRow label="版本号" value={APP_VERSION} />
+          {APP_BUILD_DATE && <InfoRow label="构建时间" value={APP_BUILD_DATE} />}
           <InfoRow label="Next.js" value={(packageJson as { dependencies?: Record<string, string> }).dependencies?.next} />
           <InfoRow label="React" value={(packageJson as { dependencies?: Record<string, string> }).dependencies?.react} />
         </CardContent>
