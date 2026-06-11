@@ -141,8 +141,8 @@ func RetryTask(ctx context.Context, id uint64) (string, error) {
 		return "", fmt.Errorf(errTaskExecutionNotFound, err)
 	}
 
-	if execution.Status == model.TaskExecutionStatusPending || execution.Status == model.TaskExecutionStatusRunning {
-		return "", fmt.Errorf(errRetryOnlyFinishedTask, execution.Status)
+	if execution.Status != model.TaskExecutionStatusFailed {
+		return "", fmt.Errorf(errRetryOnlyFailedTask, execution.Status)
 	}
 
 	if !execution.Retryable {

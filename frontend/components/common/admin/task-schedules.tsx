@@ -404,6 +404,17 @@ export function TaskSchedulesManager() {
                           value={paramValues[param.name] || ""}
                           onChange={(e) => setParamValues(prev => ({ ...prev, [param.name]: e.target.value }))}
                         />
+                      ) : param.type === 'boolean' ? (
+                        <div className="flex items-center gap-2 pt-1 h-9">
+                          <Switch
+                            id={`param-${param.name}`}
+                            checked={paramValues[param.name] === 'true'}
+                            onCheckedChange={(checked) => setParamValues(prev => ({ ...prev, [param.name]: checked ? 'true' : 'false' }))}
+                          />
+                          <span className="text-xs text-muted-foreground">
+                            {paramValues[param.name] === 'true' ? '开启' : '关闭'}
+                          </span>
+                        </div>
                       ) : (
                         <Input
                           id={`param-${param.name}`}

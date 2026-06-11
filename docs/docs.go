@@ -4301,7 +4301,7 @@ const docTemplate = `{
                         "SessionCookie": []
                     }
                 ],
-                "description": "为当前用户新建一个 API 访问令牌，仅在此接口返回一次明文令牌值，请妥善保存。",
+                "description": "为当前用户新建一个 API 访问令牌，仅在此接口返回一次明文令牌值，请妥善保存。可通过 is_admin 字段赋予令牌管理员权限（仅管理员用户可设置）。",
                 "consumes": [
                     "application/json"
                 ],
@@ -5215,6 +5215,9 @@ const docTemplate = `{
                 },
                 "id": {
                     "type": "integer"
+                },
+                "is_admin": {
+                    "type": "boolean"
                 },
                 "last_used_at": {
                     "type": "string"
@@ -6208,7 +6211,7 @@ const docTemplate = `{
                     "type": "boolean"
                 },
                 "Type": {
-                    "description": "类型：string, text, number",
+                    "description": "类型：string, text, number, boolean",
                     "type": "string"
                 }
             }
@@ -6351,6 +6354,9 @@ const docTemplate = `{
         "user.createTokenRequest": {
             "type": "object",
             "properties": {
+                "is_admin": {
+                    "type": "boolean"
+                },
                 "name": {
                     "type": "string"
                 }

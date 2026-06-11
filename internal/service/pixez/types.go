@@ -5,9 +5,6 @@
 package pixez
 
 import (
-	"encoding/json"
-	"fmt"
-	"strings"
 	"time"
 )
 
@@ -200,32 +197,6 @@ type ImportLegacyRequest struct {
 	SQLitePath string `json:"sqlite_path"`
 	MirrorDir  string `json:"mirror_dir"`
 	DryRun     bool   `json:"dry_run"`
-}
-
-// UnmarshalJSON implements custom JSON unmarshaling to handle string and bool values for dry_run.
-func (r *ImportLegacyRequest) UnmarshalJSON(data []byte) error {
-	type Alias ImportLegacyRequest
-	aux := struct {
-		DryRun any `json:"dry_run"`
-		Alias
-	}{
-		Alias: Alias(*r),
-	}
-	if err := json.Unmarshal(data, &aux); err != nil {
-		return err
-	}
-	*r = ImportLegacyRequest(aux.Alias)
-	if aux.DryRun != nil {
-		switch v := aux.DryRun.(type) {
-		case bool:
-			r.DryRun = v
-		case string:
-			r.DryRun = (strings.ToLower(v) == "true")
-		default:
-			return fmt.Errorf("invalid type for dry_run: expected bool or string, got %T", v)
-		}
-	}
-	return nil
 }
 
 // ImportLegacySummary summarizes legacy import output.

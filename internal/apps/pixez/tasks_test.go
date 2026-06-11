@@ -106,27 +106,15 @@ func TestImportLegacyTaskPayloadDefaults(t *testing.T) {
 		t.Fatalf("unexpected import defaults with true: %+v", req)
 	}
 
-	// Test string "true"
-	payload, err = handler.ValidatePayload([]byte(`{"dry_run":"true"}`))
+	// Test boolean false
+	payload, err = handler.ValidatePayload([]byte(`{"dry_run":false}`))
 	if err != nil {
-		t.Fatalf("ValidatePayload(dry_run:\"true\") error = %v", err)
-	}
-	if err := json.Unmarshal(payload, &req); err != nil {
-		t.Fatalf("decode import payload failed: %v", err)
-	}
-	if !req.DryRun {
-		t.Fatalf("expected DryRun to be true when parsed from string \"true\"")
-	}
-
-	// Test string "false"
-	payload, err = handler.ValidatePayload([]byte(`{"dry_run":"false"}`))
-	if err != nil {
-		t.Fatalf("ValidatePayload(dry_run:\"false\") error = %v", err)
+		t.Fatalf("ValidatePayload(dry_run:false) error = %v", err)
 	}
 	if err := json.Unmarshal(payload, &req); err != nil {
 		t.Fatalf("decode import payload failed: %v", err)
 	}
 	if req.DryRun {
-		t.Fatalf("expected DryRun to be false when parsed from string \"false\"")
+		t.Fatalf("expected DryRun to be false when parsed from boolean false")
 	}
 }

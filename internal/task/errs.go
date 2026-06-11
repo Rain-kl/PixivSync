@@ -8,7 +8,7 @@ const (
 	errCreateTaskExecutionFailed  = "创建任务执行记录失败: %w"
 	errTaskEnqueueFailed          = "任务入队失败: %w"
 	errTaskExecutionNotFound      = "任务执行记录不存在: %w"
-	errRetryOnlyFinishedTask      = "只有非进行中的任务才能重试，当前状态: %s"
+	errRetryOnlyFailedTask        = "只有失败的任务才能重试，当前状态: %s"
 	errTaskNotRetryable           = "该任务不支持重试"
 	errTaskMaxRetryExceeded       = "已达到最大重试次数 %d"
 	errCreateRetryExecutionFailed = "创建重试任务执行记录失败: %w"

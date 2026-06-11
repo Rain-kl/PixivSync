@@ -32,7 +32,7 @@ export interface BuildPayloadResult {
 function coerceParamValue(
   param: TaskParam,
   rawValue: string,
-): { value: string | number; ok: true } | { value: undefined; ok: true } | { error: string; ok: false } {
+): { value: string | number | boolean; ok: true } | { value: undefined; ok: true } | { error: string; ok: false } {
   const trimmed = rawValue.trim();
 
   switch (param.type) {
@@ -46,6 +46,19 @@ function coerceParamValue(
         return { error: `「${param.label}」必须是有效的数字`, ok: false };
       }
       return { value: num, ok: true };
+    }
+    case 'boolean': {
+      if (trimmed === '') {
+        // 空值 → 省略该字段
+        return { value: undefined, ok: true };
+      }
+      const val = trimmed.toLowerCase();
+      if (val === 'true') {
+        return { value: true, ok: true };
+      } else if (val === 'false') {
+        return { value: false, ok: true };
+      }
+      return { error: `「${param.label}」必须是 true 或 false`, ok: false };
     }
     case 'string':
     case 'text':
@@ -62,6 +75,7 @@ function coerceParamValue(
  *  - `number` 类型参数：序列化为 JSON number，而非 JSON string。
  *  - `number` 类型参数为空且非必填：从 payload 中省略该字段（不发送），
  *    避免后端收到 `"target_type":""` 再尝试解析为 int 时报错。
+ *  - `boolean` 类型参数：序列化为 JSON boolean。
  *  - `required` 字段为空：返回 error。
  *
  * @param params   任务的参数定义列表（来自 TaskMeta.params）
@@ -72,7 +86,7 @@ export function buildTaskPayload(
   params: TaskParam[],
   values: Record<string, string>,
 ): BuildPayloadResult {
-  const payloadData: Record<string, string | number> = {};
+  const payloadData: Record<string, string | number | boolean> = {};
 
   for (const param of params) {
     const raw = values[param.name] ?? '';

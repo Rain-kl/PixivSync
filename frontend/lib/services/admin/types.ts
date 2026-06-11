@@ -97,8 +97,9 @@ export interface TaskTypeResponse {
  * - string  → 单行文本输入，JSON 中序列化为 string
  * - text    → 多行文本输入，JSON 中序列化为 string
  * - number  → 数字输入，JSON 中序列化为 number（而非 string）
+ * - boolean → 开关输入，JSON 中序列化为 boolean（而非 string）
  */
-export type TaskParamType = 'string' | 'text' | 'number';
+export type TaskParamType = 'string' | 'text' | 'number' | 'boolean';
 
 /**
  * 任务参数定义

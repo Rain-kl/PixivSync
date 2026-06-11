@@ -39,7 +39,7 @@ const defaultMaxRetry = 3
 type TaskParam struct {
 	Name        string `json:"Name"`        // 参数键名
 	Label       string `json:"Label"`       // 显示名称
-	Type        string `json:"Type"`        // 类型：string, text, number
+	Type        string `json:"Type"`        // 类型：string, text, number, boolean
 	Required    bool   `json:"Required"`    // 是否必填
 	Placeholder string `json:"Placeholder"` // 占位符
 	Description string `json:"Description"` // 描述
@@ -162,7 +162,7 @@ var DispatchableTasks = []TaskMeta{
 		Params: []TaskParam{
 			{Name: "sqlite_path", Label: "旧 SQLite 路径", Type: "string", Required: false, Placeholder: "server/pixez-sync.db", Description: "旧 PixEz Sync SQLite 文件"},
 			{Name: "mirror_dir", Label: "旧镜像目录", Type: "string", Required: false, Placeholder: "server/data/mirror", Description: "旧插画镜像文件目录"},
-			{Name: "dry_run", Label: "只预览", Type: "string", Required: false, Placeholder: "false", Description: "true 表示只统计不写入"},
+			{Name: "dry_run", Label: "只预览", Type: "boolean", Required: false, Placeholder: "false", Description: "是否只统计不写入"},
 		},
 	},
 }

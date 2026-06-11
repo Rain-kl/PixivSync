@@ -6,6 +6,7 @@ import {Button} from "@/components/ui/button"
 import {Input} from "@/components/ui/input"
 import {Label} from "@/components/ui/label"
 import {Textarea} from "@/components/ui/textarea"
+import {Switch} from "@/components/ui/switch"
 import {Spinner} from "@/components/ui/spinner"
 import {Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle} from "@/components/ui/dialog"
 import {Calendar as CalendarIcon, Clock, Info, Layers, Play} from "lucide-react"
@@ -380,6 +381,17 @@ export function TaskManager() {
                           value={paramValues[param.name] || ""}
                           onChange={(e) => setParamValues(prev => ({ ...prev, [param.name]: e.target.value }))}
                         />
+                      ) : param.type === 'boolean' ? (
+                        <div className="flex items-center gap-2 pt-1 h-9">
+                          <Switch
+                            id={`param-${param.name}`}
+                            checked={paramValues[param.name] === 'true'}
+                            onCheckedChange={(checked) => setParamValues(prev => ({ ...prev, [param.name]: checked ? 'true' : 'false' }))}
+                          />
+                          <span className="text-xs text-muted-foreground">
+                            {paramValues[param.name] === 'true' ? '开启' : '关闭'}
+                          </span>
+                        </div>
                       ) : (
                         <Input
                           id={`param-${param.name}`}

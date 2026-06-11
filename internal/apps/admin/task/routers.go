@@ -187,7 +187,7 @@ func RetryTask(c *gin.Context) {
 		switch {
 		case strings.Contains(errMsg, "不存在"):
 			c.JSON(http.StatusNotFound, util.Err(errMsg))
-		case strings.Contains(errMsg, "只有非进行中") || strings.Contains(errMsg, "不支持重试") || strings.Contains(errMsg, "已达到最大重试"):
+		case strings.Contains(errMsg, "只有失败的任务") || strings.Contains(errMsg, "不支持重试") || strings.Contains(errMsg, "已达到最大重试"):
 			c.JSON(http.StatusBadRequest, util.Err(errMsg))
 		default:
 			c.JSON(http.StatusInternalServerError, util.Err(fmt.Sprintf("%s: %v", TaskRetryFailed, err)))
