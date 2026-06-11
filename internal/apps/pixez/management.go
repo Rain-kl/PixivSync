@@ -128,6 +128,7 @@ type pixezIllustBookmarkDetailDTO struct {
 	ImageFiles  []model.PixezMirrorImageFile `json:"image_files"`
 	RequestURLs []string                     `json:"request_urls"`
 	RetryURLs   []string                     `json:"retry_urls"`
+	IllustJSON  json.RawMessage              `json:"illust_json"`
 }
 
 type pixezNovelBookmarkDetailDTO struct {
@@ -135,6 +136,7 @@ type pixezNovelBookmarkDetailDTO struct {
 	Mirror      *pixezMirrorDetailDTO `json:"mirror"`
 	RequestURLs []string              `json:"request_urls"`
 	RetryURLs   []string              `json:"retry_urls"`
+	NovelJSON   json.RawMessage       `json:"novel_json"`
 }
 
 type pixezMirrorDetailDTO struct {
@@ -539,6 +541,7 @@ func getBookmarkIllustDetail(ctx context.Context, illustID int64) (pixezIllustBo
 		ImageFiles:  []model.PixezMirrorImageFile{},
 		RequestURLs: []string{},
 		RetryURLs:   []string{},
+		IllustJSON:  json.RawMessage(row.IllustJSON),
 	}
 	if err == nil {
 		imageFiles, err := decodeImageFiles(mirror.ImageFilesJSON)
@@ -576,6 +579,7 @@ func getBookmarkNovelDetail(ctx context.Context, novelID int64) (pixezNovelBookm
 		Item:        novelBookmarkDTO(row),
 		RequestURLs: []string{},
 		RetryURLs:   []string{},
+		NovelJSON:   json.RawMessage(row.NovelJSON),
 	}
 	if err == nil {
 		requestURLs, err := decodeStringSlice(mirror.RequestURLsJSON)

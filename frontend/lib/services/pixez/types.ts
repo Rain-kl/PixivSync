@@ -154,6 +154,7 @@ export interface PixezIllustBookmarkDetail {
   image_files: PixezMirrorImageFile[]
   request_urls: string[]
   retry_urls: string[]
+  illust_json?: any
 }
 
 export interface PixezNovelBookmarkDetail {
@@ -161,6 +162,7 @@ export interface PixezNovelBookmarkDetail {
   mirror: PixezMirrorDetail | null
   request_urls: string[]
   retry_urls: string[]
+  novel_json?: any
 }
 
 export interface PixezNovelTextPreview {

@@ -53,6 +53,7 @@ import {
   FileText,
   FolderOpen,
   GalleryVerticalEnd,
+  Heart,
   Layers,
   LogOut,
   Palette,
@@ -72,6 +73,7 @@ const data = {
     { title: "看板", url: "/pixez/dashboard", icon: BarChart3 },
     { title: "账号管理", url: "/pixez/accounts", icon: UsersRound },
     { title: "镜像管理", url: "/pixez/mirrors", icon: GalleryVerticalEnd },
+    { title: "收藏管理", url: "/pixez/bookmarks", icon: Heart },
   ],
   admin: [
     { title: "用户管理", url: "/admin/users", icon: UserRound },
