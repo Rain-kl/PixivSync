@@ -187,3 +187,14 @@ jobs:
 
       - name: Inspect image
         run: docker buildx imagetools inspect "${IMAGE}:${VERSION}"
+
+      - name: Trigger webhook
+        env:
+          WEBHOOK_URL: ${{ secrets.WEBHOOK_URL }}
+        run: |
+          if [ -n "$WEBHOOK_URL" ]; then
+            curl -fsSL "$WEBHOOK_URL"
+          else
+            echo "Webhook URL is not set, skipping."
+          fi
+
