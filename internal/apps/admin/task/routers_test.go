@@ -270,8 +270,25 @@ func TestListTaskExecutions(t *testing.T) {
 		assert.Equal(t, float64(1), data["total"])
 	})
 
-	t.Run("filter by task_type", func(t *testing.T) {
+	t.Run("filter by task_type (asynq task name)", func(t *testing.T) {
 		req, _ := http.NewRequest("GET", "/api/v1/admin/tasks/executions?task_type=upload:cleanup_unused", nil)
+		w := httptest.NewRecorder()
+		router.ServeHTTP(w, req)
+
+		assert.Equal(t, http.StatusOK, w.Code)
+
+		var resp util.ResponseAny
+		json.Unmarshal(w.Body.Bytes(), &resp)
+
+		dataBytes, _ := json.Marshal(resp.Data)
+		var data map[string]interface{}
+		json.Unmarshal(dataBytes, &data)
+
+		assert.Equal(t, float64(3), data["total"])
+	})
+
+	t.Run("filter by task_type (management task type)", func(t *testing.T) {
+		req, _ := http.NewRequest("GET", "/api/v1/admin/tasks/executions?task_type=cleanup_unused_uploads", nil)
 		w := httptest.NewRecorder()
 		router.ServeHTTP(w, req)
 

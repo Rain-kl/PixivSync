@@ -117,6 +117,12 @@ func ListTaskExecutions(c *gin.Context) {
 		return
 	}
 
+	if req.TaskType != "" {
+		if meta := task.GetTaskMeta(req.TaskType); meta != nil {
+			req.TaskType = meta.AsynqTask
+		}
+	}
+
 	executions, total, err := model.ListTaskExecutions(c.Request.Context(), req)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, util.Err(err.Error()))
