@@ -73,7 +73,7 @@ export function SystemSettingsMain() {
             安全设置
           </TabsTrigger>
           <TabsTrigger value="operation" className="px-0 pb-2 text-xs font-semibold">
-            运营设置
+            业务设置
           </TabsTrigger>
           <TabsTrigger value="system" className="px-0 pb-2 text-xs font-semibold">
             系统设置
