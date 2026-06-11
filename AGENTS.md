@@ -22,7 +22,7 @@
 
 ## 缓存与文件能力
 
-- `internal/diskcache`：通过 `diskcache.GetGlobalCache()` 提供字节缓存读写、TTL、最大空间限制、LRU 淘汰、清空、状态统计和配置热更新。
+- `internal/diskcache`：通过 `diskcache.GetGlobalCache()` 提供字节缓存读写、TTL、最大空间限制、LRU 淘汰、清空、状态统计和配置热更新。写入时使用 `DefaultExpiration`（全局默认 TTL）、正数 `time.Duration`（业务 TTL）或 `NoExpiration`（值为 `-1`，永不过期）；永久缓存仍受空间限制和 LRU 淘汰。
 - `internal/storage`：提供 S3 兼容对象上传、读取、删除、CDN/代理读取及远端文件本地缓存。
 - `internal/apps/upload`：提供上传记录、文件访问控制、本地/S3 文件响应、下载及图片 WebP 压缩；业务应复用这些入口，不直接操作底层文件。
 

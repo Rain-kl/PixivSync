@@ -121,7 +121,7 @@ func ServeUpload(c *gin.Context, upload *model.Upload) {
 		return
 	}
 
-	if err := cache.Set(cacheKey, webpBytes, 0); err != nil {
+	if err := cache.Set(cacheKey, webpBytes, diskcache.NoExpiration); err != nil {
 		logger.WarnF(c.Request.Context(), "failed to cache compressed image: %v", err)
 	}
 

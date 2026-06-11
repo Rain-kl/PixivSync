@@ -30,6 +30,11 @@ const (
 	defaultMaxSizeMB       = 100
 	defaultTTLMinutes      = 60
 	defaultCleanupInterval = 10
+
+	// DefaultExpiration applies the cache-wide default TTL.
+	DefaultExpiration time.Duration = 0
+	// NoExpiration stores the item without a TTL. Size limits and LRU eviction still apply.
+	NoExpiration time.Duration = -1
 )
 
 var (
@@ -103,13 +108,14 @@ func New(basePath string) *DiskCache {
 	return c
 }
 
-// Set stores a key-value pair in the cache with a specific TTL.
-// If ttl <= 0, the default cache TTL is used.
+// Set stores a key-value pair in the cache.
+// Use DefaultExpiration for the configured default TTL, NoExpiration for no
+// TTL, or a positive duration for a business-specific TTL.
 func (c *DiskCache) Set(key string, value []byte, ttl time.Duration) error {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
-	if ttl <= 0 {
+	if ttl == DefaultExpiration {
 		ttl = c.defaultTTL
 	}
 
