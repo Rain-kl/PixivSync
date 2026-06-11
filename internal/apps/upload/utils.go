@@ -5,9 +5,18 @@
 package upload
 
 import (
+	"bytes"
 	"errors"
 	"fmt"
+	"image"
+	_ "image/gif"  // Register GIF decoder for image.Decode
+	_ "image/jpeg" // Register JPEG decoder for image.Decode
+	_ "image/png"  // Register PNG decoder for image.Decode
+	"io"
 	"strings"
+
+	"github.com/deepteams/webp"
+	_ "golang.org/x/image/webp" // Register WebP decoder for image.Decode
 )
 
 const maxS3KeyLength = 1024
@@ -31,4 +40,39 @@ func ValidateS3Key(key string) error {
 	}
 
 	return nil
+}
+
+// CompressImageToWebP decodes an image from srcReader and encodes it into WebP format
+// using the specified quality level (low -> 60, medium -> 75, high -> 85).
+func CompressImageToWebP(srcReader io.Reader, qualityLevel string) ([]byte, error) {
+	// Decode the image
+	img, format, err := image.Decode(srcReader)
+	if err != nil {
+		return nil, fmt.Errorf("failed to decode image (format: %s): %w", format, err)
+	}
+
+	// Determine quality
+	var quality float32
+	switch strings.ToLower(qualityLevel) {
+	case "low":
+		quality = 60
+	case "medium":
+		quality = 75
+	case "high", "":
+		quality = 85
+	default:
+		quality = 85
+	}
+
+	// Encode to WebP
+	var buf bytes.Buffer
+	err = webp.Encode(&buf, img, &webp.EncoderOptions{
+		Quality: quality,
+		Method:  4, // Default method
+	})
+	if err != nil {
+		return nil, fmt.Errorf("failed to encode WebP: %w", err)
+	}
+
+	return buf.Bytes(), nil
 }

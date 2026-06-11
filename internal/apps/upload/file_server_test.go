@@ -5,10 +5,15 @@
 package upload
 
 import (
+	"bytes"
 	"encoding/json"
+	"image"
+	"image/color"
+	"image/png"
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"path/filepath"
 	"testing"
 
 	"github.com/Rain-kl/Wavelet/internal/common"
@@ -194,4 +199,123 @@ func TestGetDistinctUploadTypes(t *testing.T) {
 	if len(resp.Data) != 1 || resp.Data[0] != "custom_type_xyz" {
 		t.Errorf("expected only custom_type_xyz in types list, got: %v", resp.Data)
 	}
+}
+
+func TestImageCompression(t *testing.T) {
+	dbConn, _, cleanup := testhelper.SetupTestEnvironment(t)
+	defer cleanup()
+
+	// Ensure uploads dir is cleaned up
+	defer func() {
+		_ = os.RemoveAll("uploads")
+	}()
+
+	// Create test user
+	user := model.User{
+		ID:       555,
+		Username: "compress_tester",
+		IsActive: true,
+	}
+	dbConn.Create(&user)
+
+	// Create a 1x1 pixel PNG image
+	img := image.NewRGBA(image.Rect(0, 0, 1, 1))
+	img.Set(0, 0, color.RGBA{R: 255, G: 0, B: 0, A: 255})
+	var pngBuf bytes.Buffer
+	if err := png.Encode(&pngBuf, img); err != nil {
+		t.Fatalf("failed to encode test png: %v", err)
+	}
+
+	_ = os.MkdirAll("uploads", 0755)
+	filePath := "uploads/test_image.png"
+	if err := os.WriteFile(filePath, pngBuf.Bytes(), 0644); err != nil {
+		t.Fatalf("failed to write test png: %v", err)
+	}
+
+	// Save upload record to DB
+	uploadRecord := model.Upload{
+		ID:            3001,
+		UserID:        user.ID,
+		FileName:      "test_image.png",
+		FilePath:      filePath,
+		FileSize:      int64(pngBuf.Len()),
+		MimeType:      "image/png",
+		Extension:     "png",
+		StorageDriver: "local",
+		Type:          "avatar", // Whitelisted by default
+		Status:        model.UploadStatusUsed,
+	}
+	dbConn.Create(&uploadRecord)
+
+	// Setup Router
+	gin.SetMode(gin.TestMode)
+	r := gin.New()
+	r.GET("/f/:id", ServeFileByID)
+
+	t.Run("serve original file without compress parameter", func(t *testing.T) {
+		req, _ := http.NewRequest("GET", "/f/3001", nil)
+		w := httptest.NewRecorder()
+		r.ServeHTTP(w, req)
+
+		if w.Code != http.StatusOK {
+			t.Fatalf("expected status 200, got %d", w.Code)
+		}
+		// Content-Type should be image/png (default local serving type)
+		if w.Header().Get("Content-Type") != "image/png" {
+			t.Errorf("expected Content-Type image/png, got %s", w.Header().Get("Content-Type"))
+		}
+		if len(w.Body.Bytes()) != pngBuf.Len() {
+			t.Errorf("expected body size %d, got %d", pngBuf.Len(), len(w.Body.Bytes()))
+		}
+	})
+
+	t.Run("serve compressed WebP file with compress=true", func(t *testing.T) {
+		req, _ := http.NewRequest("GET", "/f/3001?compress=true&level=medium", nil)
+		w := httptest.NewRecorder()
+		r.ServeHTTP(w, req)
+
+		if w.Code != http.StatusOK {
+			t.Fatalf("expected status 200, got %d. Body: %s", w.Code, w.Body.String())
+		}
+		// Content-Type should be image/webp
+		if w.Header().Get("Content-Type") != "image/webp" {
+			t.Errorf("expected Content-Type image/webp, got %s", w.Header().Get("Content-Type"))
+		}
+
+		// Check if local cache file was created
+		cachePath := filepath.Join("uploads", "cache", "compressed_3001_medium.webp")
+		if _, err := os.Stat(cachePath); os.IsNotExist(err) {
+			t.Errorf("expected cached webp file to be created at %s, but it doesn't exist", cachePath)
+		}
+
+		// Subsequent request should hit the cache (modify the cached file to verify)
+		testBytes := []byte("cached webp content")
+		if err := os.WriteFile(cachePath, testBytes, 0644); err != nil {
+			t.Fatalf("failed to write test bytes to cache: %v", err)
+		}
+
+		w2 := httptest.NewRecorder()
+		r.ServeHTTP(w2, req)
+		if w2.Code != http.StatusOK {
+			t.Fatalf("expected status 200, got %d", w2.Code)
+		}
+		if string(w2.Body.Bytes()) != "cached webp content" {
+			t.Errorf("expected cached content, got %s", string(w2.Body.Bytes()))
+		}
+	})
+
+	t.Run("serve compressed with default quality high", func(t *testing.T) {
+		req, _ := http.NewRequest("GET", "/f/3001?compress=true", nil)
+		w := httptest.NewRecorder()
+		r.ServeHTTP(w, req)
+
+		if w.Code != http.StatusOK {
+			t.Fatalf("expected status 200, got %d", w.Code)
+		}
+		// Check if local cache file with "high" was created
+		cachePath := filepath.Join("uploads", "cache", "compressed_3001_high.webp")
+		if _, err := os.Stat(cachePath); os.IsNotExist(err) {
+			t.Errorf("expected cached webp file to be created at %s for default level", cachePath)
+		}
+	})
 }

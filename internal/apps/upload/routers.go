@@ -174,6 +174,8 @@ func UploadFile(c *gin.Context) {
 // @Tags upload
 // @Produce octet-stream
 // @Param id path string true "文件 ID"
+// @Param compress query string false "是否启用压缩 (传任意非空值代表启用，非图片文件将被忽略)"
+// @Param level query string false "压缩质量等级 (low, medium, high)，默认为 high"
 // @Security SessionCookie
 // @Success 200 {file} file "成功下载文件"
 // @Failure 400 {object} util.ResponseAny "参数错误"
@@ -181,52 +183,36 @@ func UploadFile(c *gin.Context) {
 // @Failure 500 {object} util.ResponseAny "服务内部错误"
 // @Router /api/v1/upload/download/{id} [get]
 func DownloadFile(c *gin.Context) {
-	c.Header("X-Content-Type-Options", "nosniff")
-	c.Header("Content-Security-Policy", "sandbox")
-
-	ctx := c.Request.Context()
-	idStr := c.Param("id")
-	uploadID, err := strconv.ParseUint(idStr, 10, 64)
+	upload, err := getUploadRecordByID(c)
 	if err != nil {
-		c.JSON(http.StatusOK, util.Err(ErrInvalidFileID))
-		return
-	}
-
-	var upload model.Upload
-	if err := db.DB(ctx).Where("id = ? AND status IN (?, ?)", uploadID, model.UploadStatusPending, model.UploadStatusUsed).First(&upload).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			c.AbortWithStatus(http.StatusNotFound)
+			return
+		}
+		if _, ok := err.(*strconv.NumError); ok {
+			c.JSON(http.StatusOK, util.Err(ErrInvalidFileID))
 			return
 		}
 		c.JSON(http.StatusOK, util.Err(ErrQueryUploadRecordFailed))
 		return
 	}
 
+	fileName := upload.FileName
+	compressStr := c.Query("compress")
+	isImage := strings.HasPrefix(strings.ToLower(upload.MimeType), "image/") || isImageExtension(strings.ToLower(upload.Extension))
+
+	if compressStr != "" && isImage {
+		ext := filepath.Ext(fileName)
+		if ext != "" {
+			fileName = strings.TrimSuffix(fileName, ext) + ".webp"
+		} else {
+			fileName += ".webp"
+		}
+	}
+
 	// 设置下载 Attachment 响应头 (支持 UTF-8 中文文件名转义)
-	c.Header("Content-Disposition", fmt.Sprintf("attachment; filename*=UTF-8''%s", url.PathEscape(upload.FileName)))
-	c.Header("Content-Type", upload.MimeType)
-	c.Header("Content-Length", strconv.FormatInt(upload.FileSize, 10))
-
-	// 根据存储驱动类型提供流式文件服务
-	if upload.StorageDriver == "local" || (upload.StorageDriver == "" && !storage.IsEnabled()) {
-		c.File(upload.FilePath)
-		return
-	}
-
-	// 从 S3/CDN 加载并返回
-	obj, err := storage.GetObjectViaCache(ctx, upload.FilePath)
-	if err != nil {
-		c.AbortWithStatus(http.StatusNotFound)
-		return
-	}
-
-	if obj.CachePath != "" {
-		c.File(obj.CachePath)
-		return
-	}
-
-	defer func() { _ = obj.Body.Close() }()
-	_, _ = io.Copy(c.Writer, obj.Body)
+	c.Header("Content-Disposition", fmt.Sprintf("attachment; filename*=UTF-8''%s", url.PathEscape(fileName)))
+	ServeUpload(c, upload)
 }
 
 // BatchDownloadFiles 批量打包 ZIP 下载接口

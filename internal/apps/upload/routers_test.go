@@ -371,8 +371,8 @@ func TestDownloadFile(t *testing.T) {
 			t.Errorf("expected Content-Disposition header %q, got %q", expectedDisp, contentDisp)
 		}
 
-		if w.Header().Get("Content-Type") != "text/plain" {
-			t.Errorf("expected Content-Type text/plain, got %s", w.Header().Get("Content-Type"))
+		if !strings.HasPrefix(w.Header().Get("Content-Type"), "text/plain") {
+			t.Errorf("expected Content-Type starting with text/plain, got %s", w.Header().Get("Content-Type"))
 		}
 	})
 
