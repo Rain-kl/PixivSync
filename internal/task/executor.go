@@ -131,6 +131,8 @@ func DispatchTask(ctx context.Context, taskType string, payload []byte, triggere
 		return "", fmt.Errorf(errTaskEnqueueFailed, err)
 	}
 
+	_ = model.AppendTaskExecutionLog(ctx, taskID, fmt.Sprintf("[系统] 任务已成功入队，等待调度执行 (队列: %s, 最大重试次数: %d)", meta.Queue, meta.MaxRetry))
+
 	return taskID, nil
 }
 
@@ -190,6 +192,8 @@ func RetryTask(ctx context.Context, id uint64) (string, error) {
 		return "", fmt.Errorf(errRetryTaskEnqueueFailed, err)
 	}
 
+	_ = model.AppendTaskExecutionLog(ctx, newTaskID, fmt.Sprintf("[系统] 手动触发重试，已重新创建任务并入队 (原任务ID: %s, 重试次数: %d/%d)", execution.TaskID, execution.RetryCount+1, execution.MaxRetry))
+
 	return newTaskID, nil
 }
 
@@ -230,6 +234,13 @@ func ProcessTask(ctx context.Context, t *asynq.Task) error {
 		if updateErr := model.UpdateTaskExecution(ctx, execution); updateErr != nil {
 			logger.ErrorF(ctx, "[TaskExecutor] 更新执行状态失败 taskID=%s: %v", taskID, updateErr)
 		}
+	}
+
+	if execution != nil {
+		AppendLog(ctx, "[系统] 开始执行异步任务 [名称: %s, 类型: %s]，重试次数: %d/%d",
+			execution.TaskName, t.Type(), execution.RetryCount, execution.MaxRetry)
+	} else {
+		AppendLog(ctx, "[系统] 开始执行异步任务 [类型: %s]", t.Type())
 	}
 
 	// 开始计时
@@ -295,26 +306,42 @@ func completeTaskExecution(ctx context.Context, execution *model.TaskExecution, 
 	execution.FinishedAt = &finishTime
 
 	if execErr != nil {
-		execution.Status = model.TaskExecutionStatusFailed
-		execution.ErrorMessage = execErr.Error()
-		logger.ErrorF(ctx, "[TaskExecutor] 任务处理失败 Type: %s TaskID: %s Duration: %d ms Error: %v", t.Type(), execution.TaskID, duration.Milliseconds(), execErr)
-		span.SetStatus(codes.Error, execErr.Error())
-		span.RecordError(execErr)
+		handleFailedTask(ctx, execution, t, duration, execErr, span)
 	} else {
-		execution.Status = model.TaskExecutionStatusSucceeded
-		execution.ErrorMessage = "" // 清除历史重试失败遗留的错误信息
-		if result != nil {
-			execution.Result = result.Message
-			if result.Detail != "" {
-				execution.Result = fmt.Sprintf("%s\n%s", result.Message, result.Detail)
-			}
-		}
-		logger.InfoF(ctx, "[TaskExecutor] 任务处理完成 Type: %s TaskID: %s Duration: %d ms", t.Type(), execution.TaskID, duration.Milliseconds())
+		handleSuccessfulTask(ctx, execution, t, duration, result)
 	}
 
 	if err := model.UpdateTaskExecution(ctx, execution); err != nil {
 		logger.ErrorF(ctx, "[TaskExecutor] 更新执行记录失败 taskID=%s: %v", execution.TaskID, err)
 	}
+}
+
+func handleFailedTask(ctx context.Context, execution *model.TaskExecution, t *asynq.Task, duration time.Duration, execErr error, span trace.Span) {
+	execution.Status = model.TaskExecutionStatusFailed
+	execution.ErrorMessage = execErr.Error()
+	logger.ErrorF(ctx, "[TaskExecutor] 任务处理失败 Type: %s TaskID: %s Duration: %d ms Error: %v", t.Type(), execution.TaskID, duration.Milliseconds(), execErr)
+	span.SetStatus(codes.Error, execErr.Error())
+	span.RecordError(execErr)
+
+	AppendLog(ctx, "[系统] 任务执行失败，耗时: %d ms，错误原因: %v", duration.Milliseconds(), execErr)
+}
+
+func handleSuccessfulTask(ctx context.Context, execution *model.TaskExecution, t *asynq.Task, duration time.Duration, result *TaskResult) {
+	execution.Status = model.TaskExecutionStatusSucceeded
+	execution.ErrorMessage = "" // 清除历史重试失败遗留的错误信息
+	if result != nil {
+		execution.Result = result.Message
+		if result.Detail != "" {
+			execution.Result = fmt.Sprintf("%s\n%s", result.Message, result.Detail)
+		}
+	}
+	logger.InfoF(ctx, "[TaskExecutor] 任务处理完成 Type: %s TaskID: %s Duration: %d ms", t.Type(), execution.TaskID, duration.Milliseconds())
+
+	resultMsg := "成功"
+	if result != nil {
+		resultMsg = result.Message
+	}
+	AppendLog(ctx, "[系统] 任务执行成功，耗时: %d ms，执行结果: %s", duration.Milliseconds(), resultMsg)
 }
 
 // generateTaskID 生成任务 ID

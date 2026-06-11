@@ -8,7 +8,6 @@ import (
 	"time"
 
 	"github.com/Rain-kl/Wavelet/internal/db"
-	"github.com/Rain-kl/Wavelet/internal/db/idgen"
 )
 
 // Schedule 定时任务配置表
@@ -30,7 +29,6 @@ func (Schedule) TableName() string {
 
 // CreateSchedule 创建定时任务
 func CreateSchedule(ctx context.Context, schedule *Schedule) error {
-	schedule.ID = idgen.NextUint64ID()
 	return db.DB(ctx).Create(schedule).Error
 }
 

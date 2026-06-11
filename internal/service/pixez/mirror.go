@@ -26,6 +26,7 @@ import (
 	"github.com/Rain-kl/Wavelet/internal/db/idgen"
 	"github.com/Rain-kl/Wavelet/internal/model"
 	"github.com/Rain-kl/Wavelet/internal/storage"
+	"github.com/Rain-kl/Wavelet/internal/task"
 	"gorm.io/gorm"
 )
 
@@ -208,18 +209,22 @@ func ProcessMirrorIllust(ctx context.Context, client *Client, taskID string, ill
 
 	user, err := latestMirrorUser(ctx)
 	if err != nil {
+		task.AppendLog(ctx, "获取可用的 Pixiv Token 失败: %v", err)
 		markIllustFailed(ctx, illustID, taskID, err)
 		return err
 	}
 
+	task.AppendLog(ctx, "正在向 Pixiv 请求插画详情 [illust_id: %d]...", illustID)
 	detailBytes, detail, err := client.GetIllustDetail(ctx, user, illustID)
 	if err != nil {
 		wrapped := fmt.Errorf("fetch Pixiv illust detail illust_id=%d: %w", illustID, err)
+		task.AppendLog(ctx, "获取插画详情失败: %v", err)
 		markIllustFailed(ctx, illustID, taskID, wrapped)
 		return wrapped
 	}
 
 	imageURLs := CollectIllustImageURLs(detail)
+	task.AppendLog(ctx, "成功获取插画详情: 「%s」 (画师: %s, 包含 %d 张图片)，开始下载...", detail.Illust.Title, detail.Illust.User.Name, len(imageURLs))
 	requestURLsJSON := mustJSON(imageURLs)
 	files := make([]model.PixezMirrorImageFile, 0, len(imageURLs))
 	failedURLs := make([]string, 0)
@@ -232,6 +237,7 @@ func ProcessMirrorIllust(ctx context.Context, client *Client, taskID string, ill
 
 	for idx, imageURL := range imageURLs {
 		if idx > 0 && downloadInterval > 0 {
+			task.AppendLog(ctx, "等待 %d 秒以满足多图下载间隔限制...", downloadInterval)
 			select {
 			case <-ctx.Done():
 				return ctx.Err()
@@ -239,16 +245,21 @@ func ProcessMirrorIllust(ctx context.Context, client *Client, taskID string, ill
 			}
 		}
 
+		task.AppendLog(ctx, "正在下载第 %d/%d 张图片...", idx+1, len(imageURLs))
 		data, mimeType, err := client.DownloadFile(ctx, imageURL)
 		if err != nil {
+			task.AppendLog(ctx, "第 %d/%d 张图片下载失败: %v", idx+1, len(imageURLs), err)
 			failedURLs = append(failedURLs, imageURL)
 			continue
 		}
+		task.AppendLog(ctx, "第 %d/%d 张图片下载成功，大小: %d 字节, 正在保存到存储驱动...", idx+1, len(imageURLs), len(data))
 		fileRecord, err := registerMirrorUpload(ctx, imageURL, idx, data, mimeType)
 		if err != nil {
+			task.AppendLog(ctx, "第 %d/%d 张图片保存失败: %v", idx+1, len(imageURLs), err)
 			failedURLs = append(failedURLs, imageURL)
 			continue
 		}
+		task.AppendLog(ctx, "第 %d/%d 张图片保存并登记成功 [存储路径: %s]", idx+1, len(imageURLs), fileRecord.StorageKey)
 		files = append(files, fileRecord)
 	}
 
@@ -279,6 +290,7 @@ func ProcessMirrorIllust(ctx context.Context, client *Client, taskID string, ill
 		updateBookmarkMirrorStatus(ctx, model.PixezMirrorTargetIllust, illustID, model.PixezBookmarkMirrorFailed)
 		return errors.New(errMessage)
 	}
+	task.AppendLog(ctx, "插画镜像同步成功，共保存 %d/%d 张图片", len(files), len(imageURLs))
 	updateBookmarkMirrorStatus(ctx, model.PixezMirrorTargetIllust, illustID, model.PixezBookmarkMirrorDone)
 	return nil
 }
@@ -305,22 +317,29 @@ func ProcessMirrorNovel(ctx context.Context, client *Client, taskID string, nove
 
 	user, err := latestMirrorUser(ctx)
 	if err != nil {
+		task.AppendLog(ctx, "获取可用的 Pixiv Token 失败: %v", err)
 		markNovelFailed(ctx, novelID, taskID, err)
 		return err
 	}
 
-	detailBytes, _, err := client.GetNovelDetail(ctx, user, novelID)
+	task.AppendLog(ctx, "正在向 Pixiv 请求小说详情 [novel_id: %d]...", novelID)
+	detailBytes, detail, err := client.GetNovelDetail(ctx, user, novelID)
 	if err != nil {
 		wrapped := fmt.Errorf("fetch Pixiv novel detail novel_id=%d: %w", novelID, err)
+		task.AppendLog(ctx, "获取小说详情失败: %v", err)
 		markNovelFailed(ctx, novelID, taskID, wrapped)
 		return wrapped
 	}
+	task.AppendLog(ctx, "成功获取小说详情: 「%s」 (字数: %d)，正在向 Pixiv 请求小说正文...", detail.Novel.Title, detail.Novel.TextLength)
+
 	textBytes, _, err := client.GetNovelText(ctx, user, novelID)
 	if err != nil {
 		wrapped := fmt.Errorf("fetch Pixiv novel text novel_id=%d: %w", novelID, err)
+		task.AppendLog(ctx, "获取小说正文失败: %v", err)
 		markNovelFailed(ctx, novelID, taskID, wrapped)
 		return wrapped
 	}
+	task.AppendLog(ctx, "成功获取小说正文，正在保存至数据库中...")
 
 	updates := map[string]any{
 		"task_id":     taskID,
@@ -341,6 +360,7 @@ func ProcessMirrorNovel(ctx context.Context, client *Client, taskID string, nove
 	if err := updateMirrorNovel(ctx, novelID, updates); err != nil {
 		return fmt.Errorf("save novel mirror result: %w", err)
 	}
+	task.AppendLog(ctx, "小说镜像及正文已成功保存")
 	updateBookmarkMirrorStatus(ctx, model.PixezMirrorTargetNovel, novelID, model.PixezBookmarkMirrorDone)
 	return nil
 }
@@ -612,6 +632,7 @@ func waitMirrorConcurrencyLimit(ctx context.Context, modelObj any, idColumn stri
 	}
 
 	const checkInterval = 2 * time.Second
+	loggedWait := false
 	for {
 		var activeCount int64
 		// 防御性设计：只统计 15 分钟内更新过的活跃任务，防止因进程异常崩溃导致 processing 状态长期泄漏、引发死锁
@@ -622,7 +643,14 @@ func waitMirrorConcurrencyLimit(ctx context.Context, modelObj any, idColumn stri
 			return fmt.Errorf("check active mirror count for %s: %w", idColumn, err)
 		}
 		if int(activeCount) < maxConcurrency {
+			if loggedWait {
+				task.AppendLog(ctx, "并发通道已释放，开始执行镜像任务")
+			}
 			return nil
+		}
+		if !loggedWait {
+			task.AppendLog(ctx, "当前活跃并发任务数 (%d) 已达限制 (%d)，任务进入等待通道...", activeCount, maxConcurrency)
+			loggedWait = true
 		}
 		select {
 		case <-ctx.Done():
