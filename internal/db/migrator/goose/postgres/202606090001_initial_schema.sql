@@ -160,7 +160,7 @@ INSERT INTO system_configs (key, value, type, visibility, description, created_a
     ('email_register_verification_enabled', 'false', 'system', 1, '是否开启邮箱注册验证（true/false）', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
     ('menu_display_config', '{}', 'system', 1, '目录显示配置（JSON 字符串，格式为 {url: enabled}）', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
     ('search_engine_indexing_enabled', 'false', 'system', 1, '是否允许搜索引擎爬取/检索该站点（true/false）', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
-    ('update_upstream_repository', 'Rain-kl/Wavelet', 'system', 0, 'GitHub Actions Release 上游仓库（owner/repo 或 GitHub 仓库地址）', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+    ('update_upstream_repository', 'Rain-kl/PixezSync', 'system', 0, 'GitHub Actions Release 上游仓库（owner/repo 或 GitHub 仓库地址）', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
 ON CONFLICT (key) DO NOTHING;
 
 INSERT INTO users (id, username, password, nickname, avatar_url, is_active, is_admin, last_login_at, created_at, updated_at)
