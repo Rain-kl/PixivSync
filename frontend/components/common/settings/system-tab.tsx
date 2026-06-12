@@ -2,7 +2,7 @@
 
 import {useEffect, useState} from "react"
 import {useMutation, useQueryClient, type UseQueryResult} from "@tanstack/react-query"
-import {Globe, Info, Loader2, Mail, Search, Server, Sparkles} from "lucide-react"
+import {Globe, Loader2, Mail, Search, Server, Sparkles} from "lucide-react"
 
 import {Button} from "@/components/ui/button"
 import {Card, CardContent, CardDescription, CardHeader, CardTitle} from "@/components/ui/card"
@@ -23,6 +23,7 @@ interface SystemTabProps {
 export function SystemTab({ configs, systemConfigsQuery }: SystemTabProps) {
   const queryClient = useQueryClient()
   const [serverAddress, setServerAddress] = useState("")
+  const [siteName, setSiteName] = useState("")
   const [smtpHost, setSmtpHost] = useState("")
   const [smtpPort, setSmtpPort] = useState("")
   const [smtpUsername, setSmtpUsername] = useState("")
@@ -36,6 +37,7 @@ export function SystemTab({ configs, systemConfigsQuery }: SystemTabProps) {
   useEffect(() => {
     if (systemConfigsQuery.data) {
       setServerAddress(configs["server_address"]?.value || "")
+      setSiteName(configs["site_name"]?.value || "")
       setSmtpHost(configs["smtp_host"]?.value || "")
       setSmtpPort(configs["smtp_port"]?.value || "587")
       setSmtpUsername(configs["smtp_username"]?.value || "")
@@ -73,14 +75,24 @@ export function SystemTab({ configs, systemConfigsQuery }: SystemTabProps) {
 
   const saveSystemMutation = useMutation({
     mutationFn: async () => {
-      const currentCfg = configs["server_address"]
-      await AdminService.updateSystemConfig("server_address", {
-        value: serverAddress,
-        description: currentCfg?.description || "服务器地址",
-      })
+      const currentAddrCfg = configs["server_address"]
+      const currentSiteCfg = configs["site_name"]
+      await Promise.all([
+        AdminService.updateSystemConfig("server_address", {
+          value: serverAddress,
+          description: currentAddrCfg?.description || "服务器地址",
+        }),
+        AdminService.updateSystemConfig("site_name", {
+          value: siteName,
+          description: currentSiteCfg?.description || "系统平台的展示名称",
+        }),
+      ])
     },
     onSuccess: async () => {
-      await queryClient.invalidateQueries({ queryKey: ["admin", "system-configs"] })
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ["admin", "system-configs"] }),
+        queryClient.invalidateQueries({ queryKey: ["public-config"] }),
+      ])
       toast.success("通用配置已成功保存")
     },
     onError: (error: Error) => {
@@ -178,136 +190,119 @@ export function SystemTab({ configs, systemConfigsQuery }: SystemTabProps) {
   return (
     <div className="space-y-8">
       {/* 通用设置 */}
-      <Card className="border border-zinc-200 dark:border-zinc-800 shadow-md bg-gradient-to-b from-card to-zinc-50/30 dark:to-zinc-950/20 overflow-hidden">
-        <CardHeader className="border-b border-zinc-100 dark:border-zinc-800 pb-5 bg-zinc-50/50 dark:bg-zinc-900/30">
-          <div className="flex items-center gap-3">
-            <div className="p-2.5 rounded-xl bg-indigo-500/10 text-indigo-500 ring-4 ring-indigo-500/5">
-              <Server className="size-5" />
+      <Card className="border border-dashed shadow-sm">
+        <CardHeader className="border-b border-dashed pb-4">
+          <div className="flex items-center gap-2">
+            <div className="rounded-lg bg-indigo-500/10 p-1.5 text-indigo-500">
+              <Server className="size-4" />
             </div>
             <div>
-              <CardTitle className="text-lg font-bold tracking-tight">通用设置</CardTitle>
-              <CardDescription className="text-xs text-muted-foreground">配置系统的全局网络通信访问限制与搜索引擎的公开检索收录参数</CardDescription>
+              <CardTitle className="text-base font-semibold">通用设置</CardTitle>
+              <CardDescription className="text-xs">
+                配置站点标识、服务地址与搜索引擎收录策略
+              </CardDescription>
             </div>
           </div>
         </CardHeader>
-        <CardContent className="p-6">
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <CardContent className="pt-6">
+          <form onSubmit={handleSystemSave} className="flex flex-col gap-6">
+            <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+              <div className="flex flex-col gap-1.5">
+                <Label htmlFor="site_name" className="text-xs font-semibold">
+                  站点名称
+                </Label>
+                <Input
+                  id="site_name"
+                  type="text"
+                  value={siteName}
+                  onChange={(e) => setSiteName(e.target.value)}
+                  placeholder="例如: Wavelet"
+                  className="border-dashed bg-card text-xs"
+                />
+                <p className="text-[11px] leading-relaxed text-muted-foreground">
+                  用于网页标题、登录注册页面、管理后台与系统邮件。
+                </p>
+              </div>
 
-            {/* 跨域源与服务器地址 */}
-            <form onSubmit={handleSystemSave} className="group relative flex flex-col justify-between space-y-5 rounded-2xl border border-zinc-200/80 dark:border-zinc-800/80 p-6 bg-card hover:shadow-lg hover:border-indigo-500/30 dark:hover:border-indigo-500/30 transition-all duration-300">
-              <div className="space-y-4">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2.5 text-indigo-500">
-                    <Globe className="size-5" />
-                    <span className="font-semibold text-sm text-foreground">访问域名与跨域来源限制</span>
-                  </div>
+              <div className="flex flex-col gap-1.5">
+                <div className="flex items-center justify-between gap-3">
+                  <Label htmlFor="server_address" className="text-xs font-semibold">
+                    服务器访问地址
+                  </Label>
                   <Button
                     type="button"
-                    variant="outline"
+                    variant="link"
                     size="sm"
                     onClick={handleDetectAddress}
-                    className="h-7 px-2.5 text-[10px] gap-1 font-medium hover:bg-indigo-500/10 hover:text-indigo-500 hover:border-indigo-500/30 transition-all duration-200 shadow-xs"
+                    className="h-auto px-0 text-xs"
                   >
-                    <Sparkles className="size-3 text-indigo-500" />
+                    <Sparkles data-icon="inline-start" />
                     使用当前域名
                   </Button>
                 </div>
-                <div className="space-y-2">
-                  <div className="flex items-center justify-between">
-                    <Label htmlFor="server_address" className="text-xs font-semibold text-muted-foreground">服务器访问地址 (Server Address)</Label>
-                  </div>
-                  <div className="relative">
-                    <Input
-                      id="server_address"
-                      type="text"
-                      value={serverAddress}
-                      onChange={(e) => setServerAddress(e.target.value)}
-                      placeholder="例如: https://example.com"
-                      className="bg-zinc-50/50 dark:bg-zinc-900/50 border-zinc-200 dark:border-zinc-800 text-xs focus-visible:ring-1 focus-visible:ring-indigo-500 transition-all duration-200 h-9.5"
-                    />
-                  </div>
-                  <div className="flex items-start gap-1.5 mt-2 bg-zinc-50 dark:bg-zinc-900/30 p-2.5 rounded-lg border border-zinc-100 dark:border-zinc-800/50">
-                    <Info className="size-3.5 text-muted-foreground shrink-0 mt-0.5" />
-                    <p className="text-[10px] text-muted-foreground leading-relaxed">
-                      配置 API 的对外服务访问域名。留空则允许任意源访问（CORS 将开放 `*`，有安全风险）。若配置具体域名，将激活同源及 CORS 白名单验证保护。
-                    </p>
-                  </div>
-                </div>
-              </div>
-              <div className="flex justify-end pt-4 border-t border-zinc-100 dark:border-zinc-800/50">
-                <Button
-                  type="submit"
-                  size="sm"
-                  disabled={saveSystemMutation.isPending}
-                >
-                  {saveSystemMutation.isPending ? (
-                    <>
-                      <Loader2 className="mr-1.5 size-3.5 animate-spin" />
-                      保存中...
-                    </>
-                  ) : (
-                    "保存访问配置"
-                  )}
-                </Button>
-              </div>
-            </form>
-
-            {/* SEO 搜索引擎抓取 */}
-            <div className={`group relative flex flex-col justify-between space-y-5 rounded-2xl border p-6 bg-card hover:shadow-lg transition-all duration-500 ${
-              indexingEnabled
-                ? "border-emerald-500/20 dark:border-emerald-500/30 hover:border-emerald-500/40 bg-gradient-to-b from-card to-emerald-500/[0.02] dark:to-emerald-500/[0.04]"
-                : "border-zinc-200 dark:border-zinc-800 hover:border-zinc-300 dark:hover:border-zinc-700 bg-gradient-to-b from-card to-zinc-500/[0.01]"
-            }`}>
-              <div className="space-y-4">
-                <div className="flex items-center justify-between">
-                  <div className={`flex items-center gap-2.5 transition-colors duration-300 ${indexingEnabled ? "text-emerald-500" : "text-zinc-500"}`}>
-                    <Search className="size-5" />
-                    <span className="font-semibold text-sm text-foreground">搜索引擎抓取检索 (SEO)</span>
-                  </div>
-                  <Badge
-                    variant={indexingEnabled ? "default" : "secondary"}
-                    className={`text-[10px] font-semibold tracking-wide px-2.5 py-0.5 shadow-xs transition-all duration-300 ${
-                      indexingEnabled
-                        ? "bg-emerald-500/15 text-emerald-600 hover:bg-emerald-500/20 dark:bg-emerald-500/20 dark:text-emerald-400 border border-emerald-500/20"
-                        : "bg-zinc-100 text-zinc-500 dark:bg-zinc-800 dark:text-zinc-400 border border-zinc-200 dark:border-zinc-700"
-                    }`}
-                  >
-                    <span className={`inline-block size-1.5 rounded-full mr-1.5 shrink-0 ${indexingEnabled ? "bg-emerald-500 animate-pulse" : "bg-zinc-400"}`} />
-                    {indexingEnabled ? "已启用索引" : "已屏蔽检索"}
-                  </Badge>
-                </div>
-                <div className="space-y-2">
-                  <span className="text-xs font-semibold text-muted-foreground block">站点检索可见性开关</span>
-                  <div className="flex items-start gap-1.5 bg-zinc-50 dark:bg-zinc-900/30 p-2.5 rounded-lg border border-zinc-100 dark:border-zinc-800/50">
-                    <Info className="size-3.5 text-muted-foreground shrink-0 mt-0.5" />
-                    <p className="text-[10px] text-muted-foreground leading-relaxed">
-                      控制本系统是否向主流搜索引擎（如 Google、Baidu、Bing）开放公开索引。关闭时，系统响应的 HTML 头部会自动注入 meta robots 标签，防止爬虫收录。
-                    </p>
-                  </div>
-                </div>
-              </div>
-
-              <div className="flex items-center justify-between pt-4 border-t border-zinc-100 dark:border-zinc-800/50 h-12">
-                <div className="flex flex-col">
-                  <span className="text-xs text-foreground font-semibold">
-                    {indexingEnabled ? "允许爬虫访问与收录" : "全面屏蔽外部搜索"}
-                  </span>
-                  <span className="text-[10px] text-muted-foreground">
-                    {indexingEnabled ? "爬虫可自由搜集并抓取网站内容" : "已拦截所有网络爬虫的收录请求"}
-                  </span>
-                </div>
-                <Switch
-                  checked={indexingEnabled}
-                  disabled={updateConfigMutation.isPending || systemConfigsQuery.isPending}
-                  onCheckedChange={(checked) =>
-                    updateConfigMutation.mutate({ key: "search_engine_indexing_enabled", value: checked })
-                  }
-                  className="data-[state=checked]:bg-emerald-500 dark:data-[state=checked]:bg-emerald-600 focus-visible:ring-emerald-500"
+                <Input
+                  id="server_address"
+                  type="url"
+                  value={serverAddress}
+                  onChange={(e) => setServerAddress(e.target.value)}
+                  placeholder="例如: https://example.com"
+                  className="border-dashed bg-card text-xs"
                 />
+                <p className="text-[11px] leading-relaxed text-muted-foreground">
+                  限定 API 的允许来源；留空将开放任意来源访问。
+                </p>
               </div>
             </div>
 
-          </div>
+            <div className="flex flex-col gap-3 rounded-lg border border-dashed p-3 sm:flex-row sm:items-center sm:justify-between">
+              <div className="flex min-w-0 items-start gap-3">
+                <div className="rounded-md bg-muted p-1.5 text-muted-foreground">
+                  <Search className="size-4" />
+                </div>
+                <div className="flex min-w-0 flex-col gap-1">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="text-xs font-semibold">搜索引擎抓取与收录</span>
+                    <Badge variant={indexingEnabled ? "default" : "secondary"}>
+                      {indexingEnabled ? "允许收录" : "禁止收录"}
+                    </Badge>
+                  </div>
+                  <p className="text-[11px] leading-relaxed text-muted-foreground">
+                    控制 Google、Baidu、Bing 等搜索引擎是否可以索引公开页面。
+                  </p>
+                </div>
+              </div>
+
+              <Switch
+                aria-label="允许搜索引擎抓取与收录"
+                checked={indexingEnabled}
+                disabled={updateConfigMutation.isPending || systemConfigsQuery.isPending}
+                onCheckedChange={(checked) =>
+                  updateConfigMutation.mutate({ key: "search_engine_indexing_enabled", value: checked })
+                }
+              />
+            </div>
+
+            <div className="flex flex-col-reverse gap-2 border-t border-dashed pt-4 sm:flex-row sm:items-center sm:justify-between">
+              <div className="flex items-center gap-2 text-[11px] text-muted-foreground">
+                <Globe className="size-3.5" />
+                地址变更会影响跨域访问策略，请填写完整协议与域名。
+              </div>
+              <Button
+                type="submit"
+                size="sm"
+                disabled={saveSystemMutation.isPending}
+              >
+                {saveSystemMutation.isPending ? (
+                  <>
+                    <Loader2 data-icon="inline-start" className="animate-spin" />
+                    保存中...
+                  </>
+                ) : (
+                  "保存配置"
+                )}
+              </Button>
+            </div>
+          </form>
         </CardContent>
       </Card>
 
