@@ -45,17 +45,19 @@ func isEmailRegisterVerificationEnabled(ctx context.Context) bool {
 }
 
 func isSMTPConfigured(ctx context.Context) bool {
-	var sc model.SystemConfig
 	var host, port, username string
 
-	if err := sc.GetByKey(ctx, model.ConfigKeySMTPHost); err == nil {
-		host = sc.Value
+	var scHost model.SystemConfig
+	if err := scHost.GetByKey(ctx, model.ConfigKeySMTPHost); err == nil {
+		host = scHost.Value
 	}
-	if err := sc.GetByKey(ctx, model.ConfigKeySMTPPort); err == nil {
-		port = sc.Value
+	var scPort model.SystemConfig
+	if err := scPort.GetByKey(ctx, model.ConfigKeySMTPPort); err == nil {
+		port = scPort.Value
 	}
-	if err := sc.GetByKey(ctx, model.ConfigKeySMTPUsername); err == nil {
-		username = sc.Value
+	var scUser model.SystemConfig
+	if err := scUser.GetByKey(ctx, model.ConfigKeySMTPUsername); err == nil {
+		username = scUser.Value
 	}
 
 	return host != "" && port != "" && username != ""
@@ -130,32 +132,44 @@ func verifyEmailCode(ctx context.Context, email, scene, code string) bool {
 }
 
 func handleLoginEmailVerification(ctx context.Context, c *gin.Context, req *loginRequest, user *model.User) error {
-	if user.Email == "" {
-		c.JSON(http.StatusOK, util.Err(errLoginEmailMissing))
-		return errors.New("handled")
-	}
-
-	if req.Code == "" {
-		cooldownKey := getEmailCooldownKey("login", user.Email)
-		var temp string
-		err := db.GetJSON(ctx, cooldownKey, &temp)
-		if err != nil {
-			if err := sendEmailVerificationCode(ctx, user.Email, "login", "login_email"); err != nil {
-				c.JSON(http.StatusOK, util.Err(err.Error()))
-				return errors.New("handled")
-			}
+	if req.Code != "" {
+		if !verifyEmailCode(ctx, user.Email, "login", req.Code) {
+			c.JSON(http.StatusOK, util.Err(errEmailCodeInvalidOrExpired))
+			return errors.New("handled")
 		}
+		return nil
+	}
 
-		maskedEmail := util.MaskEmail(user.Email)
-		c.JSON(http.StatusOK, util.Err(errNeedEmailCodePrefix+maskedEmail))
+	// 如果 SMTP 未配置，或者用户没有绑定邮箱（无法发送验证码），则使用临时码 888888
+	if !isSMTPConfigured(ctx) || user.Email == "" {
+		codeKey := getEmailCodeKey("login", user.Email)
+		if err := db.SetJSON(ctx, codeKey, "888888", emailCodeExpiry); err != nil {
+			c.JSON(http.StatusOK, util.Err(errGenerateEmailCodeFailed))
+			return errors.New("handled")
+		}
+		var msg string
+		if !isSMTPConfigured(ctx) {
+			msg = errSMTPInvalidUseTempCodePrefix + errSMTPInvalidUseTempCode
+		} else {
+			msg = errSMTPInvalidUseTempCodePrefix + "该账号未绑定邮箱，使用临时码登录"
+		}
+		c.JSON(http.StatusOK, util.Err(msg))
 		return errors.New("handled")
 	}
 
-	if !verifyEmailCode(ctx, user.Email, "login", req.Code) {
-		c.JSON(http.StatusOK, util.Err(errEmailCodeInvalidOrExpired))
-		return errors.New("handled")
+	cooldownKey := getEmailCooldownKey("login", user.Email)
+	var temp string
+	err := db.GetJSON(ctx, cooldownKey, &temp)
+	if err != nil {
+		if err := sendEmailVerificationCode(ctx, user.Email, "login", "login_email"); err != nil {
+			c.JSON(http.StatusOK, util.Err(err.Error()))
+			return errors.New("handled")
+		}
 	}
-	return nil
+
+	maskedEmail := util.MaskEmail(user.Email)
+	c.JSON(http.StatusOK, util.Err(errNeedEmailCodePrefix+maskedEmail))
+	return errors.New("handled")
 }
 
 // SendEmailCode 发送邮箱验证码

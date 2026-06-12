@@ -6,9 +6,9 @@ import {useRouter, useSearchParams} from "next/navigation"
 import {toast} from "sonner"
 import {Spinner} from "@/components/ui/spinner"
 import {LoginForm} from "@/components/auth/login-form"
+import {AuthShell} from "@/components/auth/auth-shell"
 import {Check} from "lucide-react"
 
-import {AuroraBackground} from "@/components/ui/aurora-background"
 import services from "@/lib/services"
 import {useAuth} from "@/components/providers/auth-provider"
 
@@ -27,6 +27,7 @@ export function LoginPage() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const { setUser } = useAuth()
+  const [showOTP, setShowOTP] = useState(false)
 
   /* 处理OAuth回调 */
   const [isProcessingCallback, setIsProcessingCallback] = useState(() => {
@@ -136,25 +137,8 @@ export function LoginPage() {
   }, [searchParams, router, resolveRedirectTarget, setUser])
 
   return (
-    <AuroraBackground>
-      <motion.div
-        initial={{ opacity: 0, y: 40 }}
-        whileInView={{ opacity: 1, y: 0 }}
-        viewport={{ once: true }}
-        transition={{
-          delay: 0.3,
-          duration: 0.8,
-          ease: "easeInOut",
-        }}
-        className="relative z-10 w-full max-w-sm px-4"
-      >
-        {/*Title Do Not Remove*/}
-        {/*<div className="text-center mb-8 space-y-2">*/}
-        {/*  <h1 className="text-3xl font-bold tracking-tight text-foreground">*/}
-        {/*    Refresh*/}
-        {/*  </h1>*/}
-        {/*</div>*/}
-
+    <AuthShell wide={showOTP}>
+      <div className="w-full">
         <AnimatePresence mode="wait">
           {isProcessingCallback || isCheckingSession ? (
             <motion.div
@@ -165,36 +149,36 @@ export function LoginPage() {
               className="w-full"
             >
               {isCheckingSession ? (
-                <div className="flex flex-col items-center justify-center space-y-4 py-2">
+                <div className="flex flex-col items-center justify-center gap-4 py-16">
                   <div className="relative">
-                    <Spinner className="w-8 h-8 text-blue-600" />
+                    <Spinner className="size-8" />
                   </div>
-                  <div className="text-center space-y-2">
+                  <div className="flex flex-col gap-2 text-center">
                     <h3 className="font-semibold tracking-tight text-foreground">正在检查登录状态</h3>
                     <p className="text-xs text-muted-foreground">请稍候，我们正在确认当前会话...</p>
                   </div>
                 </div>
               ) : loginSuccess ? (
-                <div className="flex flex-col items-center justify-center space-y-4 py-2">
+                <div className="flex flex-col items-center justify-center gap-4 py-16">
                   <motion.div
                     initial={{ scale: 0.5, opacity: 0 }}
                     animate={{ scale: 1, opacity: 1 }}
                     transition={{ type: "spring", stiffness: 300, damping: 20 }}
-                    className="w-8 h-8 rounded-full bg-green-500/10 flex items-center justify-center text-green-500 ring-1 ring-green-500/20"
+                    className="flex size-8 items-center justify-center rounded-full bg-primary/10 text-primary ring-1 ring-primary/20"
                   >
-                    <Check className="w-6 h-6" strokeWidth={3} />
+                    <Check className="size-6" strokeWidth={3} />
                   </motion.div>
-                  <div className="text-center space-y-2">
+                  <div className="flex flex-col gap-2 text-center">
                     <h3 className="font-semibold tracking-tight text-foreground">登录成功</h3>
                     <p className="text-xs text-muted-foreground">正在跳转至控制台...</p>
                   </div>
                 </div>
               ) : (
-                <div className="flex flex-col items-center justify-center space-y-4 py-2">
+                <div className="flex flex-col items-center justify-center gap-4 py-16">
                   <div className="relative">
-                    <Spinner className="w-8 h-8 text-blue-600" />
+                    <Spinner className="size-8" />
                   </div>
-                  <div className="text-center space-y-2">
+                  <div className="flex flex-col gap-2 text-center">
                     <h3 className="font-semibold tracking-tight text-foreground">正在验证凭据</h3>
                     <p className="text-xs text-muted-foreground">请稍候，我们正在为您建立安全会话...</p>
                   </div>
@@ -209,11 +193,11 @@ export function LoginPage() {
               transition={{ duration: 0.4 }}
               className="w-full"
             >
-              <LoginForm />
+              <LoginForm onOTPStateChange={setShowOTP} />
             </motion.div>
           )}
         </AnimatePresence>
-      </motion.div>
-    </AuroraBackground>
+      </div>
+    </AuthShell>
   )
 }

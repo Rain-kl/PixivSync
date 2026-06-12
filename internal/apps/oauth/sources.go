@@ -14,6 +14,7 @@ import (
 	"strconv"
 
 	"github.com/Rain-kl/Wavelet/internal/common"
+	"github.com/Rain-kl/Wavelet/internal/config"
 	"github.com/Rain-kl/Wavelet/internal/db"
 	"github.com/Rain-kl/Wavelet/internal/model"
 	"github.com/Rain-kl/Wavelet/internal/util"
@@ -171,19 +172,32 @@ func setLoginSession(ctx context.Context, c *gin.Context, user *model.User) erro
 	session.Set(UserNameKey, user.Username)
 
 	// 根据系统配置动态设置 Session 过期时间
-	maxAge := 0
+	maxAge := config.Config.App.SessionAge
+	isSessionCookie := false
+
 	ttlHours, err := model.GetIntByKey(ctx, model.ConfigKeyLoginSessionTTLHours)
 	if err == nil {
-		if ttlHours == -1 {
+		switch {
+		case ttlHours == -1:
 			// 永不过期，设置为 10 年
 			maxAge = 10 * 365 * 24 * 3600
-		} else if ttlHours > 0 {
+		case ttlHours > 0:
 			maxAge = ttlHours * 3600
+		case ttlHours == 0:
+			isSessionCookie = true
 		}
 	}
 	session.Options(util.GetSessionOptions(maxAge))
 
-	return session.Save()
+	if err := session.Save(); err != nil {
+		return err
+	}
+
+	if isSessionCookie {
+		util.StripCookieMaxAgeAndExpires(c.Writer.Header(), config.Config.App.SessionCookieName)
+	}
+
+	return nil
 }
 
 func uniqueUsername(ctx context.Context, base string) (string, error) {

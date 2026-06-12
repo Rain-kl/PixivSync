@@ -5,6 +5,7 @@ package user
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
@@ -13,6 +14,7 @@ import (
 
 	"github.com/Rain-kl/Wavelet/internal/apps/oauth"
 	"github.com/Rain-kl/Wavelet/internal/config"
+	"github.com/Rain-kl/Wavelet/internal/db"
 	"github.com/Rain-kl/Wavelet/internal/model"
 	"github.com/Rain-kl/Wavelet/internal/testhelper"
 	"github.com/Rain-kl/Wavelet/internal/util"
@@ -141,6 +143,7 @@ func TestRegisterCreatesAuthenticatedEncryptedUser(t *testing.T) {
 		Username: "newuser",
 		Password: "newpassword123",
 		Nickname: "New User",
+		Email:    "newuser@example.com",
 	}
 	body, _ := json.Marshal(payload)
 
@@ -238,5 +241,205 @@ VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 	info = basicUserInfoFromResponse(t, w)
 	if !info.NeedChangePassword {
 		t.Errorf("UserInfo() after Login(%q) need_change_password = false, want true", adminUsername)
+	}
+}
+
+func TestLoginEmailVerificationFallbackWhenSMTPUnconfigured(t *testing.T) {
+	dbConn, _, cleanup := testhelper.SetupTestEnvironment(t)
+	defer cleanup()
+
+	const (
+		userID   = uint64(222)
+		username = "smtpuser"
+		password = "newpassword123"
+		email    = "smtpuser@example.com"
+	)
+	now := time.Now()
+	user := model.User{
+		ID:          userID,
+		Username:    username,
+		Nickname:    "SMTP User",
+		Email:       email,
+		IsActive:    true,
+		IsAdmin:     false,
+		LastLoginAt: now,
+	}
+	if err := user.SetEncryptedPassword(password); err != nil {
+		t.Fatalf("set encrypted password failed: %v", err)
+	}
+	if err := dbConn.Create(&user).Error; err != nil {
+		t.Fatalf("create test user failed: %v", err)
+	}
+
+	// 1. Enable email login verification
+	if err := dbConn.Model(&model.SystemConfig{}).Where("key = ?", model.ConfigKeyEmailLoginVerificationEnabled).Update("value", "true").Error; err != nil {
+		t.Fatalf("enable email login verification failed: %v", err)
+	}
+	// 2. Clear SMTP host to simulate unconfigured SMTP
+	if err := dbConn.Model(&model.SystemConfig{}).Where("key = ?", model.ConfigKeySMTPHost).Update("value", "").Error; err != nil {
+		t.Fatalf("clear SMTP host failed: %v", err)
+	}
+
+	// 2.5 Invalidate the system config cache in Redis
+	if err := db.Redis.Del(context.Background(), db.PrefixedKey(model.SystemConfigRedisHashKey)).Err(); err != nil {
+		t.Fatalf("invalidate system config cache failed: %v", err)
+	}
+
+	router := setupUserTestRouter(t)
+
+	// 3. Perform login request without verification code
+	payload := loginRequest{
+		Username: username,
+		Password: password,
+	}
+	body, _ := json.Marshal(payload)
+
+	w := performUserRequest(router, http.MethodPost, "/api/v1/user/login", body, nil)
+	if w.Code != http.StatusOK {
+		t.Fatalf("Login(%q) status = %d, want %d. Body: %s", username, w.Code, http.StatusOK, w.Body.String())
+	}
+
+	// Check response error msg
+	var resp struct {
+		ErrorMsg string `json:"error_msg"`
+	}
+	if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("unmarshal response failed: %v", err)
+	}
+	expectedError := errSMTPInvalidUseTempCodePrefix + errSMTPInvalidUseTempCode
+	if resp.ErrorMsg != expectedError {
+		t.Errorf("expected error %q, got %q", expectedError, resp.ErrorMsg)
+	}
+
+	// 4. Check that verification code stored in Redis is "888888"
+	ctx := context.Background()
+	codeKey := getEmailCodeKey("login", email)
+	var storedCode string
+	if err := db.GetJSON(ctx, codeKey, &storedCode); err != nil {
+		t.Fatalf("get stored verification code failed: %v", err)
+	}
+	if storedCode != "888888" {
+		t.Errorf("expected verification code '888888', got %q", storedCode)
+	}
+
+	// 5. Retry login with code "888888"
+	payload.Code = "888888"
+	bodyWithCode, _ := json.Marshal(payload)
+	w = performUserRequest(router, http.MethodPost, "/api/v1/user/login", bodyWithCode, nil)
+	if w.Code != http.StatusOK {
+		t.Fatalf("Login with code status = %d, want %d. Body: %s", w.Code, http.StatusOK, w.Body.String())
+	}
+
+	var successResp struct {
+		ErrorMsg string `json:"error_msg"`
+	}
+	if err := json.Unmarshal(w.Body.Bytes(), &successResp); err != nil {
+		t.Fatalf("unmarshal success response failed: %v", err)
+	}
+	if successResp.ErrorMsg != "" {
+		t.Errorf("expected login success, got error %q", successResp.ErrorMsg)
+	}
+}
+
+func TestLoginEmailVerificationFallbackForEmptyEmail(t *testing.T) {
+	dbConn, _, cleanup := testhelper.SetupTestEnvironment(t)
+	defer cleanup()
+
+	const (
+		userID   = uint64(223)
+		username = "emptyemailuser"
+		password = "newpassword123"
+		email    = ""
+	)
+	now := time.Now()
+	user := model.User{
+		ID:          userID,
+		Username:    username,
+		Nickname:    "Empty Email User",
+		Email:       email,
+		IsActive:    true,
+		IsAdmin:     true,
+		LastLoginAt: now,
+	}
+	if err := user.SetEncryptedPassword(password); err != nil {
+		t.Fatalf("set encrypted password failed: %v", err)
+	}
+	if err := dbConn.Create(&user).Error; err != nil {
+		t.Fatalf("create test user failed: %v", err)
+	}
+
+	// 1. Enable email login verification
+	if err := dbConn.Model(&model.SystemConfig{}).Where("key = ?", model.ConfigKeyEmailLoginVerificationEnabled).Update("value", "true").Error; err != nil {
+		t.Fatalf("enable email login verification failed: %v", err)
+	}
+	// 2. Make sure SMTP is configured so we only trigger empty email check
+	if err := dbConn.Model(&model.SystemConfig{}).Where("key = ?", model.ConfigKeySMTPHost).Update("value", "smtp.example.com").Error; err != nil {
+		t.Fatalf("set SMTP host failed: %v", err)
+	}
+	if err := dbConn.Model(&model.SystemConfig{}).Where("key = ?", model.ConfigKeySMTPPort).Update("value", "587").Error; err != nil {
+		t.Fatalf("set SMTP port failed: %v", err)
+	}
+	if err := dbConn.Model(&model.SystemConfig{}).Where("key = ?", model.ConfigKeySMTPUsername).Update("value", "smtpuser").Error; err != nil {
+		t.Fatalf("set SMTP username failed: %v", err)
+	}
+
+	// Invalidate the system config cache in Redis
+	if err := db.Redis.Del(context.Background(), db.PrefixedKey(model.SystemConfigRedisHashKey)).Err(); err != nil {
+		t.Fatalf("invalidate system config cache failed: %v", err)
+	}
+
+	router := setupUserTestRouter(t)
+
+	// 3. Perform login request without verification code
+	payload := loginRequest{
+		Username: username,
+		Password: password,
+	}
+	body, _ := json.Marshal(payload)
+
+	w := performUserRequest(router, http.MethodPost, "/api/v1/user/login", body, nil)
+	if w.Code != http.StatusOK {
+		t.Fatalf("Login(%q) status = %d, want %d. Body: %s", username, w.Code, http.StatusOK, w.Body.String())
+	}
+
+	// Check response error msg
+	var resp struct {
+		ErrorMsg string `json:"error_msg"`
+	}
+	if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("unmarshal response failed: %v", err)
+	}
+	expectedError := errSMTPInvalidUseTempCodePrefix + "该账号未绑定邮箱，使用临时码登录"
+	if resp.ErrorMsg != expectedError {
+		t.Errorf("expected error %q, got %q", expectedError, resp.ErrorMsg)
+	}
+
+	// 4. Check that verification code stored in Redis is "888888"
+	ctx := context.Background()
+	codeKey := getEmailCodeKey("login", email)
+	var storedCode string
+	if err := db.GetJSON(ctx, codeKey, &storedCode); err != nil {
+		t.Fatalf("get stored verification code failed: %v", err)
+	}
+	if storedCode != "888888" {
+		t.Errorf("expected verification code '888888', got %q", storedCode)
+	}
+
+	// 5. Retry login with code "888888"
+	payload.Code = "888888"
+	bodyWithCode, _ := json.Marshal(payload)
+	w = performUserRequest(router, http.MethodPost, "/api/v1/user/login", bodyWithCode, nil)
+	if w.Code != http.StatusOK {
+		t.Fatalf("Login with code status = %d, want %d. Body: %s", w.Code, http.StatusOK, w.Body.String())
+	}
+
+	var successResp struct {
+		ErrorMsg string `json:"error_msg"`
+	}
+	if err := json.Unmarshal(w.Body.Bytes(), &successResp); err != nil {
+		t.Fatalf("unmarshal success response failed: %v", err)
+	}
+	if successResp.ErrorMsg != "" {
+		t.Errorf("expected login success, got error %q", successResp.ErrorMsg)
 	}
 }
