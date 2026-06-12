@@ -1,9 +1,10 @@
 services:
-
   wavelet:
 #    build:
 #      context: .
 #      dockerfile: docker/Dockerfile
+#      args:
+    #        VERSION: v0.9.9
     image: ghcr.io/rain-kl/pixezsync:latest
     restart: unless-stopped
     env_file: .env

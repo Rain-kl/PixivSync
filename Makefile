@@ -1,4 +1,8 @@
-.PHONY: swagger license license-check build-embedded build-test cross-build
+.PHONY: swagger license license-check build-embedded build-test cross-build code-check
+
+VERSION ?= dev
+BUILD_DATE ?= $(shell date -u +'%Y-%m-%dT%H:%M:%SZ')
+MODULE := $(shell go list -m)
 
 swagger:
 	scripts/swagger.sh
@@ -10,11 +14,18 @@ license-check:
 	scripts/update_go_license.sh --check
 
 build-embedded:
-	cd frontend && pnpm build:embed
+	@echo "==> Building embedded frontend version=$(VERSION) build_date=$(BUILD_DATE)..."
+	cd frontend && \
+		NEXT_PUBLIC_APP_VERSION="$(VERSION)" \
+		NEXT_PUBLIC_APP_BUILD_DATE="$(BUILD_DATE)" \
+		pnpm build:embed
 	rm -rf internal/router/dist
 	cp -R frontend/out internal/router/dist
-	go build -tags embed_frontend -o bin/pixez-sync main.go
-
+	go build \
+		-tags embed_frontend \
+		-ldflags "-s -w -X '$(MODULE)/internal/buildinfo.Version=$(VERSION)' -X '$(MODULE)/internal/buildinfo.BuildTime=$(BUILD_DATE)'" \
+		-o bin/pixez-sync \
+		main.go
 code-check:
 	golangci-lint run
 	cd frontend && pnpm tsc --noEmit --jsx preserve && npx eslint . --max-warnings 0

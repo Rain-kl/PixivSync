@@ -6,7 +6,9 @@ package scheduler
 import (
 	"context"
 	"fmt"
+	"os/signal"
 	"sync"
+	"syscall"
 	"time"
 
 	"github.com/Rain-kl/Wavelet/internal/logger"
@@ -33,6 +35,7 @@ func StartScheduler() error {
 	var err error
 	schedulerOnce.Do(func() {
 		quitChan = make(chan struct{})
+		done := quitChan
 
 		// 初始化并运行首次调度
 		if err = ReloadScheduler(); err != nil {
@@ -40,8 +43,12 @@ func StartScheduler() error {
 			return
 		}
 
-		// 阻塞等待
-		<-quitChan
+		signalCtx, stopSignals := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
+		defer stopSignals()
+
+		if waitForStop(done, signalCtx.Done()) {
+			StopScheduler()
+		}
 	})
 	return err
 }
@@ -114,14 +121,21 @@ func ReloadScheduler() error {
 		}
 	}
 
-	// 5. 替换全局调度器并异步启动
+	// 5. 启动并替换全局调度器。进程信号由 StartScheduler 统一处理。
+	if err := newScheduler.Start(); err != nil {
+		return fmt.Errorf("start scheduler failed: %w", err)
+	}
 	activeScheduler = newScheduler
-	go func() {
-		if err := activeScheduler.Run(); err != nil {
-			logger.ErrorF(context.Background(), "[Scheduler] 调度器运行错误: %v", err)
-		}
-	}()
 
 	logger.InfoF(context.Background(), "[Scheduler] 成功重新加载定时任务，共注册 %d 个活动任务", len(schedules))
 	return nil
+}
+
+func waitForStop(done <-chan struct{}, signals <-chan struct{}) bool {
+	select {
+	case <-done:
+		return false
+	case <-signals:
+		return true
+	}
 }

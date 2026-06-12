@@ -22,6 +22,7 @@ import (
 	"time"
 
 	"github.com/Rain-kl/Wavelet/internal/buildinfo"
+	"github.com/Rain-kl/Wavelet/internal/logger"
 	"github.com/Rain-kl/Wavelet/internal/model"
 	"golang.org/x/mod/semver"
 )
@@ -192,7 +193,13 @@ func (m *manager) fetchRelease(ctx context.Context, repository string) (githubRe
 	if err := decoder.Decode(&releases); err != nil {
 		return githubRelease{}, releaseAsset{}, fmt.Errorf("%s: %w", errReleaseResponseInvalid, err)
 	}
-	return selectLatestRelease(releases)
+
+	release, asset, err := selectLatestRelease(releases)
+	if err != nil {
+		return githubRelease{}, releaseAsset{}, err
+	}
+	logger.InfoF(ctx, "[Updater] Selected latest compatible release: %s (Asset: %s)", release.TagName, asset.Name)
+	return release, asset, nil
 }
 
 func loadRepository(ctx context.Context) (string, error) {
@@ -217,6 +224,8 @@ func (m *manager) status(ctx context.Context) (Status, releaseAsset, error) {
 	latestVersion := normalizeVersion(release.TagName)
 	updateAvailable := currentVersion != "" && semver.Compare(latestVersion, currentVersion) > 0
 
+	logger.InfoF(ctx, "[Updater] Check update complete. current: %s, latest: %s, update_available: %t", buildinfo.Version, release.TagName, updateAvailable)
+
 	return Status{
 		CurrentVersion:     buildinfo.Version,
 		BuildTime:          buildinfo.BuildTime,
@@ -238,6 +247,7 @@ func downloadArchive(ctx context.Context, client releaseClient, asset releaseAss
 	if asset.Size <= 0 || asset.Size > maxArchiveSize {
 		return fmt.Errorf("release 资产大小无效: %d", asset.Size)
 	}
+	logger.InfoF(ctx, "[Updater] Downloading release asset: %s", asset.Name)
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, asset.BrowserDownloadURL, nil)
 	if err != nil {
 		return fmt.Errorf("创建升级下载请求失败: %w", err)
@@ -272,6 +282,7 @@ func downloadArchive(ctx context.Context, client releaseClient, asset releaseAss
 	if written > maxArchiveSize || written != asset.Size {
 		return fmt.Errorf("升级归档大小不匹配: got %d, want %d", written, asset.Size)
 	}
+	logger.InfoF(ctx, "[Updater] Successfully downloaded release asset to %s", destination)
 	return nil
 }
 
@@ -288,7 +299,8 @@ func safeArchivePath(destination, name string) (string, error) {
 	return target, nil
 }
 
-func extractTarGz(archivePath, destination, binaryName string) (string, error) {
+func extractTarGz(ctx context.Context, archivePath, destination, binaryName string) (string, error) {
+	logger.InfoF(ctx, "[Updater] Extracting tar.gz archive: %s", archivePath)
 	file, err := os.Open(archivePath) //nolint:gosec // archivePath is created by prepareUpgrade in the executable directory.
 	if err != nil {
 		return "", err
@@ -337,12 +349,14 @@ func extractTarGz(archivePath, destination, binaryName string) (string, error) {
 		if written > maxArchiveSize {
 			return "", errors.New("解压后的程序文件超过大小限制")
 		}
+		logger.InfoF(ctx, "[Updater] Successfully extracted binary to %s", target)
 		return target, nil
 	}
 	return "", errors.New(errNoCompatibleAsset)
 }
 
-func extractZip(archivePath, destination, binaryName string) (string, error) {
+func extractZip(ctx context.Context, archivePath, destination, binaryName string) (string, error) {
+	logger.InfoF(ctx, "[Updater] Extracting zip archive: %s", archivePath)
 	reader, err := zip.OpenReader(archivePath)
 	if err != nil {
 		return "", err
@@ -365,7 +379,6 @@ func extractZip(archivePath, destination, binaryName string) (string, error) {
 		}
 		output, err := os.OpenFile(target, os.O_CREATE|os.O_EXCL|os.O_WRONLY, stagedBinaryMode) //nolint:gosec // target is constrained by safeArchivePath.
 		if err != nil {
-			// The output was not opened, so there is no useful recovery action for a read-only close failure.
 			_ = input.Close()
 			return "", err
 		}
@@ -384,6 +397,7 @@ func extractZip(archivePath, destination, binaryName string) (string, error) {
 		if written > maxArchiveSize {
 			return "", errors.New("解压后的程序文件超过大小限制")
 		}
+		logger.InfoF(ctx, "[Updater] Successfully extracted binary to %s", target)
 		return target, nil
 	}
 	return "", errors.New(errNoCompatibleAsset)
@@ -411,6 +425,8 @@ func (m *manager) prepareUpgrade(ctx context.Context) (string, string, error) {
 		return "", "", errors.New(errAlreadyUpToDate)
 	}
 
+	logger.InfoF(ctx, "[Updater] Preparing upgrade. current: %s, latest: %s", status.CurrentVersion, status.LatestVersion)
+
 	executable, err := os.Executable()
 	if err != nil {
 		return "", "", fmt.Errorf("定位当前程序失败: %w", err)
@@ -419,6 +435,7 @@ func (m *manager) prepareUpgrade(ctx context.Context) (string, string, error) {
 	if err != nil {
 		return "", "", fmt.Errorf("解析当前程序路径失败: %w", err)
 	}
+
 	tempDir, err := os.MkdirTemp(filepath.Dir(executable), ".wavelet-update-*")
 	if err != nil {
 		return "", "", fmt.Errorf("创建升级目录失败: %w", err)
@@ -434,15 +451,18 @@ func (m *manager) prepareUpgrade(ctx context.Context) (string, string, error) {
 	if runtime.GOOS == windowsOS {
 		binaryName += ".exe"
 	}
-	stagedBinary, err := extractTarGz(archivePath, tempDir, binaryName)
+	var stagedBinary string
 	if strings.HasSuffix(asset.Name, ".zip") {
-		stagedBinary, err = extractZip(archivePath, tempDir, binaryName)
+		stagedBinary, err = extractZip(ctx, archivePath, tempDir, binaryName)
+	} else {
+		stagedBinary, err = extractTarGz(ctx, archivePath, tempDir, binaryName)
 	}
 	if err != nil {
 		// Cleanup is best effort because the extraction error is the actionable failure.
 		_ = os.RemoveAll(tempDir)
 		return "", "", fmt.Errorf("解压升级资产失败: %w", err)
 	}
+	logger.InfoF(ctx, "[Updater] Staged binary successfully prepared: %s", stagedBinary)
 	m.upgrading = true
 	return executable, stagedBinary, nil
 }

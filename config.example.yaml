@@ -85,7 +85,7 @@ redis:
 # ─── Logging ────────────────────────────────────────────────────────────────────
 log:
   level: "info"                # debug | info | warn | error | fatal | panic
-  format: "json"               # text | json
+  format: "console"               # console | json
   output: "stdout"             # stdout | file
   file_path: "./logs/app.log"
   max_size: 100                # MB per log file
