@@ -133,7 +133,22 @@ func expectedAssetName(tag string) string {
 	return fmt.Sprintf("wavelet_%s_%s_%s.%s", tag, runtime.GOOS, runtime.GOARCH, extension)
 }
 
-func selectLatestRelease(releases []githubRelease) (githubRelease, releaseAsset, error) {
+func expectedAssetNames(repository, tag string) []string {
+	names := []string{expectedAssetName(tag)}
+	if parts := strings.Split(repository, "/"); len(parts) == repositoryParts {
+		repoName := parts[1]
+		if repoName != "wavelet" {
+			extension := "tar.gz"
+			if runtime.GOOS == windowsOS {
+				extension = "zip"
+			}
+			names = append(names, fmt.Sprintf("%s_%s_%s_%s.%s", repoName, tag, runtime.GOOS, runtime.GOARCH, extension))
+		}
+	}
+	return names
+}
+
+func selectLatestRelease(repository string, releases []githubRelease) (githubRelease, releaseAsset, error) {
 	var selected githubRelease
 	var selectedAsset releaseAsset
 	selectedVersion := ""
@@ -143,9 +158,16 @@ func selectLatestRelease(releases []githubRelease) (githubRelease, releaseAsset,
 		if release.Draft || version == "" {
 			continue
 		}
-		expectedName := expectedAssetName(release.TagName)
+		expectedNames := expectedAssetNames(repository, release.TagName)
 		for _, asset := range release.Assets {
-			if asset.Name != expectedName || asset.BrowserDownloadURL == "" || asset.State != "uploaded" {
+			matched := false
+			for _, name := range expectedNames {
+				if asset.Name == name {
+					matched = true
+					break
+				}
+			}
+			if !matched || asset.BrowserDownloadURL == "" || asset.State != "uploaded" {
 				continue
 			}
 			if selectedVersion == "" || semver.Compare(version, selectedVersion) > 0 {
@@ -194,7 +216,7 @@ func (m *manager) fetchRelease(ctx context.Context, repository string) (githubRe
 		return githubRelease{}, releaseAsset{}, fmt.Errorf("%s: %w", errReleaseResponseInvalid, err)
 	}
 
-	release, asset, err := selectLatestRelease(releases)
+	release, asset, err := selectLatestRelease(repository, releases)
 	if err != nil {
 		return githubRelease{}, releaseAsset{}, err
 	}

@@ -67,7 +67,7 @@ func TestSelectLatestRelease(t *testing.T) {
 		},
 	}
 
-	release, asset, err := selectLatestRelease(releases)
+	release, asset, err := selectLatestRelease("Rain-kl/Wavelet", releases)
 	if err != nil {
 		t.Fatalf("selectLatestRelease() error = %v", err)
 	}
@@ -76,6 +76,45 @@ func TestSelectLatestRelease(t *testing.T) {
 	}
 	if asset.Name != assetNameV2 {
 		t.Errorf("selectLatestRelease() asset = %q, want %q", asset.Name, assetNameV2)
+	}
+}
+
+func TestSelectLatestReleaseWithCustomRepo(t *testing.T) {
+	extension := "tar.gz"
+	if runtime.GOOS == "windows" {
+		extension = "zip"
+	}
+	releases := []githubRelease{
+		{
+			TagName:   "v1.0.0",
+			Published: time.Date(2026, time.June, 1, 0, 0, 0, 0, time.UTC),
+			Assets: []releaseAsset{{
+				Name:               "wavelet_v1.0.0_" + runtime.GOOS + "_" + runtime.GOARCH + "." + extension,
+				BrowserDownloadURL: "https://example.com/v1",
+				State:              "uploaded",
+			}},
+		},
+		{
+			TagName:   "v2.0.0",
+			Published: time.Date(2026, time.June, 2, 0, 0, 0, 0, time.UTC),
+			Assets: []releaseAsset{{
+				Name:               "PixezSync_v2.0.0_" + runtime.GOOS + "_" + runtime.GOARCH + "." + extension,
+				BrowserDownloadURL: "https://example.com/v2",
+				State:              "uploaded",
+			}},
+		},
+	}
+
+	release, asset, err := selectLatestRelease("Rain-kl/PixezSync", releases)
+	if err != nil {
+		t.Fatalf("selectLatestRelease() error = %v", err)
+	}
+	if release.TagName != "v2.0.0" {
+		t.Errorf("selectLatestRelease() tag = %q, want %q", release.TagName, "v2.0.0")
+	}
+	expectedName := "PixezSync_v2.0.0_" + runtime.GOOS + "_" + runtime.GOARCH + "." + extension
+	if asset.Name != expectedName {
+		t.Errorf("selectLatestRelease() asset = %q, want %q", asset.Name, expectedName)
 	}
 }
 
