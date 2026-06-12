@@ -2,13 +2,27 @@
 
 import {useEffect, useState} from "react"
 import {useMutation, useQuery, useQueryClient, type UseQueryResult} from "@tanstack/react-query"
-import {Fingerprint, Globe, Loader2, Lock, Mail, Pencil, Plus, Settings, Shield, Trash2, UserPlus} from "lucide-react"
+import {
+  Clock,
+  Fingerprint,
+  Globe,
+  Loader2,
+  Lock,
+  Mail,
+  Pencil,
+  Plus,
+  Settings,
+  Shield,
+  Trash2,
+  UserPlus
+} from "lucide-react"
 
 import {Button} from "@/components/ui/button"
 import {Card, CardContent, CardDescription, CardHeader, CardTitle} from "@/components/ui/card"
 import {Switch} from "@/components/ui/switch"
 import {Input} from "@/components/ui/input"
 import {Label} from "@/components/ui/label"
+import {Select, SelectContent, SelectItem, SelectTrigger, SelectValue} from "@/components/ui/select"
 import {AuthSourceModal} from "@/components/common/settings/auth-source-modal"
 import {AdminService} from "@/lib/services"
 import type {AuthSource, SystemConfig} from "@/lib/services/admin"
@@ -70,6 +84,9 @@ export function SecurityTab({ configs, systemConfigsQuery }: SecurityTabProps) {
   const [capTokenTTL, setCapTokenTTL] = useState("")
   const [capAutoSolve, setCapAutoSolve] = useState(true)
 
+  const [sessionTTL, setSessionTTL] = useState("168")
+  const [customHours, setCustomHours] = useState("")
+
   const authSourcesQuery = useQuery({
     queryKey: ["auth", "sources"],
     queryFn: () => AdminService.listAuthSources(),
@@ -84,8 +101,57 @@ export function SecurityTab({ configs, systemConfigsQuery }: SecurityTabProps) {
       setCapTTL(cfgMap["cap_challenge_ttl_seconds"]?.value || "600")
       setCapTokenTTL(cfgMap["cap_token_ttl_seconds"]?.value || "1200")
       setCapAutoSolve(cfgMap["cap_auto_solve"]?.value !== "false")
+
+      // 初始化登录保持设置
+      const ttlVal = cfgMap["login_session_ttl_hours"]?.value || "0"
+      if (ttlVal === "0" || ttlVal === "168" || ttlVal === "720" || ttlVal === "-1") {
+        setSessionTTL(ttlVal)
+        setCustomHours("")
+      } else {
+        setSessionTTL("custom")
+        setCustomHours(ttlVal)
+      }
     }
   }, [systemConfigsQuery.data, configs])
+
+  const updateTTLMutation = useMutation({
+    mutationFn: async (value: string) => {
+      const config = configs["login_session_ttl_hours"]
+      if (!config) {
+        throw new Error("缺少配置项: login_session_ttl_hours")
+      }
+      await AdminService.updateSystemConfig("login_session_ttl_hours", {
+        value: value,
+        description: config.description,
+      })
+    },
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ["admin", "system-configs"] })
+      toast.success("登录状态保持时间已更新")
+    },
+    onError: (error: Error) => {
+      toast.error(error.message || "更新配置失败")
+    },
+  })
+
+  const handleTTLChange = (val: string) => {
+    setSessionTTL(val)
+    if (val !== "custom") {
+      updateTTLMutation.mutate(val)
+    }
+  }
+
+  const handleCustomBlur = () => {
+    const parsed = parseInt(customHours, 10)
+    if (isNaN(parsed) || parsed <= 0) {
+      toast.error("请输入有效的过期小时数（正整数）")
+      // 重置为原本的值
+      const originalVal = configs["login_session_ttl_hours"]?.value || "0"
+      setCustomHours(originalVal === "custom" || ["0", "168", "720", "-1"].includes(originalVal) ? "" : originalVal)
+      return
+    }
+    updateTTLMutation.mutate(parsed.toString())
+  }
 
   const updateConfigMutation = useMutation({
     mutationFn: async ({ key, value }: { key: string; value: boolean }) => {
@@ -183,7 +249,7 @@ export function SecurityTab({ configs, systemConfigsQuery }: SecurityTabProps) {
               <Settings className="size-4" />
             </div>
             <div>
-              <CardTitle className="text-base font-semibold">系统安全与注册控制</CardTitle>
+              <CardTitle className="text-base font-semibold">系统登录/注册设置</CardTitle>
               <CardDescription className="text-xs">配置系统的登录限制与用户自主注册权限</CardDescription>
             </div>
           </div>
@@ -214,6 +280,58 @@ export function SecurityTab({ configs, systemConfigsQuery }: SecurityTabProps) {
                 </div>
               )
             })}
+
+            {/* 登录状态保持时间 (选择后立即更改) */}
+            <div
+              className="flex items-center justify-between gap-4 rounded-xl border border-dashed p-4 bg-card hover:bg-muted/10 hover:border-indigo-500/30 transition-all duration-300 shadow-sm md:col-span-2"
+            >
+              <div className="space-y-1 pr-4">
+                <div className="flex items-center gap-2">
+                  <Clock className="size-4 text-indigo-500" />
+                  <span className="font-medium text-sm text-foreground">登录状态保持时间</span>
+                </div>
+                <p className="text-xs text-muted-foreground leading-relaxed pr-2">
+                  配置用户登录会话在浏览器中的保持期限。设置为“关闭”则在浏览器关闭后自动退登。
+                </p>
+              </div>
+
+              <div className="flex items-center gap-2 flex-shrink-0">
+                <Select
+                  value={sessionTTL}
+                  disabled={updateTTLMutation.isPending}
+                  onValueChange={handleTTLChange}
+                >
+                  <SelectTrigger className="w-[180px] bg-card border-dashed text-xs h-8">
+                    <SelectValue placeholder="选择保留时间" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="0">关闭 (浏览器关闭自动退登)</SelectItem>
+                    <SelectItem value="168">7 天</SelectItem>
+                    <SelectItem value="720">30 天</SelectItem>
+                    <SelectItem value="-1">永不过期</SelectItem>
+                    <SelectItem value="custom">自定义时长</SelectItem>
+                  </SelectContent>
+                </Select>
+
+                {sessionTTL === "custom" && (
+                  <Input
+                    type="number"
+                    min={1}
+                    value={customHours}
+                    onChange={(e) => setCustomHours(e.target.value)}
+                    onBlur={handleCustomBlur}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") {
+                        handleCustomBlur()
+                      }
+                    }}
+                    placeholder="小时"
+                    disabled={updateTTLMutation.isPending}
+                    className="w-20 bg-card border-dashed text-xs h-8 px-2"
+                  />
+                )}
+              </div>
+            </div>
           </div>
         </CardContent>
       </Card>

@@ -280,6 +280,12 @@ func getSeedConfigsPart2() []model.SystemConfig {
 			Type:        configTypeSystem,
 			Description: "是否启用 LRU 淘汰机制",
 		},
+		{
+			Key:         model.ConfigKeyLoginSessionTTLHours,
+			Value:       "0",
+			Type:        configTypeSystem,
+			Description: "登录会话过期时间 (小时，0表示浏览器关闭后自动退出，-1表示永不过期)",
+		},
 	}
 }
 

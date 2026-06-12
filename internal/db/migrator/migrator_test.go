@@ -16,7 +16,7 @@ import (
 	"gorm.io/gorm"
 )
 
-const expectedMigratedSystemConfigCount = 30
+const expectedMigratedSystemConfigCount = 31
 
 func TestMigrateInitializesSQLiteDatabase(t *testing.T) {
 	sqliteDB, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{

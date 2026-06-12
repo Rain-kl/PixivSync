@@ -165,10 +165,24 @@ func containsScope(scopes []string, scope string) bool {
 	return false
 }
 
-func setLoginSession(c *gin.Context, user *model.User) error {
+func setLoginSession(ctx context.Context, c *gin.Context, user *model.User) error {
 	session := sessions.Default(c)
 	session.Set(UserIDKey, user.ID)
 	session.Set(UserNameKey, user.Username)
+
+	// 根据系统配置动态设置 Session 过期时间
+	maxAge := 0
+	ttlHours, err := model.GetIntByKey(ctx, model.ConfigKeyLoginSessionTTLHours)
+	if err == nil {
+		if ttlHours == -1 {
+			// 永不过期，设置为 10 年
+			maxAge = 10 * 365 * 24 * 3600
+		} else if ttlHours > 0 {
+			maxAge = ttlHours * 3600
+		}
+	}
+	session.Options(util.GetSessionOptions(maxAge))
+
 	return session.Save()
 }
 
@@ -508,7 +522,7 @@ func handleCallbackLogin(ctx context.Context, c *gin.Context, source *model.Auth
 
 	user.LastLoginAt = time.Now()
 	_ = db.DB(ctx).Model(&user).Update("last_login_at", user.LastLoginAt).Error
-	if err := setLoginSession(c, &user); err != nil {
+	if err := setLoginSession(ctx, c, &user); err != nil {
 		c.JSON(http.StatusInternalServerError, util.Err(err.Error()))
 		return
 	}

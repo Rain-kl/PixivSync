@@ -50,6 +50,8 @@ const (
 	ConfigKeyPixezMirrorDownloadInterval      = "pixez_mirror_download_interval_seconds" // Pixiv插画图片下载间隔（秒）
 	ConfigKeyPixezMirrorIllustConcurrency     = "pixez_mirror_illust_concurrency"        // Pixiv插画并发镜像限制数
 	ConfigKeyPixezMirrorNovelConcurrency      = "pixez_mirror_novel_concurrency"         // Pixiv小说并发镜像限制数
+	ConfigKeyLoginSessionTTLHours             = "login_session_ttl_hours"                // 登录会话过期时间 (小时，0表示浏览器关闭后自动退出登录，-1表示永不过期)
+
 )
 
 const (
