@@ -762,6 +762,7 @@ func TestServeMirroredImageQuality(t *testing.T) {
 		StorageDriver: "local",
 		Type:          "pixez_mirror",
 		Status:        model.UploadStatusUsed,
+		AccessMode:    1,
 	}
 	if err := db.DB(ctx).Create(&upload).Error; err != nil {
 		t.Fatalf("seed mirror upload failed: %v", err)

@@ -27,6 +27,7 @@ export interface Upload {
   storage_driver: string
   type: string
   status: string
+  access_mode: number
   metadata: UploadMetadata
   created_at: string
   updated_at: string

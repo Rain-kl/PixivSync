@@ -477,6 +477,7 @@ func registerMirrorUpload(ctx context.Context, pixivURL string, pageIndex int, d
 		StorageDriver: storageDriver,
 		Type:          pixezMirrorUploadType,
 		Status:        model.UploadStatusUsed,
+		AccessMode:    1,
 		Metadata: model.UploadMetadata{
 			OriginalMime: mimeType,
 			Bucket:       config.Config.S3.Bucket,

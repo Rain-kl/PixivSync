@@ -109,6 +109,7 @@ func TestFindMirroredImageUploadMapsDerivedFilenames(t *testing.T) {
 		StorageDriver: "local",
 		Type:          pixezMirrorUploadType,
 		Status:        model.UploadStatusUsed,
+		AccessMode:    1,
 	}
 	if err := db.DB(ctx).Create(&upload).Error; err != nil {
 		t.Fatalf("seed upload failed: %v", err)

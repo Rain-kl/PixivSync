@@ -283,6 +283,7 @@ export function FilesMain() {
                 <TableHead className="py-3">文件名</TableHead>
                 <TableHead className="max-w-[200px] truncate py-3">路径</TableHead>
                 <TableHead className="w-[100px] py-3">业务类别</TableHead>
+                <TableHead className="w-[100px] py-3">访问模式</TableHead>
                 <TableHead className="w-[125px] py-3">MIME类型</TableHead>
                 <TableHead className="w-[100px] py-3">大小</TableHead>
                 <TableHead className="w-[150px] py-3">上传时间</TableHead>
@@ -335,6 +336,17 @@ export function FilesMain() {
                       <Badge variant="secondary" className="text-[10px] py-0 px-1.5 font-normal rounded-md">
                         {file.type}
                       </Badge>
+                    </TableCell>
+                    <TableCell className="py-3">
+                      {file.access_mode === 1 ? (
+                        <Badge variant="outline" className="text-[10px] py-0 px-1.5 font-normal rounded-md text-emerald-600 bg-emerald-50 border-emerald-200 dark:text-emerald-400 dark:bg-emerald-950/30 dark:border-emerald-900/30">
+                          公开
+                        </Badge>
+                      ) : (
+                        <Badge variant="outline" className="text-[10px] py-0 px-1.5 font-normal rounded-md text-amber-600 bg-amber-50 border-amber-200 dark:text-amber-400 dark:bg-amber-950/30 dark:border-amber-900/30">
+                          私有
+                        </Badge>
+                      )}
                     </TableCell>
                     <TableCell className="py-3 text-[11px] text-muted-foreground truncate max-w-[125px]" title={file.mime_type}>
                       {file.mime_type}
@@ -485,6 +497,21 @@ export function FilesMain() {
                     <Badge variant="secondary" className="text-[10px] py-0 px-2 rounded-md font-normal">
                       {detailTarget.type}
                     </Badge>
+                  </span>
+                </div>
+
+                <div className="grid grid-cols-3 gap-2 border-b border-dashed pb-2">
+                  <span className="text-muted-foreground font-medium">访问模式</span>
+                  <span className="col-span-2">
+                    {detailTarget.access_mode === 1 ? (
+                      <Badge variant="outline" className="text-[10px] py-0 px-2 rounded-md font-normal text-emerald-600 bg-emerald-50 border-emerald-200 dark:text-emerald-400 dark:bg-emerald-950/30 dark:border-emerald-900/30">
+                        公开
+                      </Badge>
+                    ) : (
+                      <Badge variant="outline" className="text-[10px] py-0 px-2 rounded-md font-normal text-amber-600 bg-amber-50 border-amber-200 dark:text-amber-400 dark:bg-amber-950/30 dark:border-amber-900/30">
+                        私有
+                      </Badge>
+                    )}
                   </span>
                 </div>
 
