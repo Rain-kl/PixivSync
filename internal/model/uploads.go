@@ -43,7 +43,8 @@ type Upload struct {
 	StorageDriver string         `json:"storage_driver" gorm:"size:50;not null"`         // 存储引擎驱动 (如 local, s3, oss)
 	Type          string         `json:"type" gorm:"column:type;size:50;not null;index"` // 业务标识类型 (如 avatar, doc, attachment)
 	Status        UploadStatus   `json:"status" gorm:"type:varchar(20);not null"`        // 状态
-	Metadata      UploadMetadata `json:"metadata" gorm:"serializer:json;type:jsonb"`     // 业务扩展元数据
+	AccessMode    int            `json:"access_mode" gorm:"column:access_mode;not null;default:0"`
+	Metadata      UploadMetadata `json:"metadata" gorm:"serializer:json;type:jsonb"` // 业务扩展元数据
 	CreatedAt     time.Time      `json:"created_at" gorm:"autoCreateTime"`
 	UpdatedAt     time.Time      `json:"updated_at" gorm:"autoUpdateTime"`
 }

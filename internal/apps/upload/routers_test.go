@@ -14,6 +14,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"strconv"
 	"strings"
 	"testing"
 
@@ -620,4 +621,91 @@ func TestBatchDownloadFiles(t *testing.T) {
 
 		t.Logf("Successfully unzipped batch. Extracted files: %+v", extracted)
 	})
+}
+
+func TestUploadAccessModeAccessControl(t *testing.T) {
+	dbConn, _, cleanup := testhelper.SetupTestEnvironment(t)
+	defer cleanup()
+	defer func() { _ = os.RemoveAll("uploads") }()
+
+	user1 := &model.User{ID: 1001, Username: "user1"}
+	user2 := &model.User{ID: 1002, Username: "user2"}
+
+	// Seed user1
+	if err := dbConn.Create(user1).Error; err != nil {
+		t.Fatalf("create test user1 failed: %v", err)
+	}
+	// Seed user2
+	if err := dbConn.Create(user2).Error; err != nil {
+		t.Fatalf("create test user2 failed: %v", err)
+	}
+
+	router := setupTestRouter(user1)
+
+	// 1. Upload private file for user1 (explicitly specifying access_mode = 0)
+	imgContent := []byte("\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDR\x00\x00\x00\x01\x00\x00\x00\x01\x08\x06\x00\x00\x00\x1f\x15\xc4\x89")
+	contentType, body := createMultipartRequest(t, "file", "private.png", imgContent, map[string]string{
+		"type":        "generic",
+		"access_mode": "0",
+	})
+	req, _ := http.NewRequest("POST", "/api/v1/upload", body)
+	req.Header.Set("Content-Type", contentType)
+
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, req)
+	if w.Code != http.StatusOK {
+		t.Fatalf("Upload failed: %d, %s", w.Code, w.Body.String())
+	}
+	t.Logf("Raw upload response: %s", w.Body.String())
+	var resp1 testResponse
+	_ = json.Unmarshal(w.Body.Bytes(), &resp1)
+	var upload1 model.Upload
+	_ = json.Unmarshal(resp1.Data, &upload1)
+
+	if upload1.AccessMode != 0 {
+		t.Errorf("expected access_mode 0, got %d", upload1.AccessMode)
+	}
+
+	// 2. Upload public file for user1 (type avatar, should default to public 1)
+	contentType2, body2 := createMultipartRequest(t, "file", "public.png", []byte("\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDR\x00\x00\x00\x01\x00\x00\x00\x01\x08\x06\x00\x00\x00\x1f\x15\xc4\x89"), map[string]string{
+		"type": "avatar",
+	})
+	req2, _ := http.NewRequest("POST", "/api/v1/upload", body2)
+	req2.Header.Set("Content-Type", contentType2)
+
+	w2 := httptest.NewRecorder()
+	router.ServeHTTP(w2, req2)
+	var resp2 testResponse
+	_ = json.Unmarshal(w2.Body.Bytes(), &resp2)
+	var upload2 model.Upload
+	_ = json.Unmarshal(resp2.Data, &upload2)
+
+	if upload2.AccessMode != 1 {
+		t.Errorf("expected access_mode 1 (public) for avatar, got %d", upload2.AccessMode)
+	}
+
+	// 3. Verify accessing private file as user1 (owner) succeeds
+	wAccessOwner := httptest.NewRecorder()
+	reqAccessOwner, _ := http.NewRequest("GET", "/api/v1/upload/download/"+strconv.FormatUint(upload1.ID, 10), nil)
+	router.ServeHTTP(wAccessOwner, reqAccessOwner)
+	if wAccessOwner.Code != http.StatusOK {
+		t.Errorf("owner should be allowed to download private file, got status %d", wAccessOwner.Code)
+	}
+
+	// 4. Verify accessing private file as user2 (non-owner) fails
+	routerUser2 := setupTestRouter(user2)
+	wAccessOther := httptest.NewRecorder()
+	reqAccessOther, _ := http.NewRequest("GET", "/api/v1/upload/download/"+strconv.FormatUint(upload1.ID, 10), nil)
+	routerUser2.ServeHTTP(wAccessOther, reqAccessOther)
+	if wAccessOther.Code != http.StatusUnauthorized {
+		t.Errorf("non-owner should be denied download of private file, got status %d, want 401", wAccessOther.Code)
+	}
+
+	// 5. Verify accessing public file as user2 (non-owner) succeeds
+	wAccessPublic := httptest.NewRecorder()
+	reqAccessPublic, _ := http.NewRequest("GET", "/api/v1/upload/download/"+strconv.FormatUint(upload2.ID, 10), nil)
+	routerUser2.ServeHTTP(wAccessPublic, reqAccessPublic)
+	if wAccessPublic.Code != http.StatusOK {
+		t.Errorf("any logged-in user should be allowed to download public file, got status %d", wAccessPublic.Code)
+	}
 }

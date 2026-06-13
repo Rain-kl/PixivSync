@@ -46,13 +46,17 @@ export class UploadService extends BaseService {
   static async uploadFile(
     file: File,
     type: string = 'generic',
-    metadata?: Record<string, unknown>
+    metadata?: Record<string, unknown>,
+    accessMode?: number
   ): Promise<Upload> {
     const formData = new FormData()
     formData.append('file', file)
     formData.append('type', type)
     if (metadata) {
       formData.append('metadata', JSON.stringify(metadata))
+    }
+    if (accessMode !== undefined) {
+      formData.append('access_mode', String(accessMode))
     }
 
     return this.post<Upload>('', formData, {
@@ -113,13 +117,14 @@ export class UploadService extends BaseService {
   static async uploadBase64Image(
     base64: string,
     type: string = 'generic',
-    filename: string = 'image.png'
+    filename: string = 'image.png',
+    accessMode?: number
   ): Promise<UploadImageResponse> {
     const response = await fetch(base64)
     const blob = await response.blob()
     const mimeType = base64.match(/data:([^;]+);/)?.[1] || 'image/png'
     const file = new File([blob], filename, { type: mimeType })
-    const result = await this.uploadFile(file, type)
+    const result = await this.uploadFile(file, type, undefined, accessMode)
     return { id: result.id }
   }
 }

@@ -65,6 +65,7 @@ func TestServeFileByIDAccessControl(t *testing.T) {
 		StorageDriver: "local",
 		Type:          "avatar",
 		Status:        model.UploadStatusUsed,
+		AccessMode:    1,
 	}
 	attachmentFile := model.Upload{
 		ID:            8002,
@@ -77,6 +78,7 @@ func TestServeFileByIDAccessControl(t *testing.T) {
 		StorageDriver: "local",
 		Type:          "attachment",
 		Status:        model.UploadStatusUsed,
+		AccessMode:    1,
 	}
 
 	_ = os.MkdirAll("uploads", 0755)
@@ -254,6 +256,7 @@ func TestImageCompression(t *testing.T) {
 		StorageDriver: "local",
 		Type:          "avatar", // Whitelisted by default
 		Status:        model.UploadStatusUsed,
+		AccessMode:    1,
 	}
 	dbConn.Create(&uploadRecord)
 

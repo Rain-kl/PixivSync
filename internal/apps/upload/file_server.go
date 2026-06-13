@@ -23,6 +23,7 @@ import (
 	"github.com/Rain-kl/Wavelet/internal/logger"
 	"github.com/Rain-kl/Wavelet/internal/model"
 	"github.com/Rain-kl/Wavelet/internal/storage"
+	"github.com/Rain-kl/Wavelet/internal/util"
 	"github.com/gin-gonic/gin"
 	"gorm.io/gorm"
 )
@@ -56,7 +57,7 @@ func ServeFileByID(c *gin.Context) {
 	}
 
 	// 校验业务白名单与访问权限
-	if err := checkFileAccessPermission(c, upload.Type); err != nil {
+	if err := checkFileAccessPermission(c, upload); err != nil {
 		c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error_msg": common.UnAuthorized, "data": nil})
 		return
 	}
@@ -309,12 +310,37 @@ func isFilePublic(ctx context.Context, uploadType string) bool {
 	return false
 }
 
-// checkFileAccessPermission 校验文件是否可以被当前请求访问
-func checkFileAccessPermission(c *gin.Context, uploadType string) error {
-	if !isFilePublic(c.Request.Context(), uploadType) {
-		// 必须进行鉴权
-		if _, err := oauth.GetUserFromRequest(c); err != nil {
+func checkPrivateFileOwner(c *gin.Context, ownerID uint64) error {
+	var currUser *model.User
+	var err error
+	if u, ok := util.GetFromContext[*model.User](c, oauth.UserObjKey); ok && u != nil {
+		currUser = u
+	} else {
+		currUser, err = oauth.GetUserFromRequest(c)
+		if err != nil {
 			return err
+		}
+	}
+	if currUser.ID != ownerID {
+		return errors.New("forbidden: cross-user access denied")
+	}
+	return nil
+}
+
+// checkFileAccessPermission 校验文件是否可以被当前请求访问
+func checkFileAccessPermission(c *gin.Context, upload *model.Upload) error {
+	// 1. 私有文件校验（优先级高于当前白名单逻辑）
+	if upload.AccessMode == 0 {
+		return checkPrivateFileOwner(c, upload.UserID)
+	}
+
+	// 2. 如果类型为公开的则再进行校验白名单
+	if !isFilePublic(c.Request.Context(), upload.Type) {
+		// 必须进行鉴权
+		if _, ok := util.GetFromContext[*model.User](c, oauth.UserObjKey); !ok {
+			if _, err := oauth.GetUserFromRequest(c); err != nil {
+				return err
+			}
 		}
 	}
 	return nil

@@ -25,6 +25,7 @@ import (
 	"time"
 
 	"github.com/Rain-kl/Wavelet/internal/apps/oauth"
+	"github.com/Rain-kl/Wavelet/internal/common"
 	"github.com/Rain-kl/Wavelet/internal/config"
 	"github.com/Rain-kl/Wavelet/internal/db"
 	"github.com/Rain-kl/Wavelet/internal/db/idgen"
@@ -117,8 +118,27 @@ func UploadFile(c *gin.Context) {
 		return
 	}
 
+	uploadType := c.DefaultPostForm("type", "generic")
+
+	accessModeStr := c.PostForm("access_mode")
+	var accessMode int
+	if accessModeStr == "" {
+		if uploadType == "avatar" {
+			accessMode = 1
+		} else {
+			accessMode = 0
+		}
+	} else {
+		var err error
+		accessMode, err = strconv.Atoi(accessModeStr)
+		if err != nil || (accessMode != 0 && accessMode != 1) {
+			c.JSON(http.StatusOK, util.Err("无效的 access_mode 参数"))
+			return
+		}
+	}
+
 	// 6. 秒传匹配校验：校验数据库中是否存在相同 Hash 且大小一致的可用文件
-	handled, lookupErr := tryInstantUpload(ctx, c, currUser, fileHash, size, mimeType, ext, origName)
+	handled, lookupErr := tryInstantUpload(ctx, c, currUser, fileHash, size, mimeType, ext, origName, accessMode)
 	if handled {
 		return
 	}
@@ -155,8 +175,9 @@ func UploadFile(c *gin.Context) {
 		Extension:     ext,
 		Hash:          fileHash,
 		StorageDriver: storageDriver,
-		Type:          c.DefaultPostForm("type", "generic"),
+		Type:          uploadType,
 		Status:        model.UploadStatusUsed,
+		AccessMode:    accessMode,
 		Metadata:      meta,
 	}
 
@@ -193,6 +214,12 @@ func DownloadFile(c *gin.Context) {
 			return
 		}
 		c.JSON(http.StatusOK, util.Err(ErrQueryUploadRecordFailed))
+		return
+	}
+
+	// 校验文件访问权限
+	if err := checkFileAccessPermission(c, upload); err != nil {
+		c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error_msg": common.UnAuthorized, "data": nil})
 		return
 	}
 
@@ -270,6 +297,12 @@ func BatchDownloadFiles(c *gin.Context) {
 	usedNames := make(map[string]int)
 
 	for _, upload := range uploads {
+		// 校验文件访问权限
+		if err := checkFileAccessPermission(c, &upload); err != nil {
+			logger.WarnF(ctx, "Batch download: skip file %d due to permission denied: %v", upload.ID, err)
+			continue
+		}
+
 		// 校验防冲突重命名逻辑
 		fileName := upload.FileName
 		if count, exists := usedNames[fileName]; exists {
@@ -460,7 +493,7 @@ func validateUploadExtension(ctx context.Context, ext string) string {
 }
 
 // tryInstantUpload 尝试秒传：若数据库已存在相同 Hash 且大小一致的可用文件，直接生成新记录
-func tryInstantUpload(ctx context.Context, c *gin.Context, currUser *model.User, fileHash string, size int64, mimeType, ext, origName string) (bool, error) {
+func tryInstantUpload(ctx context.Context, c *gin.Context, currUser *model.User, fileHash string, size int64, mimeType, ext, origName string, accessMode int) (bool, error) {
 	var existing model.Upload
 	err := db.DB(ctx).Where("hash = ? AND file_size = ? AND status IN (?, ?)", fileHash, size, model.UploadStatusPending, model.UploadStatusUsed).First(&existing).Error
 	if err != nil {
@@ -480,6 +513,7 @@ func tryInstantUpload(ctx context.Context, c *gin.Context, currUser *model.User,
 		StorageDriver: existing.StorageDriver,
 		Type:          c.DefaultPostForm("type", "generic"),
 		Status:        model.UploadStatusUsed,
+		AccessMode:    accessMode,
 		Metadata:      existing.Metadata,
 	}
 
