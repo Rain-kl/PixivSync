@@ -48,6 +48,11 @@ func setupTestRouter(authUser *model.User) *gin.Engine {
 	uploadGroup.Use(authMiddleware)
 	{
 		uploadGroup.POST("", UploadFile)
+		uploadGroup.GET("/my", ListMyFiles)
+		uploadGroup.DELETE("/:id", DeleteMyFile)
+		uploadGroup.PUT("/:id", UpdateMyFile)
+		uploadGroup.GET("/download/:id", DownloadFile)
+		uploadGroup.POST("/download/batch", BatchDownloadFiles)
 	}
 
 	adminGroup := r.Group("/api/v1/admin/uploads")
@@ -854,4 +859,134 @@ func TestGetFileStats(t *testing.T) {
 	if categoryMap["文档"] != 1 {
 		t.Errorf("expected 1 document category, got %d", categoryMap["文档"])
 	}
+}
+
+func TestUserUploadManagement(t *testing.T) {
+	dbConn, _, cleanup := testhelper.SetupTestEnvironment(t)
+	defer cleanup()
+
+	user1 := &model.User{ID: 1001, Username: "user1"}
+	user2 := &model.User{ID: 1002, Username: "user2"}
+
+	_ = dbConn.Create(user1)
+	_ = dbConn.Create(user2)
+
+	router1 := setupTestRouter(user1)
+	router2 := setupTestRouter(user2)
+
+	// Seed upload records
+	upload1 := model.Upload{
+		ID:            4001,
+		UserID:        1001,
+		FileName:      "user1-file.txt",
+		FilePath:      "uploads/user1-file.txt",
+		FileSize:      100,
+		MimeType:      "text/plain",
+		Extension:     "txt",
+		StorageDriver: "local",
+		Status:        model.UploadStatusUsed,
+		CreatedAt:     time.Now(),
+	}
+	upload2 := model.Upload{
+		ID:            4002,
+		UserID:        1002,
+		FileName:      "user2-file.png",
+		FilePath:      "uploads/user2-file.png",
+		FileSize:      200,
+		MimeType:      "image/png",
+		Extension:     "png",
+		StorageDriver: "local",
+		Status:        model.UploadStatusUsed,
+		CreatedAt:     time.Now(),
+	}
+
+	_ = dbConn.Create(&upload1)
+	_ = dbConn.Create(&upload2)
+
+	t.Run("ListMyFiles only returns own files", func(t *testing.T) {
+		req, _ := http.NewRequest("GET", "/api/v1/upload/my", nil)
+		w := httptest.NewRecorder()
+		router1.ServeHTTP(w, req)
+
+		var resp struct {
+			ErrorMsg string              `json:"error_msg"`
+			Data     listMyFilesResponse `json:"data"`
+		}
+		_ = json.Unmarshal(w.Body.Bytes(), &resp)
+
+		if resp.ErrorMsg != "" {
+			t.Fatalf("ListMyFiles error: %s", resp.ErrorMsg)
+		}
+		if resp.Data.Total != 1 {
+			t.Errorf("expected 1 file for user1, got %d", resp.Data.Total)
+		}
+		if len(resp.Data.Items) != 1 || resp.Data.Items[0].ID != 4001 {
+			t.Errorf("expected file 4001, got items: %+v", resp.Data.Items)
+		}
+	})
+
+	t.Run("UpdateMyFile updates file name and access mode successfully", func(t *testing.T) {
+		newMode := 1
+		reqBody, _ := json.Marshal(updateMyFileRequest{
+			FileName:   "renamed.txt",
+			AccessMode: &newMode,
+		})
+		req, _ := http.NewRequest("PUT", "/api/v1/upload/4001", bytes.NewReader(reqBody))
+		req.Header.Set("Content-Type", "application/json")
+		w := httptest.NewRecorder()
+		router1.ServeHTTP(w, req)
+
+		if w.Code != http.StatusOK {
+			t.Fatalf("expected status 200, got %d. Body: %s", w.Code, w.Body.String())
+		}
+
+		var updated model.Upload
+		dbConn.First(&updated, 4001)
+		if updated.FileName != "renamed.txt" {
+			t.Errorf("expected file name renamed.txt, got %s", updated.FileName)
+		}
+		if updated.AccessMode != 1 {
+			t.Errorf("expected access mode 1, got %d", updated.AccessMode)
+		}
+	})
+
+	t.Run("UpdateMyFile blocks non-owners", func(t *testing.T) {
+		reqBody, _ := json.Marshal(updateMyFileRequest{
+			FileName: "hack.txt",
+		})
+		req, _ := http.NewRequest("PUT", "/api/v1/upload/4001", bytes.NewReader(reqBody))
+		req.Header.Set("Content-Type", "application/json")
+		w := httptest.NewRecorder()
+		router2.ServeHTTP(w, req)
+
+		if w.Code != http.StatusForbidden {
+			t.Errorf("expected status 403, got %d", w.Code)
+		}
+	})
+
+	t.Run("DeleteMyFile blocks non-owners", func(t *testing.T) {
+		req, _ := http.NewRequest("DELETE", "/api/v1/upload/4001", nil)
+		w := httptest.NewRecorder()
+		router2.ServeHTTP(w, req)
+
+		if w.Code != http.StatusForbidden {
+			t.Errorf("expected status 403, got %d", w.Code)
+		}
+	})
+
+	t.Run("DeleteMyFile deletes file successfully", func(t *testing.T) {
+		req, _ := http.NewRequest("DELETE", "/api/v1/upload/4001", nil)
+		w := httptest.NewRecorder()
+		router1.ServeHTTP(w, req)
+
+		if w.Code != http.StatusOK {
+			t.Fatalf("expected status 200, got %d", w.Code)
+		}
+
+		var deleted model.Upload
+		dbConn.First(&deleted, 4001)
+		if deleted.Status != model.UploadStatusDeleted {
+			t.Errorf("expected status deleted, got %s", deleted.Status)
+		}
+	})
 }

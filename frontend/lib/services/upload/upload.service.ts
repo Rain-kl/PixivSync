@@ -136,4 +136,54 @@ export class UploadService extends BaseService {
     const result = await this.uploadFile(file, type, undefined, accessMode)
     return { id: result.id }
   }
+
+  /**
+   * 获取我的文件列表
+   */
+  static async listMyUploads(
+    page = 1,
+    pageSize = 20,
+    keyword?: string,
+    type?: string,
+    extension?: string
+  ): Promise<ListUploadsResponse> {
+    const params: Record<string, string | number> = { page, page_size: pageSize }
+    if (keyword) params.keyword = keyword
+    if (type) params.type = type
+    if (extension) params.extension = extension
+    const response = await apiClient.get<{ data: ListUploadsResponse }>('/api/v1/upload/my', {
+      params
+    } as InternalAxiosRequestConfig)
+    return response.data.data
+  }
+
+
+  /**
+   * 删除我的文件
+   */
+  static async deleteMyFile(id: string): Promise<void> {
+    const response = await apiClient.delete<{ data: void }>(`/api/v1/upload/${id}`)
+    return response.data.data
+  }
+
+  /**
+   * 更新我的文件
+   */
+  static async updateMyFile(id: string, fileName: string, accessMode?: number): Promise<Upload> {
+    const response = await apiClient.put<{ data: Upload }>(`/api/v1/upload/${id}`, {
+      file_name: fileName,
+      access_mode: accessMode
+    })
+    return response.data.data
+  }
+
+  /**
+   * 我的文件批量 ZIP 打包下载
+   */
+  static async batchDownloadMyFiles(ids: string[]): Promise<Blob> {
+    const response = await apiClient.post<Blob>('/api/v1/upload/download/batch', { ids }, {
+      responseType: 'blob',
+    } as InternalAxiosRequestConfig)
+    return response.data
+  }
 }

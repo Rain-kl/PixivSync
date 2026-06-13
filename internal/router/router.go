@@ -210,11 +210,7 @@ func registerRoutes(r *gin.Engine) {
 			}
 
 			// Upload
-			uploadRouter := apiV1Router.Group("/upload")
-			uploadRouter.Use(oauth.LoginRequired())
-			{
-				uploadRouter.POST("", upload.UploadFile)
-			}
+			registerUploadRoutes(apiV1Router)
 
 			// Config (public)
 			configRouter := apiV1Router.Group("/config")
@@ -277,15 +273,7 @@ func registerRoutes(r *gin.Engine) {
 				adminRouter.DELETE("/users/:id", admin_user.DeleteUser)
 
 				// Uploads
-				adminUploadsRouter := adminRouter.Group("/uploads")
-				{
-					adminUploadsRouter.GET("", upload.ListFiles)
-					adminUploadsRouter.GET("/stats", upload.GetFileStats)
-					adminUploadsRouter.DELETE("/:id", upload.DeleteFile)
-					adminUploadsRouter.GET("/download/:id", upload.DownloadFile)
-					adminUploadsRouter.POST("/download/batch", upload.BatchDownloadFiles)
-					adminUploadsRouter.GET("/types", upload.GetDistinctUploadTypes)
-				}
+				registerAdminUploadRoutes(adminRouter)
 
 				// System Config
 				adminRouter.POST("/system-configs", system_config.CreateSystemConfig)
@@ -324,4 +312,29 @@ func registerRoutes(r *gin.Engine) {
 
 	// 注册前端静态路由（当启用 embed_frontend 编译标签时）
 	registerFrontend(r)
+}
+
+func registerUploadRoutes(apiV1Router *gin.RouterGroup) {
+	uploadRouter := apiV1Router.Group("/upload")
+	uploadRouter.Use(oauth.LoginRequired())
+	{
+		uploadRouter.POST("", upload.UploadFile)
+		uploadRouter.GET("/my", upload.ListMyFiles)
+		uploadRouter.DELETE("/:id", upload.DeleteMyFile)
+		uploadRouter.PUT("/:id", upload.UpdateMyFile)
+		uploadRouter.GET("/download/:id", upload.DownloadFile)
+		uploadRouter.POST("/download/batch", upload.BatchDownloadFiles)
+	}
+}
+
+func registerAdminUploadRoutes(adminRouter *gin.RouterGroup) {
+	adminUploadsRouter := adminRouter.Group("/uploads")
+	{
+		adminUploadsRouter.GET("", upload.ListFiles)
+		adminUploadsRouter.GET("/stats", upload.GetFileStats)
+		adminUploadsRouter.DELETE("/:id", upload.DeleteFile)
+		adminUploadsRouter.GET("/download/:id", upload.DownloadFile)
+		adminUploadsRouter.POST("/download/batch", upload.BatchDownloadFiles)
+		adminUploadsRouter.GET("/types", upload.GetDistinctUploadTypes)
+	}
 }

@@ -14,6 +14,15 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
+const (
+	catImage    = "图片"
+	catVideo    = "视频"
+	catAudio    = "音频"
+	catDocument = "文档"
+	catArchive  = "压缩包"
+	catOther    = "其他"
+)
+
 type trendItem struct {
 	Date  string `json:"date"`
 	Count int64  `json:"count"`
@@ -110,7 +119,7 @@ func GetFileStats(c *gin.Context) {
 
 	catCount := make(map[string]int64)
 	catSize := make(map[string]int64)
-	categoriesList := []string{"图片", "视频", "音频", "文档", "压缩包", "其他"}
+	categoriesList := []string{catImage, catVideo, catAudio, catDocument, catArchive, catOther}
 	for _, cat := range categoriesList {
 		catCount[cat] = 0
 		catSize[cat] = 0
@@ -190,21 +199,21 @@ func getFileCategory(mimeType, ext string) string {
 	ext = strings.ToLower(ext)
 
 	if strings.HasPrefix(mimeType, "image/") || isImageExtension(ext) {
-		return "图片"
+		return catImage
 	}
 	if strings.HasPrefix(mimeType, "video/") {
-		return "视频"
+		return catVideo
 	}
 	if strings.HasPrefix(mimeType, "audio/") {
-		return "音频"
+		return catAudio
 	}
 	if isArchiveExtension(ext) || strings.Contains(mimeType, "zip") || strings.Contains(mimeType, "tar") || strings.Contains(mimeType, "gzip") {
-		return "压缩包"
+		return catArchive
 	}
 	if isDocumentExtension(ext) || strings.HasPrefix(mimeType, "text/") || mimeType == "application/pdf" {
-		return "文档"
+		return catDocument
 	}
-	return "其他"
+	return catOther
 }
 
 func isArchiveExtension(ext string) bool {
