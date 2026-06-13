@@ -420,6 +420,17 @@ func (c *Client) AddPixivUserByRefreshToken(ctx context.Context, refreshToken st
 	}
 }
 
+// GetUserProfile fetches Pixiv user profile detail from Pixiv API.
+func (c *Client) GetUserProfile(ctx context.Context, user model.PixezPixivUser, targetUserID string) ([]byte, error) {
+	reqURL := fmt.Sprintf("https://%s/v1/user/detail?filter=for_android&user_id=%s", pixivAPIHost, targetUserID)
+	var raw map[string]any
+	data, err := c.getJSONWithAuth(ctx, user, reqURL, &raw)
+	if err != nil {
+		return nil, err
+	}
+	return data, nil
+}
+
 
 func (c *Client) doPixivGet(ctx context.Context, reqURL string, accessToken string) ([]byte, int, error) {
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, reqURL, nil)

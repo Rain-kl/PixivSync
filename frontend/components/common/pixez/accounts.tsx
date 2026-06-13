@@ -30,7 +30,6 @@ export function PixEzAccounts() {
   const queryClient = useQueryClient()
   const accountsQuery = usePixEzAccounts()
   const [syncingID, setSyncingID] = useState<string | null>(null)
-  const [refreshingID, setRefreshingID] = useState<string | null>(null)
   const [deletingID, setDeletingID] = useState<string | null>(null)
   const [isAddOpen, setIsAddOpen] = useState(false)
   const [refreshToken, setRefreshToken] = useState("")
@@ -94,20 +93,6 @@ export function PixEzAccounts() {
     }
   }
 
-  const handleRefresh = async (account: PixezAccount) => {
-    try {
-      setRefreshingID(account.pixiv_user_id)
-      await PixezService.refreshAccountToken(account.pixiv_user_id)
-      toast.success("Pixiv 凭证已刷新")
-      await queryClient.invalidateQueries({queryKey: ["pixez", "accounts"]})
-    } catch (error) {
-      toast.error("刷新凭证失败", {
-        description: error instanceof Error ? error.message : "未知错误",
-      })
-    } finally {
-      setRefreshingID(null)
-    }
-  }
 
   const handleDelete = async (account: PixezAccount) => {
     try {
@@ -170,10 +155,8 @@ export function PixEzAccounts() {
                 key={account.pixiv_user_id}
                 account={account}
                 syncing={syncingID === account.pixiv_user_id}
-                refreshing={refreshingID === account.pixiv_user_id}
                 deleting={deletingID === account.pixiv_user_id}
                 onSync={handleSync}
-                onRefresh={handleRefresh}
                 onDelete={handleDelete}
               />
             ))}

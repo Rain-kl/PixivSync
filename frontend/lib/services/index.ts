@@ -161,4 +161,5 @@ export type {
   PixezPaginatedResponse,
   PixezQueueStats,
   PixezRunStatus,
+  PixivProfileResponse,
 } from './pixez';

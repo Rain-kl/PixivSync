@@ -8,6 +8,7 @@ import (
 	//nolint:gosec // MD5 is used only for non-cryptographic checksums of sync data
 	"crypto/md5"
 	"encoding/hex"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"net/http"
@@ -152,6 +153,50 @@ func AddUser(c *gin.Context) {
 
 	c.JSON(http.StatusOK, util.OK(user.ToSafeDTO()))
 }
+
+// GetUserProfile fetches a Pixiv user's dynamic profile details from Pixiv API.
+// @Summary Get Pixiv user profile detail
+// @Description Fetches fresh user profile information directly from Pixiv API using the user's credentials.
+// @Tags pixez
+// @Produce json
+// @Security SessionCookie
+// @Param pixiv_user_id path string true "Pixiv user ID"
+// @Success 200 {object} util.ResponseAny
+// @Router /api/pixez/users/{pixiv_user_id}/profile [get]
+func GetUserProfile(c *gin.Context) {
+	userID, ok := pixivUserIDParam(c)
+	if !ok {
+		return
+	}
+
+	ctx := c.Request.Context()
+	var user model.PixezPixivUser
+	if err := db.DB(ctx).Where("pixiv_user_id = ?", userID).First(&user).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			c.JSON(http.StatusNotFound, util.Err(errUserNotFound))
+			return
+		}
+		logger.ErrorF(ctx, "[PixEz] fetch user for profile failed pixiv_user_id=%s: %v", userID, err)
+		c.JSON(http.StatusOK, util.Err(errFetchUserFailed))
+		return
+	}
+
+	profileData, err := pixezsvc.DefaultClient.GetUserProfile(ctx, user, userID)
+	if err != nil {
+		logger.ErrorF(ctx, "[PixEz] fetch user profile from pixiv failed user_id=%s: %v", userID, err)
+		c.JSON(http.StatusOK, util.Err(errFetchProfileFailed))
+		return
+	}
+
+	var raw map[string]any
+	if err := json.Unmarshal(profileData, &raw); err != nil {
+		c.JSON(http.StatusOK, util.Err("failed to parse profile data"))
+		return
+	}
+
+	c.JSON(http.StatusOK, util.OK(raw))
+}
+
 
 
 // DeleteUser removes a Pixiv user and synced backup data.

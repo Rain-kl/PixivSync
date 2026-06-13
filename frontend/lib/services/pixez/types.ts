@@ -257,3 +257,24 @@ export interface PixezMirrorStatus {
   retry_urls_json?: string
   error_message?: string
 }
+
+export interface PixivProfileResponse {
+  user?: {
+    name?: string
+    account?: string
+    comment?: string
+    profile_image_urls?: {
+      medium?: string
+    }
+  }
+  profile?: {
+    gender?: string
+    region?: string
+    total_illusts?: number
+    total_novels?: number
+    total_illust_bookmarks_public?: number
+    total_follow_users?: number
+    twitter_account?: string
+    is_premium?: boolean
+  }
+}

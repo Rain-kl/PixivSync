@@ -23,4 +23,5 @@ export type {
   PixezPaginatedResponse,
   PixezQueueStats,
   PixezRunStatus,
+  PixivProfileResponse,
 } from "./types"

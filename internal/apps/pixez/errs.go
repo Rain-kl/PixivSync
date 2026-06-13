@@ -27,4 +27,5 @@ const (
 	errFetchBookmarkDetailFailed   = "failed to fetch bookmark mirror detail"
 	errRefreshPixivAccountFailed   = "failed to refresh Pixiv account state"
 	errAddUserFailed               = "failed to add Pixiv user by refresh token"
+	errFetchProfileFailed          = "failed to fetch profile from Pixiv"
 )

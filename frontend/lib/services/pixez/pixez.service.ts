@@ -16,6 +16,7 @@ import type {
   PixezNovelBookmarkDetail,
   PixezNovelTextPreview,
   PixezPaginatedResponse,
+  PixivProfileResponse,
 } from "./types"
 
 function cleanParams(params: PixezBookmarkQuery): Record<string, unknown> {
@@ -141,5 +142,9 @@ export class PixezService extends BaseService {
 
   static async mirrorNovel(novelID: number): Promise<PixezMirrorStatus> {
     return this.post<PixezMirrorStatus>(`/novels/${novelID}/mirror`)
+  }
+
+  static async getUserProfile(pixivUserID: string): Promise<PixivProfileResponse> {
+    return this.get<PixivProfileResponse>(`/users/${encodeURIComponent(pixivUserID)}/profile`)
   }
 }

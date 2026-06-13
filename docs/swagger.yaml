@@ -1838,6 +1838,28 @@ paths:
       summary: Upsert Pixiv user credentials
       tags:
       - pixez
+  /api/pixez/users/{pixiv_user_id}/profile:
+    get:
+      description: Fetches fresh user profile information directly from Pixiv API
+        using the user's credentials.
+      parameters:
+      - description: Pixiv user ID
+        in: path
+        name: pixiv_user_id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/util.ResponseAny'
+      security:
+      - SessionCookie: []
+      summary: Get Pixiv user profile detail
+      tags:
+      - pixez
   /api/pixez/users/{pixiv_user_id}/refresh-token:
     post:
       description: Refreshes the stored Pixiv access token for a PixEz account.

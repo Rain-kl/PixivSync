@@ -58,6 +58,7 @@ func setupPixezTestRouter() *gin.Engine {
 	group.GET("/users", ListUsers)
 	group.POST("/users", AddUser)
 	group.GET("/users/:pixiv_user_id", GetUser)
+	group.GET("/users/:pixiv_user_id/profile", GetUserProfile)
 	group.POST("/users/:pixiv_user_id/refresh-token", RefreshUserToken)
 	group.PUT("/users/:pixiv_user_id", UpsertUser)
 	group.DELETE("/users/:pixiv_user_id", DeleteUser)

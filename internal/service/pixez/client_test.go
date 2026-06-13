@@ -177,3 +177,47 @@ func TestAddPixivUserByRefreshToken(t *testing.T) {
 	}
 }
 
+func TestGetUserProfile(t *testing.T) {
+	_, _, cleanup := testhelper.SetupTestEnvironment(t)
+	defer cleanup()
+
+	ctx := context.Background()
+	user := model.PixezPixivUser{
+		PixivUserID:  "12345",
+		Name:         "Pixiv User",
+		Account:      "pixiv_user",
+		AccessToken:  "mock-access",
+		RefreshToken: "mock-refresh",
+	}
+
+	client := NewClient(&http.Client{Transport: roundTripFunc(func(req *http.Request) (*http.Response, error) {
+		if req.URL.Host == "app-api.pixiv.net" && req.URL.Path == "/v1/user/detail" {
+			if req.Header.Get("Authorization") != "Bearer mock-access" {
+				t.Fatalf("unexpected auth: %s", req.Header.Get("Authorization"))
+			}
+			return jsonResponse(http.StatusOK, `{
+				"user": {
+					"id": 12345,
+					"name": "Pixiv User",
+					"account": "pixiv_user"
+				},
+				"profile": {
+					"total_illusts": 42
+				}
+			}`), nil
+		}
+		t.Fatalf("unexpected request: %s %s", req.Method, req.URL.String())
+		return nil, nil
+	})})
+
+	data, err := client.GetUserProfile(ctx, user, "12345")
+	if err != nil {
+		t.Fatalf("GetUserProfile() error = %v", err)
+	}
+
+	if !strings.Contains(string(data), `"total_illusts": 42`) {
+		t.Fatalf("unexpected profile response data: %s", string(data))
+	}
+}
+
+

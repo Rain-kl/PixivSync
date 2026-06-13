@@ -918,6 +918,40 @@ const docTemplate = `{
                 }
             }
         },
+        "/api/pixez/users/{pixiv_user_id}/profile": {
+            "get": {
+                "security": [
+                    {
+                        "SessionCookie": []
+                    }
+                ],
+                "description": "Fetches fresh user profile information directly from Pixiv API using the user's credentials.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "pixez"
+                ],
+                "summary": "Get Pixiv user profile detail",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Pixiv user ID",
+                        "name": "pixiv_user_id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/util.ResponseAny"
+                        }
+                    }
+                }
+            }
+        },
         "/api/pixez/users/{pixiv_user_id}/refresh-token": {
             "post": {
                 "security": [
