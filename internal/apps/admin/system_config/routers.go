@@ -246,6 +246,11 @@ func UpdateSystemConfig(c *gin.Context) {
 		return
 	}
 
+	if key == model.ConfigKeyStorageConfig {
+		storage.ResetCache()
+		storage.PublishCacheInvalidation(c.Request.Context())
+	}
+
 	c.JSON(http.StatusOK, util.OKNil())
 }
 

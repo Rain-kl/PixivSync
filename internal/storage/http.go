@@ -8,6 +8,9 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
+	"time"
+
+	"github.com/Rain-kl/Wavelet/internal/httppool"
 )
 
 func getHTTPObject(ctx context.Context, baseURL, key string) (*Object, error) {
@@ -19,7 +22,9 @@ func getHTTPObject(ctx context.Context, baseURL, key string) (*Object, error) {
 	if err != nil {
 		return nil, fmt.Errorf("create CDN request: %w", err)
 	}
-	response, err := http.DefaultClient.Do(request)
+	const cdnRequestTimeout = 30 * time.Second
+	client := httppool.NewClient(cdnRequestTimeout)
+	response, err := client.Do(request)
 	if err != nil {
 		return nil, fmt.Errorf("get CDN object: %w", err)
 	}

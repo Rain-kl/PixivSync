@@ -10,6 +10,7 @@ import (
 	"path"
 	"strings"
 
+	"github.com/Rain-kl/Wavelet/internal/httppool"
 	"github.com/studio-b12/gowebdav"
 )
 
@@ -19,8 +20,10 @@ type webDAVBackend struct {
 }
 
 func newWebDAVBackend(cfg WebDAVConfig) (*webDAVBackend, error) {
+	client := gowebdav.NewClient(strings.TrimRight(cfg.Endpoint, "/"), cfg.Username, cfg.Password)
+	client.SetTransport(httppool.DefaultTransport())
 	return &webDAVBackend{
-		client:   gowebdav.NewClient(strings.TrimRight(cfg.Endpoint, "/"), cfg.Username, cfg.Password),
+		client:   client,
 		basePath: strings.Trim(cfg.BasePath, "/"),
 	}, nil
 }

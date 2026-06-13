@@ -5,16 +5,22 @@ package upload
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"os"
 	"strings"
+	"sync/atomic"
+	"time"
 
 	"github.com/Rain-kl/Wavelet/internal/db"
 	"github.com/Rain-kl/Wavelet/internal/model"
 	"github.com/Rain-kl/Wavelet/internal/storage"
 	"github.com/Rain-kl/Wavelet/internal/task"
+	"golang.org/x/sync/errgroup"
 	"gorm.io/gorm"
 )
 
@@ -62,6 +68,51 @@ func (h *MigrationHandler) ValidatePayload(payload []byte) ([]byte, error) {
 
 // Execute migrates all unique active-storage objects to the pending backend.
 func (h *MigrationHandler) Execute(ctx context.Context, payload []byte) (*task.TaskResult, error) {
+	if db.Redis != nil {
+		const (
+			cleanupTimeout  = 5 * time.Second
+			renewalInterval = 10 * time.Minute
+		)
+
+		lockKey := db.PrefixedKey("lock:storage:migrate")
+		ok, err := db.Redis.SetNX(ctx, lockKey, "locked", time.Hour).Result()
+		if err != nil {
+			return nil, fmt.Errorf("acquire migration lock: %w", err)
+		}
+		if !ok {
+			return nil, errors.New("另一个存储迁移任务正在运行中")
+		}
+
+		// 任务结束时清理锁，使用 Background context 避免受任务 context 取消的影响
+		stopRenewal := make(chan struct{})
+		//nolint:contextcheck
+		defer func() {
+			close(stopRenewal)
+			cleanupCtx, cancel := context.WithTimeout(context.Background(), cleanupTimeout)
+			defer cancel()
+			_ = db.Redis.Del(cleanupCtx, lockKey)
+		}()
+
+		// 启动看门狗续租协程，每 10 分钟将锁的 TTL 自动延长为 1 小时
+		//nolint:contextcheck,gosec
+		go func() {
+			ticker := time.NewTicker(renewalInterval)
+			defer ticker.Stop()
+			for {
+				select {
+				case <-ticker.C:
+					renewCtx, cancel := context.WithTimeout(context.Background(), cleanupTimeout)
+					_ = db.Redis.Expire(renewCtx, lockKey, time.Hour).Err()
+					cancel()
+				case <-stopRenewal:
+					return
+				case <-ctx.Done():
+					return
+				}
+			}
+		}()
+	}
+
 	active, err := storage.LoadConfig(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("load active storage config: %w", err)
@@ -187,68 +238,102 @@ func migrateObjects(
 	total int64,
 ) (int64, error) {
 	const batchSize = 50
+	const migrationConcurrency = 10
+	const sha256HexLength = 64
 	var migrated int64
 	for {
 		if err := ctx.Err(); err != nil {
-			return migrated, fmt.Errorf("storage migration canceled: %w", err)
+			return atomic.LoadInt64(&migrated), fmt.Errorf("storage migration canceled: %w", err)
 		}
 
 		var objects []struct {
 			FilePath string `gorm:"column:file_path"`
 			FileSize int64  `gorm:"column:file_size"`
 			MimeType string `gorm:"column:mime_type"`
+			Hash     string `gorm:"column:hash"`
 		}
 		if err := db.DB(ctx).Model(&model.Upload{}).
-			Select("file_path, MAX(file_size) AS file_size, MAX(mime_type) AS mime_type").
+			Select("file_path, MAX(file_size) AS file_size, MAX(mime_type) AS mime_type, MAX(hash) AS hash").
 			Where("storage_driver = ? AND status != ?", sourceDriver, model.UploadStatusDeleted).
 			Group("file_path").
 			Order("file_path ASC").
 			Limit(batchSize).
 			Scan(&objects).Error; err != nil {
-			return migrated, fmt.Errorf("query source objects: %w", err)
+			return atomic.LoadInt64(&migrated), fmt.Errorf("query source objects: %w", err)
 		}
 		if len(objects) == 0 {
 			break
 		}
 
+		var g errgroup.Group
+		g.SetLimit(migrationConcurrency)
+
 		for _, object := range objects {
-			source, err := sourceBackend.Get(ctx, object.FilePath)
-			if err != nil {
-				if isNotFoundError(err) {
-					task.AppendLog(ctx, "警告: 源存储中物理文件不存在，标记为已删除并跳过: %s (错误: %v)", object.FilePath, err)
-					if updateErr := db.DB(ctx).Model(&model.Upload{}).
-						Where("storage_driver = ? AND file_path = ?", sourceDriver, object.FilePath).
-						Updates(map[string]any{
-							"status":         model.UploadStatusDeleted,
-							"storage_driver": targetDriver,
-						}).Error; updateErr != nil {
-						return migrated, fmt.Errorf("update missing object %q: %w", object.FilePath, updateErr)
+			obj := object // Capture range variable
+			g.Go(func() error {
+				source, err := sourceBackend.Get(ctx, obj.FilePath)
+				if err != nil {
+					if isNotFoundError(err) {
+						task.AppendLog(ctx, "警告: 源存储中物理文件不存在，标记为已删除并跳过: %s (错误: %v)", obj.FilePath, err)
+						if updateErr := db.DB(ctx).Model(&model.Upload{}).
+							Where("storage_driver = ? AND file_path = ?", sourceDriver, obj.FilePath).
+							Updates(map[string]any{
+								"status":         model.UploadStatusDeleted,
+								"storage_driver": targetDriver,
+							}).Error; updateErr != nil {
+							return fmt.Errorf("update missing object %q: %w", obj.FilePath, updateErr)
+						}
+						return nil
 					}
-					continue
+					return fmt.Errorf("open source object %q: %w", obj.FilePath, err)
 				}
-				return migrated, fmt.Errorf("open source object %q: %w", object.FilePath, err)
-			}
-			targetPath, putErr := targetBackend.Put(ctx, object.FilePath, source.Body, object.FileSize, object.MimeType)
-			closeErr := source.Body.Close()
-			if putErr != nil {
-				return migrated, fmt.Errorf("copy object %q: %w", object.FilePath, putErr)
-			}
-			if closeErr != nil {
-				return migrated, fmt.Errorf("close source object %q: %w", object.FilePath, closeErr)
-			}
-			if err := db.DB(ctx).Model(&model.Upload{}).
-				Where("storage_driver = ? AND file_path = ?", sourceDriver, object.FilePath).
-				Updates(map[string]any{
-					"storage_driver": targetDriver,
-					"file_path":      targetPath,
-				}).Error; err != nil {
-				return migrated, fmt.Errorf("update migrated object %q: %w", object.FilePath, err)
-			}
-			migrated++
+				targetPath, putErr := targetBackend.Put(ctx, obj.FilePath, source.Body, obj.FileSize, obj.MimeType)
+				closeErr := source.Body.Close()
+				if putErr != nil {
+					return fmt.Errorf("copy object %q: %w", obj.FilePath, putErr)
+				}
+				if closeErr != nil {
+					return fmt.Errorf("close source object %q: %w", obj.FilePath, closeErr)
+				}
+
+				// Data integrity check (SHA-256 hash verification)
+				if len(obj.Hash) == sha256HexLength {
+					targetObj, getErr := targetBackend.Get(ctx, targetPath)
+					if getErr != nil {
+						return fmt.Errorf("retrieve target object for verification %q: %w", obj.FilePath, getErr)
+					}
+					h := sha256.New()
+					if _, copyErr := io.Copy(h, targetObj.Body); copyErr != nil {
+						_ = targetObj.Body.Close()
+						return fmt.Errorf("read target object for verification %q: %w", obj.FilePath, copyErr)
+					}
+					_ = targetObj.Body.Close()
+					computedHash := hex.EncodeToString(h.Sum(nil))
+					if computedHash != obj.Hash {
+						return fmt.Errorf("integrity check failed for %q: got hash %s, want %s", obj.FilePath, computedHash, obj.Hash)
+					}
+				}
+
+				if err := db.DB(ctx).Model(&model.Upload{}).
+					Where("storage_driver = ? AND file_path = ?", sourceDriver, obj.FilePath).
+					Updates(map[string]any{
+						"storage_driver": targetDriver,
+						"file_path":      targetPath,
+					}).Error; err != nil {
+					return fmt.Errorf("update migrated object %q: %w", obj.FilePath, err)
+				}
+				atomic.AddInt64(&migrated, 1)
+				return nil
+			})
 		}
-		task.AppendLog(ctx, "迁移进度: %d/%d", migrated, total)
+
+		if err := g.Wait(); err != nil {
+			return atomic.LoadInt64(&migrated), err
+		}
+
+		task.AppendLog(ctx, "迁移进度: %d/%d", atomic.LoadInt64(&migrated), total)
 	}
-	return migrated, nil
+	return atomic.LoadInt64(&migrated), nil
 }
 
 func isNotFoundError(err error) bool {

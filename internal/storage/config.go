@@ -10,6 +10,7 @@ import (
 	"errors"
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/Rain-kl/Wavelet/internal/db"
 	"github.com/Rain-kl/Wavelet/internal/model"
@@ -87,6 +88,23 @@ func DefaultConfig() Config {
 
 // LoadConfig loads the active storage configuration.
 func LoadConfig(ctx context.Context) (Config, error) {
+	pubSubOnce.Do(startPubSubListener)
+
+	cacheMutex.RLock()
+	isCacheValid := time.Since(lastChecked) < 5*time.Second && activeConfigJSON != ""
+	configJSON := activeConfigJSON
+	cacheMutex.RUnlock()
+
+	if isCacheValid {
+		cfg := DefaultConfig()
+		if strings.TrimSpace(configJSON) != "" {
+			if err := json.Unmarshal([]byte(configJSON), &cfg); err != nil {
+				return Config{}, fmt.Errorf("parse storage config from cache: %w", err)
+			}
+		}
+		return cfg, nil
+	}
+
 	return loadConfigByKey(ctx, model.ConfigKeyStorageConfig, DefaultConfig())
 }
 
@@ -163,9 +181,14 @@ func SaveActiveConfig(ctx context.Context, cfg Config) error {
 }
 
 func saveSystemConfig(ctx context.Context, key string, value any, description string) error {
-	return db.DB(ctx).Transaction(func(tx *gorm.DB) error {
+	err := db.DB(ctx).Transaction(func(tx *gorm.DB) error {
 		return upsertSystemConfig(ctx, tx, key, value, description)
 	})
+	if err == nil && key == model.ConfigKeyStorageConfig {
+		ResetCache()
+		PublishCacheInvalidation(ctx)
+	}
+	return err
 }
 
 func upsertSystemConfig(ctx context.Context, tx *gorm.DB, key string, value any, description string) error {

@@ -134,27 +134,54 @@ export function StorageConfigTab() {
 
   React.useEffect(() => {
     if (query.data?.config) {
-      setConfig(normalizeConfig(query.data.config))
+      setConfig((current) => {
+        const normalized = normalizeConfig(query.data.config)
+        if (current) {
+          return {
+            ...normalized,
+            driver: current.driver,
+          }
+        }
+        return normalized
+      })
     }
   }, [query.data?.config])
 
   const saveMutation = useMutation({
     mutationFn: async (value: StorageConfig) => {
-      if (query.data?.config.driver === value.driver) {
-        await AdminService.updateSystemConfig(storageConfigKey, {
-          value: JSON.stringify(value),
-        })
-        return ""
+      const activeDriver = query.data?.config.driver || value.driver
+      const valueToSave = {
+        ...value,
+        driver: activeDriver,
       }
-      const payload: StorageMigrationPayload = {target: value}
-      return AdminService.dispatchTask({task_type: storageMigrationTaskType, payload: JSON.stringify(payload)})
+      await AdminService.updateSystemConfig(storageConfigKey, {
+        value: JSON.stringify(valueToSave),
+      })
     },
-    onSuccess: (taskID) => {
-      toast.success(taskID ? "配置已保存，存储迁移任务已下发" : "存储配置已保存")
+    onSuccess: () => {
+      toast.success("存储配置已保存")
       void queryClient.invalidateQueries({queryKey: ["admin", "storage-config"]})
     },
     onError: (error: Error) => {
       toast.error(error.message || "保存存储配置失败")
+      void queryClient.invalidateQueries({queryKey: ["admin", "storage-config"]})
+    },
+  })
+
+  const migrateMutation = useMutation({
+    mutationFn: async (value: StorageConfig) => {
+      const payload: StorageMigrationPayload = {target: value}
+      return AdminService.dispatchTask({
+        task_type: storageMigrationTaskType,
+        payload: JSON.stringify(payload),
+      })
+    },
+    onSuccess: () => {
+      toast.success("存储迁移任务已下发")
+      void queryClient.invalidateQueries({queryKey: ["admin", "storage-config"]})
+    },
+    onError: (error: Error) => {
+      toast.error(error.message || "下发存储迁移任务失败")
       void queryClient.invalidateQueries({queryKey: ["admin", "storage-config"]})
     },
   })
@@ -173,7 +200,10 @@ export function StorageConfigTab() {
 
   const migration = query.data?.migration
   const isReadOnly = migration ? migration.state !== "idle" : false
-  const isFormDisabled = migration ? (migration.state === "pending" || migration.state === "running") : false
+  const isFormDisabled =
+    (migration ? (migration.state === "pending" || migration.state === "running") : false) ||
+    saveMutation.isPending ||
+    migrateMutation.isPending
 
   const updateObject = (driver: "s3" | "r2" | "minio" | "oss", patch: Partial<ObjectStorageConfig>) => {
     setConfig((current) => current ? {
@@ -276,11 +306,31 @@ export function StorageConfigTab() {
             )}
           </FieldGroup>
         </CardContent>
-        <CardFooter className="justify-end gap-2">
-          <Button disabled={isFormDisabled || saveMutation.isPending} onClick={() => saveMutation.mutate(config)}>
-            {saveMutation.isPending ? <Loader2 data-icon="inline-start" className="animate-spin" /> : <Save data-icon="inline-start" />}
-            保存配置
-          </Button>
+        <CardFooter className="justify-end gap-2 flex-col sm:flex-row items-end sm:items-center">
+          {config.driver !== query.data?.config.driver && (
+            <span className="text-xs text-amber-500 mr-auto text-left max-w-md">
+              ⚠️ 您已切换存储类型。请先点击“保存配置”保存各存储端的配置凭据，然后点击“开始迁移”手动执行文件迁移。
+            </span>
+          )}
+          <div className="flex gap-2">
+            <Button
+              variant="outline"
+              disabled={isFormDisabled}
+              onClick={() => saveMutation.mutate(config)}
+            >
+              {saveMutation.isPending ? <Loader2 data-icon="inline-start" className="animate-spin" /> : <Save data-icon="inline-start" />}
+              保存配置
+            </Button>
+            {config.driver !== query.data?.config.driver && (
+              <Button
+                disabled={isFormDisabled}
+                onClick={() => migrateMutation.mutate(config)}
+              >
+                {migrateMutation.isPending ? <Loader2 data-icon="inline-start" className="animate-spin" /> : <Play data-icon="inline-start" />}
+                开始迁移
+              </Button>
+            )}
+          </div>
         </CardFooter>
       </Card>
     </div>
