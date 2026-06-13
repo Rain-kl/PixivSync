@@ -1,6 +1,6 @@
 "use client"
 
-import {useEffect, useMemo, useState} from "react"
+import {useEffect, useMemo, useRef, useState} from "react"
 import {useMutation, useQuery} from "@tanstack/react-query"
 import {useRouter, useSearchParams} from "next/navigation"
 import {toast} from "sonner"
@@ -12,6 +12,7 @@ import {Input} from "@/components/ui/input"
 import {Spinner} from "@/components/ui/spinner"
 import {Field, FieldGroup, FieldLabel} from "@/components/ui/field"
 import {AuthHeading} from "@/components/auth/auth-shell"
+import {CapWidget} from "@/components/auth/cap-widget"
 import services from "@/lib/services"
 import type {RegisterRequest} from "@/lib/services/auth/types"
 import {safeRedirectTarget} from "@/lib/utils"
@@ -66,6 +67,33 @@ export function RegisterForm() {
 
   const emailRegisterEnabled = configBool(publicConfigQuery.data?.email_register_verification_enabled, false)
 
+  const capEnabled = configBool(publicConfigQuery.data?.cap_login_enabled, false)
+  const capAutoSolve = configBool(publicConfigQuery.data?.cap_auto_solve, true)
+
+  const [capScope, setCapScope] = useState<'send_email_code' | 'register'>('send_email_code')
+
+  // 监听 emailRegisterEnabled 改变初始 scope
+  useEffect(() => {
+    setCapScope(emailRegisterEnabled ? 'send_email_code' : 'register')
+  }, [emailRegisterEnabled])
+
+  const capTokenRef = useRef<string | null>(null)
+  const [capReady, setCapReady] = useState(false)
+  const [capError, setCapError] = useState(false)
+  const [capResetKey, setCapResetKey] = useState(0)
+
+  const handleCapToken = (token: string) => {
+    capTokenRef.current = token
+    setCapReady(true)
+    setCapError(false)
+  }
+
+  const handleCapError = () => {
+    capTokenRef.current = null
+    setCapReady(false)
+    setCapError(true)
+  }
+
   // Redirect to login if registration is closed
   useEffect(() => {
     if (publicConfigQuery.isSuccess && !registrationEnabled) {
@@ -75,7 +103,15 @@ export function RegisterForm() {
   }, [publicConfigQuery.isSuccess, registrationEnabled, router])
 
   const registerMutation = useMutation({
-    mutationFn: (req: RegisterRequest) => services.auth.register(req),
+    mutationFn: (req: RegisterRequest) => {
+      const headers: Record<string, string> = {}
+      if (capEnabled && capTokenRef.current) {
+        headers["X-Cap-Token"] = capTokenRef.current
+        capTokenRef.current = null
+        setCapReady(false)
+      }
+      return services.auth.register(req, Object.keys(headers).length ? headers : undefined)
+    },
     onSuccess: (user) => {
       setUser(user)
       router.replace(redirectTarget)
@@ -83,19 +119,52 @@ export function RegisterForm() {
     },
     onError: (error: Error) => {
       setErrorMessage(error.message || "注册失败，请重试")
+      if (capEnabled) {
+        capTokenRef.current = null
+        setCapReady(false)
+        setCapResetKey((key) => key + 1)
+      }
     },
   })
 
   const sendRegisterCodeMutation = useMutation({
-    mutationFn: (targetEmail: string) => services.auth.sendEmailCode(targetEmail, "register"),
+    mutationFn: (targetEmail: string) => {
+      const headers: Record<string, string> = {}
+      if (capEnabled && capTokenRef.current) {
+        headers["X-Cap-Token"] = capTokenRef.current
+        capTokenRef.current = null
+        setCapReady(false)
+      }
+      return services.auth.sendEmailCode(targetEmail, "register", Object.keys(headers).length ? headers : undefined)
+    },
     onSuccess: () => {
       setRegisterCooldown(60)
       toast.success("验证码已发送至您的邮箱，请查收")
+      if (capEnabled) {
+        setCapScope('register')
+        capTokenRef.current = null
+        setCapReady(false)
+        setCapResetKey((key) => key + 1)
+      }
     },
     onError: (error: Error) => {
       toast.error(error.message || "发送验证码失败，请重试")
+      if (capEnabled) {
+        capTokenRef.current = null
+        setCapReady(false)
+        setCapResetKey((key) => key + 1)
+      }
     },
   })
+
+  const registerDisabled =
+    registerMutation.isPending ||
+    (capEnabled && capScope === 'register' && capAutoSolve && !capReady && !capError)
+
+  const sendCodeDisabled =
+    registerCooldown > 0 ||
+    sendRegisterCodeMutation.isPending ||
+    (capEnabled && capScope === 'send_email_code' && capAutoSolve && !capReady && !capError)
 
   const handleSendRegisterCode = () => {
     const trimmedEmail = email.trim()
@@ -106,6 +175,14 @@ export function RegisterForm() {
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
     if (!emailRegex.test(trimmedEmail)) {
       toast.error("请输入有效的邮箱地址")
+      return
+    }
+    if (capEnabled && capScope === 'send_email_code' && !capReady) {
+      toast.error(
+        capAutoSolve
+          ? "人机验证尚未完成，请稍候…"
+          : "请先点击「开始验证」完成人机验证",
+      )
       return
     }
     sendRegisterCodeMutation.mutate(trimmedEmail)
@@ -133,6 +210,14 @@ export function RegisterForm() {
     }
     if (emailRegisterEnabled && !code.trim()) {
       toast.error("验证码不能为空")
+      return
+    }
+    if (capEnabled && capScope === 'register' && !capReady) {
+      toast.error(
+        capAutoSolve
+          ? "人机验证尚未完成，请稍候…"
+          : "请先点击「开始验证」完成人机验证",
+      )
       return
     }
     registerMutation.mutate({
@@ -235,7 +320,7 @@ export function RegisterForm() {
                   type="button"
                   variant="outline"
                   onClick={handleSendRegisterCode}
-                  disabled={registerCooldown > 0 || sendRegisterCodeMutation.isPending}
+                  disabled={sendCodeDisabled}
                   className="h-10 w-[120px] text-xs [@media(max-height:700px)]:h-9"
                 >
                   {registerCooldown > 0 ? `${registerCooldown}秒后重发` : "获取验证码"}
@@ -244,6 +329,16 @@ export function RegisterForm() {
             </Field>
           )}
         </FieldGroup>
+
+        {capEnabled && (
+          <CapWidget
+            key={capResetKey}
+            scope={capScope}
+            onToken={handleCapToken}
+            onError={handleCapError}
+            autoStart={capAutoSolve}
+          />
+        )}
 
         {errorMessage ? (
           <div className="rounded-lg border border-destructive/30 bg-destructive/5 px-3 py-2 text-sm text-destructive">
@@ -256,7 +351,7 @@ export function RegisterForm() {
           className="h-10 w-full [@media(max-height:700px)]:h-9"
           variant="auth"
           onClick={handleRegister}
-          disabled={registerMutation.isPending}
+          disabled={registerDisabled}
         >
           {registerMutation.isPending ? (
             <>

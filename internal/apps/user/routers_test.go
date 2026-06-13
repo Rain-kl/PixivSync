@@ -383,6 +383,9 @@ func TestLoginEmailVerificationFallbackForEmptyEmail(t *testing.T) {
 	if err := dbConn.Model(&model.SystemConfig{}).Where("key = ?", model.ConfigKeySMTPUsername).Update("value", "smtpuser").Error; err != nil {
 		t.Fatalf("set SMTP username failed: %v", err)
 	}
+	if err := dbConn.Model(&model.SystemConfig{}).Where("key = ?", model.ConfigKeySMTPPassword).Update("value", "smtppassword").Error; err != nil {
+		t.Fatalf("set SMTP password failed: %v", err)
+	}
 
 	// Invalidate the system config cache in Redis
 	if err := db.Redis.Del(context.Background(), db.PrefixedKey(model.SystemConfigRedisHashKey)).Err(); err != nil {
@@ -522,8 +525,8 @@ func TestAccessTokenEndpointsDisallowTokenAuth(t *testing.T) {
 	if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
 		t.Fatalf("decode response failed: %v", err)
 	}
-	if resp.ErrorMsg != oauth.TokenAuthNotAllowed {
-		t.Errorf("expected error message %q, got %q", oauth.TokenAuthNotAllowed, resp.ErrorMsg)
+	if resp.ErrorMsg != oauth.ErrTokenAuthNotAllowed {
+		t.Errorf("expected error message %q, got %q", oauth.ErrTokenAuthNotAllowed, resp.ErrorMsg)
 	}
 
 	// 4. Test that accessing using a Session succeeds

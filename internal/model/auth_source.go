@@ -118,9 +118,9 @@ func (source *AuthSource) Sanitize() {
 }
 
 // GetAuthSources 获取所有认证源（已脱敏）
-func GetAuthSources() ([]AuthSource, error) {
+func GetAuthSources(ctx context.Context) ([]AuthSource, error) {
 	var sources []AuthSource
-	if err := db.DB(context.Background()).Order("id asc").Find(&sources).Error; err != nil {
+	if err := db.DB(ctx).Order("id asc").Find(&sources).Error; err != nil {
 		return nil, err
 	}
 	for i := range sources {
@@ -130,9 +130,9 @@ func GetAuthSources() ([]AuthSource, error) {
 }
 
 // GetActiveAuthSources 获取所有已启用的认证源（已脱敏）
-func GetActiveAuthSources() ([]AuthSource, error) {
+func GetActiveAuthSources(ctx context.Context) ([]AuthSource, error) {
 	var sources []AuthSource
-	if err := db.DB(context.Background()).Where("is_active = ?", true).Order("id asc").Find(&sources).Error; err != nil {
+	if err := db.DB(ctx).Where("is_active = ?", true).Order("id asc").Find(&sources).Error; err != nil {
 		return nil, err
 	}
 	for i := range sources {
@@ -142,12 +142,12 @@ func GetActiveAuthSources() ([]AuthSource, error) {
 }
 
 // GetAuthSourceByID 根据 ID 获取认证源
-func GetAuthSourceByID(id uint64) (*AuthSource, error) {
+func GetAuthSourceByID(ctx context.Context, id uint64) (*AuthSource, error) {
 	if id == 0 {
 		return nil, errors.New(errAuthSourceIDRequired)
 	}
 	var source AuthSource
-	if err := db.DB(context.Background()).First(&source, "id = ?", id).Error; err != nil {
+	if err := db.DB(ctx).First(&source, "id = ?", id).Error; err != nil {
 		return nil, err
 	}
 	source.ClientSecretConfigured = source.ClientSecret != ""
@@ -155,13 +155,13 @@ func GetAuthSourceByID(id uint64) (*AuthSource, error) {
 }
 
 // GetAuthSourceByName 根据名称获取认证源（名称比较不区分大小写）
-func GetAuthSourceByName(name string) (*AuthSource, error) {
+func GetAuthSourceByName(ctx context.Context, name string) (*AuthSource, error) {
 	name = strings.TrimSpace(name)
 	if name == "" {
 		return nil, errors.New(errAuthSourceNameRequired)
 	}
 	var source AuthSource
-	if err := db.DB(context.Background()).First(&source, "LOWER(name) = LOWER(?)", name).Error; err != nil {
+	if err := db.DB(ctx).First(&source, "LOWER(name) = LOWER(?)", name).Error; err != nil {
 		return nil, err
 	}
 	source.ClientSecretConfigured = source.ClientSecret != ""
@@ -169,20 +169,20 @@ func GetAuthSourceByName(name string) (*AuthSource, error) {
 }
 
 // CreateAuthSource 创建认证源
-func CreateAuthSource(source *AuthSource) error {
+func CreateAuthSource(ctx context.Context, source *AuthSource) error {
 	if err := source.Validate(); err != nil {
 		return err
 	}
-	return db.DB(context.Background()).Create(source).Error
+	return db.DB(ctx).Create(source).Error
 }
 
 // UpdateAuthSource 更新认证源，keepSecret 为 true 时保留原密钥
-func UpdateAuthSource(source *AuthSource, keepSecret bool) error {
+func UpdateAuthSource(ctx context.Context, source *AuthSource, keepSecret bool) error {
 	if source.ID == 0 {
 		return errors.New(errAuthSourceIDRequired)
 	}
 	var current AuthSource
-	if err := db.DB(context.Background()).First(&current, "id = ?", source.ID).Error; err != nil {
+	if err := db.DB(ctx).First(&current, "id = ?", source.ID).Error; err != nil {
 		return err
 	}
 	if keepSecret {
@@ -191,7 +191,7 @@ func UpdateAuthSource(source *AuthSource, keepSecret bool) error {
 	if err := source.Validate(); err != nil {
 		return err
 	}
-	return db.DB(context.Background()).Model(&current).Updates(map[string]any{
+	return db.DB(ctx).Model(&current).Updates(map[string]any{
 		"name":                 source.Name,
 		"type":                 source.Type,
 		"display_name":         source.DisplayName,
@@ -205,8 +205,8 @@ func UpdateAuthSource(source *AuthSource, keepSecret bool) error {
 }
 
 // ToggleAuthSource 切换认证源启用状态
-func ToggleAuthSource(id uint64, isActive bool) error {
-	source, err := GetAuthSourceByID(id)
+func ToggleAuthSource(ctx context.Context, id uint64, isActive bool) error {
+	source, err := GetAuthSourceByID(ctx, id)
 	if err != nil {
 		return err
 	}
@@ -214,15 +214,15 @@ func ToggleAuthSource(id uint64, isActive bool) error {
 	if err := source.Validate(); err != nil {
 		return err
 	}
-	return db.DB(context.Background()).Model(&AuthSource{}).Where("id = ?", id).Update("is_active", isActive).Error
+	return db.DB(ctx).Model(&AuthSource{}).Where("id = ?", id).Update("is_active", isActive).Error
 }
 
 // DeleteAuthSource 删除认证源及其关联的外部帐号绑定
-func DeleteAuthSource(id uint64) error {
+func DeleteAuthSource(ctx context.Context, id uint64) error {
 	if id == 0 {
 		return errors.New(errAuthSourceIDRequired)
 	}
-	return db.DB(context.Background()).Transaction(func(tx *gorm.DB) error {
+	return db.DB(ctx).Transaction(func(tx *gorm.DB) error {
 		if err := tx.Where("auth_source_id = ?", id).Delete(&ExternalAccount{}).Error; err != nil {
 			return err
 		}
@@ -268,12 +268,12 @@ func BindExternalAccount(ctx context.Context, account *ExternalAccount) error {
 }
 
 // ListExternalAccountsByUserID 获取指定用户的所有外部帐号绑定视图
-func ListExternalAccountsByUserID(userID uint64) ([]ExternalAccountView, error) {
+func ListExternalAccountsByUserID(ctx context.Context, userID uint64) ([]ExternalAccountView, error) {
 	if userID == 0 {
 		return nil, errors.New(errUserIDRequired)
 	}
 	var accounts []ExternalAccount
-	if err := db.DB(context.Background()).Where("user_id = ?", userID).Order("id asc").Find(&accounts).Error; err != nil {
+	if err := db.DB(ctx).Where("user_id = ?", userID).Order("id asc").Find(&accounts).Error; err != nil {
 		return nil, err
 	}
 	views := make([]ExternalAccountView, 0, len(accounts))
@@ -284,7 +284,7 @@ func ListExternalAccountsByUserID(userID uint64) ([]ExternalAccountView, error) 
 			sourceType = "oidc"
 			label = "历史认证源"
 		} else {
-			source, err := GetAuthSourceByID(account.AuthSourceID)
+			source, err := GetAuthSourceByID(ctx, account.AuthSourceID)
 			if err != nil {
 				continue
 			}
@@ -310,9 +310,9 @@ func ListExternalAccountsByUserID(userID uint64) ([]ExternalAccountView, error) 
 }
 
 // DeleteExternalAccountForUser 删除指定用户的外部帐号绑定
-func DeleteExternalAccountForUser(id uint64, userID uint64) error {
+func DeleteExternalAccountForUser(ctx context.Context, id uint64, userID uint64) error {
 	if id == 0 || userID == 0 {
 		return errors.New(errExternalAccountBindingIDRequired)
 	}
-	return db.DB(context.Background()).Where("id = ? AND user_id = ?", id, userID).Delete(&ExternalAccount{}).Error
+	return db.DB(ctx).Where("id = ? AND user_id = ?", id, userID).Delete(&ExternalAccount{}).Error
 }

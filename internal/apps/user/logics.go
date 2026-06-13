@@ -45,7 +45,7 @@ func isEmailRegisterVerificationEnabled(ctx context.Context) bool {
 }
 
 func isSMTPConfigured(ctx context.Context) bool {
-	var host, port, username string
+	var host, port, username, password string
 
 	var scHost model.SystemConfig
 	if err := scHost.GetByKey(ctx, model.ConfigKeySMTPHost); err == nil {
@@ -59,8 +59,12 @@ func isSMTPConfigured(ctx context.Context) bool {
 	if err := scUser.GetByKey(ctx, model.ConfigKeySMTPUsername); err == nil {
 		username = scUser.Value
 	}
+	var scPass model.SystemConfig
+	if err := scPass.GetByKey(ctx, model.ConfigKeySMTPPassword); err == nil {
+		password = scPass.Value
+	}
 
-	return host != "" && port != "" && username != ""
+	return host != "" && port != "" && username != "" && password != ""
 }
 
 func generateVerificationCode() (string, error) {

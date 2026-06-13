@@ -14,6 +14,7 @@ import (
 	"github.com/Rain-kl/Wavelet/internal/config"
 	"github.com/Rain-kl/Wavelet/internal/db"
 	"github.com/Rain-kl/Wavelet/internal/db/idgen"
+	"github.com/Rain-kl/Wavelet/internal/logger"
 	"github.com/Rain-kl/Wavelet/internal/model"
 	"github.com/Rain-kl/Wavelet/internal/util"
 	"github.com/gin-contrib/sessions"
@@ -124,10 +125,12 @@ func Login(c *gin.Context) {
 	var user model.User
 	ctx := c.Request.Context()
 	if err := db.DB(ctx).Where("username = ? OR email = ?", req.Username, req.Username).First(&user).Error; err != nil {
+		logger.WarnF(ctx, "[LoginAudit] failed login attempt (username not found) for input: %s, IP: %s", req.Username, c.ClientIP())
 		c.JSON(http.StatusOK, util.Err(errUsernameOrPasswordWrong))
 		return
 	}
 	if !user.IsActive {
+		logger.WarnF(ctx, "[LoginAudit] banned user login attempt for username: %s, ID: %d, IP: %s", user.Username, user.ID, c.ClientIP())
 		c.JSON(http.StatusOK, util.Err(common.BannedAccount))
 		return
 	}
@@ -136,6 +139,7 @@ func Login(c *gin.Context) {
 	isPlaintext := !user.IsPasswordEncrypted()
 
 	if !user.CheckPassword(req.Password) {
+		logger.WarnF(ctx, "[LoginAudit] failed login attempt (incorrect password) for username: %s, ID: %d, IP: %s", user.Username, user.ID, c.ClientIP())
 		c.JSON(http.StatusOK, util.Err(errUsernameOrPasswordWrong))
 		return
 	}
@@ -164,6 +168,8 @@ func Login(c *gin.Context) {
 		c.JSON(http.StatusOK, util.Err(errSaveSessionFailed))
 		return
 	}
+
+	logger.InfoF(ctx, "[LoginAudit] successful login for user: %s, ID: %d, IP: %s", user.Username, user.ID, c.ClientIP())
 
 	c.JSON(http.StatusOK, util.OK(oauth.BuildBasicUserInfo(&user, needChangePassword)))
 }
@@ -264,6 +270,11 @@ func Register(c *gin.Context) {
 // @Router /api/v1/user/logout [get]
 func Logout(c *gin.Context) {
 	session := sessions.Default(c)
+	userID := session.Get(oauth.UserIDKey)
+	username := session.Get(oauth.UserNameKey)
+	if userID != nil {
+		logger.InfoF(c.Request.Context(), "[LoginAudit] user logged out: %v, ID: %v, IP: %s", username, userID, c.ClientIP())
+	}
 	session.Options(util.GetSessionOptions(-1))
 	session.Clear()
 	if err := session.Save(); err != nil {

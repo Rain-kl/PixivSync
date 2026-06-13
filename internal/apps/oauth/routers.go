@@ -7,6 +7,7 @@ package oauth
 import (
 	"net/http"
 
+	"github.com/Rain-kl/Wavelet/internal/logger"
 	"github.com/Rain-kl/Wavelet/internal/model"
 	"github.com/Rain-kl/Wavelet/internal/util"
 	"github.com/gin-contrib/sessions"
@@ -89,6 +90,11 @@ func UserInfo(c *gin.Context) {
 // @Router /api/v1/oauth/logout [get]
 func Logout(c *gin.Context) {
 	session := sessions.Default(c)
+	userID := session.Get(UserIDKey)
+	username := session.Get(UserNameKey)
+	if userID != nil {
+		logger.InfoF(c.Request.Context(), "[LoginAudit] user logged out: %v, ID: %v, IP: %s", username, userID, c.ClientIP())
+	}
 	session.Options(util.GetSessionOptions(-1))
 	session.Clear()
 	if err := session.Save(); err != nil {

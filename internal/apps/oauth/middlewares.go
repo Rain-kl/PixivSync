@@ -112,7 +112,7 @@ func LoginRequired() gin.HandlerFunc {
 func DisallowTokenAuth() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		if tokenAuth, _ := util.GetFromContext[bool](c, TokenAuthKey); tokenAuth {
-			c.AbortWithStatusJSON(http.StatusForbidden, gin.H{"error_msg": TokenAuthNotAllowed, "data": nil})
+			c.AbortWithStatusJSON(http.StatusForbidden, gin.H{"error_msg": ErrTokenAuthNotAllowed, "data": nil})
 			return
 		}
 		c.Next()

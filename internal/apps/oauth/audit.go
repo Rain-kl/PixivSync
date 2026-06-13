@@ -29,8 +29,8 @@ func LogForAudit(ctx context.Context, user *model.User, c *gin.Context) {
 	auditJSON, err := json.Marshal(auditLog)
 	if err != nil {
 		logger.ErrorF(ctx, "[LoginRequiredAudit] marshal failed: %v", err)
-		logger.InfoF(ctx, "[LoginRequiredAudit] %s %d %s", c.ClientIP(), user.ID, user.Username)
+		logger.DebugF(ctx, "[LoginRequiredAudit] %s %d %s", c.ClientIP(), user.ID, user.Username)
 	} else {
-		logger.InfoF(ctx, "[LoginRequiredAudit] %s", auditJSON)
+		logger.DebugF(ctx, "[LoginRequiredAudit] %s", auditJSON)
 	}
 }

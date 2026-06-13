@@ -45,7 +45,7 @@ type ToggleAuthSourceRequest struct {
 // @Failure 500 {object} util.ResponseAny "内部错误"
 // @Router /api/v1/admin/auth-sources [get]
 func ListAuthSources(c *gin.Context) {
-	sources, err := model.GetAuthSources()
+	sources, err := model.GetAuthSources(c.Request.Context())
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, util.Err(err.Error()))
 		return
@@ -84,7 +84,7 @@ func CreateAuthSource(c *gin.Context) {
 		Scopes:             req.Scopes,
 		IconURL:            req.IconURL,
 	}
-	if err := model.CreateAuthSource(&source); err != nil {
+	if err := model.CreateAuthSource(c.Request.Context(), &source); err != nil {
 		c.JSON(http.StatusBadRequest, util.Err(err.Error()))
 		return
 	}
@@ -133,11 +133,11 @@ func UpdateAuthSource(c *gin.Context) {
 		IconURL:            req.IconURL,
 	}
 	keepSecret := source.ClientSecret == ""
-	if err := model.UpdateAuthSource(&source, keepSecret); err != nil {
+	if err := model.UpdateAuthSource(c.Request.Context(), &source, keepSecret); err != nil {
 		c.JSON(http.StatusBadRequest, util.Err(err.Error()))
 		return
 	}
-	updated, err := model.GetAuthSourceByID(id)
+	updated, err := model.GetAuthSourceByID(c.Request.Context(), id)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, util.Err(err.Error()))
 		return
@@ -173,7 +173,7 @@ func ToggleAuthSource(c *gin.Context) {
 		return
 	}
 
-	if err := model.ToggleAuthSource(id, req.IsActive); err != nil {
+	if err := model.ToggleAuthSource(c.Request.Context(), id, req.IsActive); err != nil {
 		c.JSON(http.StatusBadRequest, util.Err(err.Error()))
 		return
 	}
@@ -198,7 +198,7 @@ func DeleteAuthSource(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, util.Err(err.Error()))
 		return
 	}
-	if err := model.DeleteAuthSource(id); err != nil {
+	if err := model.DeleteAuthSource(c.Request.Context(), id); err != nil {
 		c.JSON(http.StatusBadRequest, util.Err(err.Error()))
 		return
 	}
@@ -210,7 +210,7 @@ func parseSourceID(c *gin.Context) (uint64, error) {
 	if raw == "" {
 		return 0, errors.New(admin.InvalidAuthSourceID)
 	}
-	source, err := model.GetAuthSourceByName(raw)
+	source, err := model.GetAuthSourceByName(c.Request.Context(), raw)
 	if err == nil {
 		return source.ID, nil
 	}

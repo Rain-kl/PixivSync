@@ -17,6 +17,7 @@ import (
 	"github.com/Rain-kl/Wavelet/internal/common"
 	"github.com/Rain-kl/Wavelet/internal/config"
 	"github.com/Rain-kl/Wavelet/internal/db"
+	"github.com/Rain-kl/Wavelet/internal/logger"
 	"github.com/Rain-kl/Wavelet/internal/model"
 	"github.com/Rain-kl/Wavelet/internal/util"
 	"github.com/coreos/go-oidc/v3/oidc"
@@ -98,28 +99,28 @@ func isOIDCLoginEnabled(ctx context.Context) bool {
 	return enabled
 }
 
-func resolveAuthSource(sourceName string) (*model.AuthSource, error) {
+func resolveAuthSource(ctx context.Context, sourceName string) (*model.AuthSource, error) {
 	name := strings.TrimSpace(strings.ToLower(sourceName))
 	if name == "" {
-		sources, err := model.GetActiveAuthSources()
+		sources, err := model.GetActiveAuthSources(ctx)
 		if err != nil {
 			return nil, err
 		}
 		if len(sources) == 0 {
-			return nil, errors.New(NoActiveAuthSource)
+			return nil, errors.New(errNoActiveAuthSource)
 		}
 		return &sources[0], nil
 	}
-	return model.GetAuthSourceByName(name)
+	return model.GetAuthSourceByName(ctx, name)
 }
 
-func activeLoginSources() []AuthSourceView {
-	enabled, err := model.GetBoolByKey(context.Background(), model.ConfigKeyOIDCLoginEnabled)
+func activeLoginSources(ctx context.Context) []AuthSourceView {
+	enabled, err := model.GetBoolByKey(ctx, model.ConfigKeyOIDCLoginEnabled)
 	if err == nil && !enabled {
 		return nil
 	}
 
-	dbSources, err := model.GetActiveAuthSources()
+	dbSources, err := model.GetActiveAuthSources(ctx)
 	if err != nil {
 		return nil
 	}
@@ -141,18 +142,18 @@ func activeLoginSources() []AuthSourceView {
 func getFrontendLoginRedirectURL(ctx context.Context) (string, error) {
 	var sc model.SystemConfig
 	if err := sc.GetByKey(ctx, model.ConfigKeyServerAddress); err != nil || strings.TrimSpace(sc.Value) == "" {
-		return "", errors.New(ServerAddressMissing)
+		return "", errors.New(errServerAddressMissing)
 	}
 	return strings.TrimRight(sc.Value, "/") + "/login", nil
 }
 
 func buildOAuthConfig(ctx context.Context, source *model.AuthSource, redirectURL string) (*oauth2.Config, *oidc.IDTokenVerifier, error) {
 	if source == nil {
-		return nil, nil, errors.New(AuthSourceRequired)
+		return nil, nil, errors.New(errAuthSourceRequired)
 	}
 
 	if source.OpenIDDiscoveryURL == "" {
-		return nil, nil, errors.New(DiscoveryURLRequired)
+		return nil, nil, errors.New(errDiscoveryURLRequired)
 	}
 
 	// Clean the issuer URL (trim /.well-known/openid-configuration if configured by mistake)
@@ -227,21 +228,38 @@ func setLoginSession(ctx context.Context, c *gin.Context, user *model.User) erro
 }
 
 func uniqueUsername(ctx context.Context, base string) (string, error) {
-	candidate := strings.TrimSpace(base)
-	if candidate == "" {
-		candidate = "user"
+	base = strings.TrimSpace(base)
+	if base == "" {
+		base = "user"
 	}
-	for i := 0; i < 1000; i++ {
-		var count int64
-		if err := db.DB(ctx).Model(&model.User{}).Where("username = ?", candidate).Count(&count).Error; err != nil {
-			return "", err
-		}
-		if count == 0 {
+
+	var existingUsernames []string
+	if err := db.DB(ctx).Model(&model.User{}).
+		Where("username = ? OR username LIKE ?", base, base+"-%").
+		Pluck("username", &existingUsernames).Error; err != nil {
+		return "", err
+	}
+
+	// 将现有的用户名放入 map 中，以便 O(1) 查找
+	exists := make(map[string]bool, len(existingUsernames))
+	for _, u := range existingUsernames {
+		exists[strings.ToLower(u)] = true
+	}
+
+	// 检查 base 是否被占用
+	if !exists[strings.ToLower(base)] {
+		return base, nil
+	}
+
+	// 顺序查找第一个可用的带后缀用户名
+	for i := 1; i <= 1000; i++ {
+		candidate := fmt.Sprintf("%s-%d", base, i)
+		if !exists[strings.ToLower(candidate)] {
 			return candidate, nil
 		}
-		candidate = fmt.Sprintf("%s-%d", base, i+1)
 	}
-	return "", errors.New(UsernameGenerateFailed)
+
+	return "", errors.New(errUsernameGenerateFailed)
 }
 
 func buildOAuthUserInfo(ctx context.Context, source *model.AuthSource, code string, nonce string, redirectURL string) (*model.OAuthUserInfo, error) {
@@ -286,10 +304,10 @@ func verifyIDToken(ctx context.Context, verifier *oidc.IDTokenVerifier, token *o
 	}
 	idToken, verifyErr := verifier.Verify(ctx, rawIDToken)
 	if verifyErr != nil {
-		return fmt.Errorf(IDTokenVerifyFailedFormat, IDTokenVerifyFailed, verifyErr)
+		return fmt.Errorf(errIDTokenVerifyFailedFormat, errIDTokenVerifyFailed, verifyErr)
 	}
 	if nonce != "" && idToken.Nonce != nonce {
-		return errors.New(NonceMismatch)
+		return errors.New(errNonceMismatch)
 	}
 	if claimsErr := idToken.Claims(userInfo); claimsErr != nil {
 		return claimsErr
@@ -314,7 +332,7 @@ func normalizeOAuthUserInfo(userInfo *model.OAuthUserInfo) error {
 		userInfo.Username = userInfo.Sub
 	}
 	if userInfo.Username == "" {
-		return errors.New(UsernameFromSourceFailed)
+		return errors.New(errUsernameFromSourceFailed)
 	}
 	if userInfo.Name == "" {
 		userInfo.Name = userInfo.Username
@@ -342,7 +360,7 @@ func buildCallbackResult(user *model.User, status string) OAuthCallbackResult {
 // @Success 200 {object} util.ResponseAny{data=[]oauth.AuthSourceView} "登录源列表"
 // @Router /api/v1/oauth/sources [get]
 func GetLoginSources(c *gin.Context) {
-	c.JSON(http.StatusOK, util.OK(activeLoginSources()))
+	c.JSON(http.StatusOK, util.OK(activeLoginSources(c.Request.Context())))
 }
 
 // GetLoginURL 获取登录授权地址
@@ -353,23 +371,23 @@ func GetLoginSources(c *gin.Context) {
 // @Param source query string false "认证源名称，为空使用第一个启用的认证源"
 // @Success 200 {object} util.ResponseAny{data=oauth.OAuthAuthorizeResponse} "授权 URL"
 // @Failure 400 {object} util.ResponseAny "认证源不存在或未配置"
-// @Failure 500 {object} util.ResponseAny "Redis 异常或构造 URL 失败"
+// @Failure 500 {object} util.ResponseAny "Redis 异常 or 构造 URL 失败"
 // @Router /api/v1/oauth/login [get]
 func GetLoginURL(c *gin.Context) {
 	ctx := c.Request.Context()
 	if !isOIDCLoginEnabled(ctx) {
-		c.JSON(http.StatusBadRequest, util.Err(AuthSourceDisabled))
+		c.JSON(http.StatusBadRequest, util.Err(errAuthSourceDisabled))
 		return
 	}
 
-	source, err := resolveAuthSource(c.Query("source"))
+	source, err := resolveAuthSource(ctx, c.Query("source"))
 	if err != nil {
 		c.JSON(http.StatusBadRequest, util.Err(err.Error()))
 		return
 	}
 
 	if !source.IsActive {
-		c.JSON(http.StatusBadRequest, util.Err(AuthSourceDisabled))
+		c.JSON(http.StatusBadRequest, util.Err(errAuthSourceDisabled))
 		return
 	}
 
@@ -438,18 +456,18 @@ func buildAuthorizeURL(ctx context.Context, source *model.AuthSource, state stri
 func Authorize(c *gin.Context) {
 	ctx := c.Request.Context()
 	if !isOIDCLoginEnabled(ctx) {
-		c.JSON(http.StatusBadRequest, util.Err(AuthSourceDisabled))
+		c.JSON(http.StatusBadRequest, util.Err(errAuthSourceDisabled))
 		return
 	}
 
-	source, err := resolveAuthSource(c.Param("source"))
+	source, err := resolveAuthSource(ctx, c.Param("source"))
 	if err != nil {
 		c.JSON(http.StatusBadRequest, util.Err(err.Error()))
 		return
 	}
 
 	if !source.IsActive {
-		c.JSON(http.StatusBadRequest, util.Err(AuthSourceDisabled))
+		c.JSON(http.StatusBadRequest, util.Err(errAuthSourceDisabled))
 		return
 	}
 	purpose := strings.ToLower(strings.TrimSpace(c.Query("purpose")))
@@ -521,7 +539,7 @@ func Callback(c *gin.Context) {
 	stateKey := db.PrefixedKey(fmt.Sprintf(OAuthStateCacheKeyFormat, req.State))
 	payloadRaw, err := db.Redis.Get(ctx, stateKey).Result()
 	if err != nil {
-		c.JSON(http.StatusBadRequest, util.Err(InvalidState))
+		c.JSON(http.StatusBadRequest, util.Err(errInvalidState))
 		return
 	}
 	_ = db.Redis.Del(ctx, stateKey)
@@ -557,18 +575,18 @@ func Callback(c *gin.Context) {
 	}
 
 	if !isOIDCLoginEnabled(ctx) {
-		c.JSON(http.StatusBadRequest, util.Err(AuthSourceDisabled))
+		c.JSON(http.StatusBadRequest, util.Err(errAuthSourceDisabled))
 		return
 	}
 
-	source, err := resolveAuthSource(payload.SourceName)
+	source, err := resolveAuthSource(ctx, payload.SourceName)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, util.Err(err.Error()))
 		return
 	}
 
 	if !source.IsActive {
-		c.JSON(http.StatusBadRequest, util.Err(AuthSourceDisabled))
+		c.JSON(http.StatusBadRequest, util.Err(errAuthSourceDisabled))
 		return
 	}
 
@@ -654,6 +672,9 @@ func handleCallbackLogin(ctx context.Context, c *gin.Context, source *model.Auth
 		c.JSON(http.StatusInternalServerError, util.Err(err.Error()))
 		return
 	}
+
+	logger.InfoF(ctx, "[LoginAudit] successful OAuth login via source: %s, external ID: %s, user: %s, ID: %d, IP: %s", source.Name, userInfo.Sub, user.Username, user.ID, c.ClientIP())
+
 	c.JSON(http.StatusOK, util.OK(buildCallbackResult(&user, "logged_in")))
 }
 
@@ -692,6 +713,8 @@ func handleCallbackRegister(ctx context.Context, c *gin.Context, source *model.A
 		c.JSON(http.StatusBadRequest, util.Err(err.Error()))
 		return model.User{}, false
 	}
+	logger.InfoF(ctx, "[LoginAudit] successful OAuth registration via source: %s, external ID: %s, user: %s, ID: %d, IP: %s", source.Name, userInfo.Sub, user.Username, user.ID, c.ClientIP())
+
 	return user, true
 }
 
@@ -707,7 +730,7 @@ func handleCallbackRegister(ctx context.Context, c *gin.Context, source *model.A
 // @Router /api/v1/oauth/external-accounts [get]
 func ListExternalAccounts(c *gin.Context) {
 	userID := GetUserIDFromContext(c)
-	accounts, err := model.ListExternalAccountsByUserID(userID)
+	accounts, err := model.ListExternalAccountsByUserID(c.Request.Context(), userID)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, util.Err(err.Error()))
 		return
@@ -735,10 +758,10 @@ func DeleteExternalAccount(c *gin.Context) {
 	rawID := strings.TrimSpace(c.Param("id"))
 	id, err := strconv.ParseUint(rawID, 10, 64)
 	if err != nil || id == 0 {
-		c.JSON(http.StatusBadRequest, util.Err(InvalidExternalAccountBindingID))
+		c.JSON(http.StatusBadRequest, util.Err(errInvalidExternalAccountBindingID))
 		return
 	}
-	if err := model.DeleteExternalAccountForUser(id, userID); err != nil {
+	if err := model.DeleteExternalAccountForUser(c.Request.Context(), id, userID); err != nil {
 		c.JSON(http.StatusBadRequest, util.Err(err.Error()))
 		return
 	}

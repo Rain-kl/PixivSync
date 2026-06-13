@@ -109,12 +109,12 @@ export class AuthService extends BaseService {
     return this.post<User>('/user/login', request, headers ? ({ headers } as unknown as InternalAxiosRequestConfig) : undefined);
   }
 
-  static async register(request: RegisterRequest): Promise<User> {
-    return this.post<User>('/user/register', request);
+  static async register(request: RegisterRequest, headers?: Record<string, string>): Promise<User> {
+    return this.post<User>('/user/register', request, headers ? ({ headers } as unknown as InternalAxiosRequestConfig) : undefined);
   }
 
-  static async sendEmailCode(email: string, scene: 'register' | 'login'): Promise<void> {
-    return this.post<void>('/user/send-email-code', { email, scene });
+  static async sendEmailCode(email: string, scene: 'register' | 'login', headers?: Record<string, string>): Promise<void> {
+    return this.post<void>('/user/send-email-code', { email, scene }, headers ? ({ headers } as unknown as InternalAxiosRequestConfig) : undefined);
   }
 
   static async changePassword(request: ChangePasswordRequest): Promise<void> {

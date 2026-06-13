@@ -1,7 +1,7 @@
 import * as React from "react";
 import Link from "next/link";
-import { motion } from "motion/react";
-import type { LucideIcon } from "lucide-react";
+import {motion} from "motion/react";
+import type {LucideIcon} from "lucide-react";
 import {
   ArrowRight,
   BookOpen,
@@ -14,8 +14,8 @@ import {
   ShieldCheck,
   Smartphone,
 } from "lucide-react";
-import { cn } from "@/lib/utils";
-import { Button } from "@/components/ui/button";
+import {cn} from "@/lib/utils";
+import {Button} from "@/components/ui/button";
 
 export interface HeroSectionProps {
   className?: string;
@@ -131,7 +131,7 @@ export const HeroSection = React.memo(function HeroSection({ className }: HeroSe
                   className="w-full font-medium active:scale-95"
                 >
                   <BookOpen className="size-4" />
-                  开箱即用
+                  查看文档
                 </Button>
               </Link>
             </motion.div>

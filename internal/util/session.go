@@ -20,6 +20,7 @@ func GetSessionOptions(maxAge int) sessions.Options {
 		MaxAge:   maxAge,
 		HttpOnly: config.Config.App.SessionHTTPOnly,
 		Secure:   config.Config.App.SessionSecure,
+		SameSite: http.SameSiteLaxMode,
 	}
 }
 
