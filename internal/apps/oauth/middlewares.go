@@ -13,6 +13,7 @@ import (
 	"github.com/Rain-kl/Wavelet/internal/model"
 	"github.com/Rain-kl/Wavelet/internal/otel_trace"
 	"github.com/Rain-kl/Wavelet/internal/util"
+	"github.com/gin-contrib/sessions"
 	"github.com/gin-gonic/gin"
 )
 
@@ -41,39 +42,44 @@ func GetUserFromRequest(c *gin.Context) (*model.User, error) {
 	}
 
 	var user model.User
-	var authenticated bool
-	var tokenAuth bool
-	var tokenAdmin bool
 
+	// 优先使用 Access Token 鉴权
 	if tokenStr != "" {
 		tokenHash := model.HashToken(tokenStr)
 		var tokenRecord model.AccessToken
 		if err := db.DB(ctx).Where("token_hash = ?", tokenHash).First(&tokenRecord).Error; err == nil {
 			if err := db.DB(ctx).Where("id = ? AND is_active = ?", tokenRecord.UserID, true).First(&user).Error; err == nil {
-				authenticated = true
-				tokenAuth = true
-				tokenAdmin = tokenRecord.IsAdmin
+				util.SetToContext(c, TokenAuthKey, true)
+				util.SetToContext(c, TokenAdminKey, tokenRecord.IsAdmin)
+				return &user, nil
 			}
 		}
 	}
 
-	if !authenticated {
-		// load user from session
-		userID := GetUserIDFromContext(c)
-		if userID <= 0 {
-			return nil, errors.New("unauthorized")
-		}
+	// 降级使用 Session 鉴权
+	userID := GetUserIDFromContext(c)
+	if userID <= 0 {
+		return nil, errors.New("unauthorized")
+	}
 
-		// load user from db to make sure is active
-		tx := db.DB(ctx).Where("id = ? AND is_active = ?", userID, true).First(&user)
-		if tx.Error != nil {
-			return nil, tx.Error
+	// load user from db to make sure is active
+	tx := db.DB(ctx).Where("id = ? AND is_active = ?", userID, true).First(&user)
+	if tx.Error != nil {
+		return nil, tx.Error
+	}
+
+	// 密码哈希校验：当用户存在本地密码时，要求 Session 中的密码哈希必须与当前数据库中一致
+	if user.Password != "" {
+		session := sessions.Default(c)
+		sessionHash, _ := session.Get(PasswordHashKey).(string)
+		if sessionHash != user.Password {
+			return nil, errors.New("session expired due to password change")
 		}
 	}
 
-	// set keys in context
-	util.SetToContext(c, TokenAuthKey, tokenAuth)
-	util.SetToContext(c, TokenAdminKey, tokenAdmin)
+	// set keys in context for session auth
+	util.SetToContext(c, TokenAuthKey, false)
+	util.SetToContext(c, TokenAdminKey, false)
 
 	return &user, nil
 }

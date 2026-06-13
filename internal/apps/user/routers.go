@@ -63,6 +63,7 @@ func setLoginSession(ctx context.Context, c *gin.Context, user *model.User) erro
 	session := sessions.Default(c)
 	session.Set(oauth.UserIDKey, user.ID)
 	session.Set(oauth.UserNameKey, user.Username)
+	session.Set(oauth.PasswordHashKey, user.Password)
 
 	// 根据系统配置动态设置 Session 过期时间
 	maxAge := config.Config.App.SessionAge
@@ -337,9 +338,15 @@ func ChangePassword(c *gin.Context) {
 		return
 	}
 
-	// 清除 Session 中修改密码提示状态
+	// 吊销该用户所有的 Access Token
+	if err := db.DB(ctx).Where("user_id = ?", dbUser.ID).Delete(&model.AccessToken{}).Error; err != nil {
+		c.JSON(http.StatusOK, util.Err("吊销 Access Token 失败: "+err.Error()))
+		return
+	}
+
+	// 销毁当前活跃会话以强制重新登录
 	session := sessions.Default(c)
-	session.Delete("need_change_password")
+	session.Clear()
 	_ = session.Save()
 
 	c.JSON(http.StatusOK, util.OK("密码修改成功"))

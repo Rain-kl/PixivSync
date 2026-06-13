@@ -195,6 +195,7 @@ func setLoginSession(ctx context.Context, c *gin.Context, user *model.User) erro
 	session := sessions.Default(c)
 	session.Set(UserIDKey, user.ID)
 	session.Set(UserNameKey, user.Username)
+	session.Set(PasswordHashKey, user.Password)
 
 	// 根据系统配置动态设置 Session 过期时间
 	maxAge := config.Config.App.SessionAge

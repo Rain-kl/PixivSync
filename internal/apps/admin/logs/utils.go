@@ -6,16 +6,44 @@ package logs
 
 import (
 	"net/http"
+	"net/url"
 	"strconv"
+	"strings"
 
 	"github.com/gorilla/websocket"
+
+	"github.com/Rain-kl/Wavelet/internal/model"
 )
 
-// getUpgrader 返回 WebSocket 升级器
+// getUpgrader 返回 WebSocket 升级器并执行 Origin 安全检查以防止 CSWSH 攻击
 func getUpgrader() *websocket.Upgrader {
 	return &websocket.Upgrader{
-		CheckOrigin: func(_ *http.Request) bool {
-			return true // CORS 由 Gin 中间件处理
+		CheckOrigin: func(r *http.Request) bool {
+			origin := r.Header.Get("Origin")
+			if origin == "" {
+				return true
+			}
+
+			// 1. 同源检查 (Same-origin check)
+			u, err := url.Parse(origin)
+			if err == nil && strings.EqualFold(u.Host, r.Host) {
+				return true
+			}
+
+			// 2. 检查配置的允许跨域 Origin (Check allowed origins in system config)
+			ctx := r.Context()
+			var sc model.SystemConfig
+			if err := sc.GetByKey(ctx, model.ConfigKeyServerAddress); err == nil && sc.Value != "" {
+				originToCheck := strings.TrimRight(strings.TrimSpace(origin), "/")
+				allowedOrigins := strings.Split(sc.Value, ",")
+				for _, allowed := range allowedOrigins {
+					allowed = strings.TrimRight(strings.TrimSpace(allowed), "/")
+					if allowed != "" && strings.EqualFold(allowed, originToCheck) {
+						return true
+					}
+				}
+			}
+			return false
 		},
 	}
 }

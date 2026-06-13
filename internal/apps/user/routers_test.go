@@ -9,6 +9,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 	"time"
 
@@ -536,6 +537,7 @@ func TestAccessTokenEndpointsDisallowTokenAuth(t *testing.T) {
 		session := sessions.Default(c)
 		session.Set(oauth.UserIDKey, userID)
 		session.Set(oauth.UserNameKey, username)
+		session.Set(oauth.PasswordHashKey, userRecord.Password)
 		_ = session.Save()
 		c.String(http.StatusOK, "ok")
 	})
@@ -552,5 +554,133 @@ func TestAccessTokenEndpointsDisallowTokenAuth(t *testing.T) {
 
 	if wSession.Code != http.StatusOK {
 		t.Errorf("expected status 200 OK when accessing with Session, got %d. Body: %s", wSession.Code, wSession.Body.String())
+	}
+}
+
+func TestChangePasswordRevocation(t *testing.T) {
+	dbConn, _, cleanup := testhelper.SetupTestEnvironment(t)
+	defer cleanup()
+
+	// 1. Seed a user with a password
+	user := model.User{
+		ID:       uint64(888),
+		Username: "revoketest",
+		Nickname: "Revoke Test",
+		IsActive: true,
+	}
+	if err := user.SetEncryptedPassword("oldpassword123"); err != nil {
+		t.Fatalf("set encrypted password failed: %v", err)
+	}
+	if err := dbConn.Create(&user).Error; err != nil {
+		t.Fatalf("create test user failed: %v", err)
+	}
+
+	// 2. Seed an active AccessToken for this user
+	tokenStr, err := model.GenerateTokenString()
+	if err != nil {
+		t.Fatalf("generate token string failed: %v", err)
+	}
+	tokenHash := model.HashToken(tokenStr)
+	tokenRecord := model.AccessToken{
+		UserID:      user.ID,
+		Name:        "Test Token",
+		TokenHash:   tokenHash,
+		MaskedToken: model.MaskTokenString(tokenStr),
+	}
+	if err := dbConn.Create(&tokenRecord).Error; err != nil {
+		t.Fatalf("create test access token failed: %v", err)
+	}
+
+	// 3. Set up router
+	gin.SetMode(gin.TestMode)
+	r := gin.New()
+	store := cookie.NewStore([]byte("test_session_secret"))
+	r.Use(sessions.Sessions("test_session_id", store))
+
+	r.GET("/mock-login", func(c *gin.Context) {
+		session := sessions.Default(c)
+		session.Set(oauth.UserIDKey, user.ID)
+		session.Set(oauth.UserNameKey, user.Username)
+		session.Set(oauth.PasswordHashKey, user.Password)
+		_ = session.Save()
+		c.String(http.StatusOK, "ok")
+	})
+
+	r.GET("/mock-old-session-login", func(c *gin.Context) {
+		session := sessions.Default(c)
+		session.Set(oauth.UserIDKey, user.ID)
+		session.Set(oauth.UserNameKey, user.Username)
+		session.Set(oauth.PasswordHashKey, "invalid_old_password_hash")
+		_ = session.Save()
+		c.String(http.StatusOK, "ok")
+	})
+
+	r.POST("/api/v1/user/change-password", oauth.LoginRequired(), ChangePassword)
+	r.GET("/api/v1/user/access-tokens", oauth.LoginRequired(), ListAccessTokens)
+
+	// 4. Perform mock login to get cookie
+	wMock := httptest.NewRecorder()
+	reqMock, _ := http.NewRequest(http.MethodGet, "/mock-login", nil)
+	r.ServeHTTP(wMock, reqMock)
+	cookieVal := wMock.Header().Get("Set-Cookie")
+
+	// 5. Test that session and token work initially
+	reqSession, _ := http.NewRequest(http.MethodGet, "/api/v1/user/access-tokens", nil)
+	reqSession.Header.Set("Cookie", cookieVal)
+	wSession := httptest.NewRecorder()
+	r.ServeHTTP(wSession, reqSession)
+	if wSession.Code != http.StatusOK {
+		t.Errorf("expected 200, got %d", wSession.Code)
+	}
+
+	reqToken, _ := http.NewRequest(http.MethodGet, "/api/v1/user/access-tokens", nil)
+	reqToken.Header.Set("X-Access-Token", tokenStr)
+	wToken := httptest.NewRecorder()
+	r.ServeHTTP(wToken, reqToken)
+	if wToken.Code != http.StatusOK {
+		t.Errorf("expected 200 for token, got %d", wToken.Code)
+	}
+
+	// 6. Change password using the active session
+	reqBody := `{"old_password": "oldpassword123", "new_password": "newpassword12345"}`
+	reqChange, _ := http.NewRequest(http.MethodPost, "/api/v1/user/change-password", strings.NewReader(reqBody))
+	reqChange.Header.Set("Content-Type", "application/json")
+	reqChange.Header.Set("Cookie", cookieVal)
+	wChange := httptest.NewRecorder()
+	r.ServeHTTP(wChange, reqChange)
+	if wChange.Code != http.StatusOK {
+		t.Fatalf("expected change password to return 200, got %d. Body: %s", wChange.Code, wChange.Body.String())
+	}
+
+	// 7. Verification: The active session that performed change-password is now cleared (401)
+	reqSessionAfter, _ := http.NewRequest(http.MethodGet, "/api/v1/user/access-tokens", nil)
+	reqSessionAfter.Header.Set("Cookie", cookieVal)
+	wSessionAfter := httptest.NewRecorder()
+	r.ServeHTTP(wSessionAfter, reqSessionAfter)
+	if wSessionAfter.Code != http.StatusUnauthorized {
+		t.Errorf("expected session to be revoked (401), got %d", wSessionAfter.Code)
+	}
+
+	// 8. Verification: An old session (holding an outdated password hash) should be rejected (401)
+	wMockOld := httptest.NewRecorder()
+	reqMockOld, _ := http.NewRequest(http.MethodGet, "/mock-old-session-login", nil)
+	r.ServeHTTP(wMockOld, reqMockOld)
+	oldCookieVal := wMockOld.Header().Get("Set-Cookie")
+
+	reqOldSession, _ := http.NewRequest(http.MethodGet, "/api/v1/user/access-tokens", nil)
+	reqOldSession.Header.Set("Cookie", oldCookieVal)
+	wOldSession := httptest.NewRecorder()
+	r.ServeHTTP(wOldSession, reqOldSession)
+	if wOldSession.Code != http.StatusUnauthorized {
+		t.Errorf("expected old session with invalid hash to return 401, got %d", wOldSession.Code)
+	}
+
+	// 9. Verification: The Access Token should be deleted from DB and rejected (401)
+	reqTokenAfter, _ := http.NewRequest(http.MethodGet, "/api/v1/user/access-tokens", nil)
+	reqTokenAfter.Header.Set("X-Access-Token", tokenStr)
+	wTokenAfter := httptest.NewRecorder()
+	r.ServeHTTP(wTokenAfter, reqTokenAfter)
+	if wTokenAfter.Code != http.StatusUnauthorized {
+		t.Errorf("expected access token to be revoked (401), got %d", wTokenAfter.Code)
 	}
 }
