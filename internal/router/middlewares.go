@@ -5,8 +5,10 @@
 package router
 
 import (
+	"context"
 	"net/http"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/Rain-kl/Wavelet/internal/config"
@@ -67,17 +69,26 @@ func loggerMiddleware() gin.HandlerFunc {
 	}
 }
 
+func isOriginAllowed(ctx context.Context, origin string) bool {
+	var sc model.SystemConfig
+	if err := sc.GetByKey(ctx, model.ConfigKeyServerAddress); err != nil || sc.Value == "" {
+		return false
+	}
+	allowedOrigins := strings.Split(sc.Value, ",")
+	for _, allowed := range allowedOrigins {
+		allowed = strings.TrimRight(strings.TrimSpace(allowed), "/")
+		if allowed != "" && strings.EqualFold(allowed, origin) {
+			return true
+		}
+	}
+	return false
+}
+
 func corsMiddleware() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		origin := c.Request.Header.Get("Origin")
-		if origin != "" {
-			var sc model.SystemConfig
-			// Fetch from system config. We use request context which supports trace
-			if err := sc.GetByKey(c.Request.Context(), model.ConfigKeyServerAddress); err == nil && sc.Value != "" {
-				c.Writer.Header().Set("Access-Control-Allow-Origin", sc.Value)
-			} else {
-				c.Writer.Header().Set("Access-Control-Allow-Origin", origin)
-			}
+		if origin != "" && isOriginAllowed(c.Request.Context(), origin) {
+			c.Writer.Header().Set("Access-Control-Allow-Origin", origin)
 			c.Writer.Header().Set("Access-Control-Allow-Credentials", "true")
 			c.Writer.Header().Set("Access-Control-Allow-Headers", "Content-Type, Content-Length, Accept-Encoding, X-CSRF-Token, Authorization, accept, origin, Cache-Control, X-Requested-With, X-Access-Token, X-Cap-Token")
 			c.Writer.Header().Set("Access-Control-Allow-Methods", "POST, OPTIONS, GET, PUT, DELETE, PATCH")
