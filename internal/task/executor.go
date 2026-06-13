@@ -177,13 +177,19 @@ func RetryTask(ctx context.Context, id uint64) (string, error) {
 		return "", fmt.Errorf(errCreateRetryExecutionFailed, err)
 	}
 
+	meta := GetTaskMeta(execution.TaskType)
+	queueName := QueueDefault
+	if meta != nil {
+		queueName = meta.Queue
+	}
+
 	// 入队 Asynq
 	taskInfo := asynq.NewTask(execution.TaskType, []byte(execution.Payload))
 	if _, err := AsynqClient.Enqueue(
 		taskInfo,
 		asynq.TaskID(newTaskID),
 		asynq.MaxRetry(execution.MaxRetry),
-		asynq.Queue(PrefixedQueue(QueueDefault)),
+		asynq.Queue(queueName),
 	); err != nil {
 		newExecution.Status = model.TaskExecutionStatusFailed
 		newExecution.ErrorMessage = fmt.Sprintf("重试入队失败: %v", err)

@@ -29,6 +29,8 @@ const (
 	StorageMigrationTask = "storage:migrate"
 	// TaskTypeStorageMigration is the task metadata type for storage migration.
 	TaskTypeStorageMigration = "storage_migration"
+
+	colStorageDriver = "storage_driver"
 )
 
 // StorageMigrationMeta describes the manually dispatchable migration task.
@@ -41,6 +43,16 @@ var StorageMigrationMeta = task.TaskMeta{
 	MaxRetry:     task.DefaultMaxRetry,
 	Queue:        task.QueueDefault,
 	Retryable:    true,
+	Params: []task.TaskParam{
+		{
+			Name:        "target",
+			Label:       "目标存储配置 (JSON)",
+			Type:        "text",
+			Required:    true,
+			Placeholder: `{"driver": "s3", "local": {"root": "."}, "s3": {"bucket": "my-bucket", ...}}`,
+			Description: "待迁移到的目标存储引擎完整配置 JSON 字符串",
+		},
+	},
 }
 
 // MigrationHandler copies stored objects and activates the target backend.
@@ -182,15 +194,40 @@ func parseMigrationTargetConfig(ctx context.Context, payload []byte) (storage.Co
 	if strings.TrimSpace(string(payload)) == "" {
 		return storage.Config{}, errors.New("storage migration target payload is required")
 	}
-	var req storageMigrationPayload
-	if err := json.Unmarshal(payload, &req); err != nil {
-		return storage.Config{}, fmt.Errorf("parse storage migration payload: %w", err)
+
+	// Try to parse using raw JSON message to handle both struct and string payload formats
+	var raw struct {
+		Target json.RawMessage `json:"target"`
 	}
+	if err := json.Unmarshal(payload, &raw); err != nil {
+		return storage.Config{}, fmt.Errorf("parse storage migration payload envelope: %w", err)
+	}
+
+	if len(raw.Target) == 0 {
+		return storage.Config{}, errors.New("storage migration target payload is required")
+	}
+
+	var targetBytes []byte
+	var targetStr string
+	// Check if Target is a JSON string
+	if err := json.Unmarshal(raw.Target, &targetStr); err == nil {
+		// It is a string (e.g. from dynamic form input), parse its content as JSON
+		targetBytes = []byte(targetStr)
+	} else {
+		// It is a JSON object, use directly
+		targetBytes = raw.Target
+	}
+
+	var target storage.Config
+	if err := json.Unmarshal(targetBytes, &target); err != nil {
+		return storage.Config{}, fmt.Errorf("parse target storage config: %w", err)
+	}
+
 	current, err := storage.LoadConfig(ctx)
 	if err != nil {
 		return storage.Config{}, fmt.Errorf("load active storage config: %w", err)
 	}
-	target := storage.MergeMaskedSecrets(req.Target, current)
+	target = storage.MergeMaskedSecrets(target, current)
 	if err := storage.ValidateConfig(target); err != nil {
 		return storage.Config{}, fmt.Errorf("validate target storage config: %w", err)
 	}
@@ -246,6 +283,8 @@ func migrateObjects(
 			return atomic.LoadInt64(&migrated), fmt.Errorf("storage migration canceled: %w", err)
 		}
 
+		task.AppendLog(ctx, "正在查询待迁移对象批次，当前已完成迁移: %d/%d", atomic.LoadInt64(&migrated), total)
+
 		var objects []struct {
 			FilePath string `gorm:"column:file_path"`
 			FileSize int64  `gorm:"column:file_size"`
@@ -262,8 +301,11 @@ func migrateObjects(
 			return atomic.LoadInt64(&migrated), fmt.Errorf("query source objects: %w", err)
 		}
 		if len(objects) == 0 {
+			task.AppendLog(ctx, "所有对象迁移完毕")
 			break
 		}
+
+		task.AppendLog(ctx, "获取当前批次迁移对象，批次大小: %d，实际获取对象数: %d", batchSize, len(objects))
 
 		var g errgroup.Group
 		g.SetLimit(migrationConcurrency)
@@ -271,56 +313,8 @@ func migrateObjects(
 		for _, object := range objects {
 			obj := object // Capture range variable
 			g.Go(func() error {
-				source, err := sourceBackend.Get(ctx, obj.FilePath)
-				if err != nil {
-					if isNotFoundError(err) {
-						task.AppendLog(ctx, "警告: 源存储中物理文件不存在，标记为已删除并跳过: %s (错误: %v)", obj.FilePath, err)
-						if updateErr := db.DB(ctx).Model(&model.Upload{}).
-							Where("storage_driver = ? AND file_path = ?", sourceDriver, obj.FilePath).
-							Updates(map[string]any{
-								"status":         model.UploadStatusDeleted,
-								"storage_driver": targetDriver,
-							}).Error; updateErr != nil {
-							return fmt.Errorf("update missing object %q: %w", obj.FilePath, updateErr)
-						}
-						return nil
-					}
-					return fmt.Errorf("open source object %q: %w", obj.FilePath, err)
-				}
-				targetResult, putErr := targetBackend.Put(ctx, obj.FilePath, source.Body, obj.FileSize, obj.MimeType)
-				closeErr := source.Body.Close()
-				if putErr != nil {
-					return fmt.Errorf("copy object %q: %w", obj.FilePath, putErr)
-				}
-				if closeErr != nil {
-					return fmt.Errorf("close source object %q: %w", obj.FilePath, closeErr)
-				}
-
-				// Data integrity check (SHA-256 hash verification)
-				if len(obj.Hash) == sha256HexLength {
-					targetObj, getErr := targetBackend.Get(ctx, targetResult.Key)
-					if getErr != nil {
-						return fmt.Errorf("retrieve target object for verification %q: %w", obj.FilePath, getErr)
-					}
-					h := sha256.New()
-					if _, copyErr := io.Copy(h, targetObj.Body); copyErr != nil {
-						_ = targetObj.Body.Close()
-						return fmt.Errorf("read target object for verification %q: %w", obj.FilePath, copyErr)
-					}
-					_ = targetObj.Body.Close()
-					computedHash := hex.EncodeToString(h.Sum(nil))
-					if computedHash != obj.Hash {
-						return fmt.Errorf("integrity check failed for %q: got hash %s, want %s", obj.FilePath, computedHash, obj.Hash)
-					}
-				}
-
-				if err := db.DB(ctx).Model(&model.Upload{}).
-					Where("storage_driver = ? AND file_path = ?", sourceDriver, obj.FilePath).
-					Updates(map[string]any{
-						"storage_driver": targetDriver,
-						"file_path":      targetResult.Key,
-					}).Error; err != nil {
-					return fmt.Errorf("update migrated object %q: %w", obj.FilePath, err)
+				if err := migrateSingleObject(ctx, sourceBackend, targetBackend, sourceDriver, targetDriver, obj, sha256HexLength); err != nil {
+					return err
 				}
 				atomic.AddInt64(&migrated, 1)
 				return nil
@@ -331,9 +325,120 @@ func migrateObjects(
 			return atomic.LoadInt64(&migrated), err
 		}
 
-		task.AppendLog(ctx, "迁移进度: %d/%d", atomic.LoadInt64(&migrated), total)
+		task.AppendLog(ctx, "当前批次迁移完成。迁移进度: %d/%d", atomic.LoadInt64(&migrated), total)
 	}
 	return atomic.LoadInt64(&migrated), nil
+}
+
+func migrateSingleObject(
+	ctx context.Context,
+	sourceBackend storage.Backend,
+	targetBackend storage.Backend,
+	sourceDriver storage.Driver,
+	targetDriver storage.Driver,
+	obj struct {
+		FilePath string `gorm:"column:file_path"`
+		FileSize int64  `gorm:"column:file_size"`
+		MimeType string `gorm:"column:mime_type"`
+		Hash     string `gorm:"column:hash"`
+	},
+	sha256HexLength int,
+) error {
+	// Check if the file already exists in target storage and has matching size
+	if shouldSkipMigration(ctx, targetBackend, obj) {
+		task.AppendLog(ctx, "[跳过迁移] 目标存储已存在相同文件且校验一致: %s", obj.FilePath)
+		if err := db.DB(ctx).Model(&model.Upload{}).
+			Where("storage_driver = ? AND file_path = ?", sourceDriver, obj.FilePath).
+			Updates(map[string]any{
+				colStorageDriver: targetDriver,
+			}).Error; err != nil {
+			return fmt.Errorf("update migrated object %q: %w", obj.FilePath, err)
+		}
+		return nil
+	}
+
+	task.AppendLog(ctx, "[迁移开始] 正在从源存储读取文件: %s", obj.FilePath)
+	source, err := sourceBackend.Get(ctx, obj.FilePath)
+	if err != nil {
+		if isNotFoundError(err) {
+			task.AppendLog(ctx, "警告: 源存储中物理文件不存在，标记为已删除并跳过: %s (错误: %v)", obj.FilePath, err)
+			if updateErr := db.DB(ctx).Model(&model.Upload{}).
+				Where("storage_driver = ? AND file_path = ?", sourceDriver, obj.FilePath).
+				Updates(map[string]any{
+					"status":         model.UploadStatusDeleted,
+					colStorageDriver: targetDriver,
+				}).Error; updateErr != nil {
+				return fmt.Errorf("update missing object %q: %w", obj.FilePath, updateErr)
+			}
+			return nil
+		}
+		return fmt.Errorf("open source object %q: %w", obj.FilePath, err)
+	}
+	task.AppendLog(ctx, "[传输中] 正在向目标存储上传文件: %s (大小: %d 字节, 类型: %s)", obj.FilePath, obj.FileSize, obj.MimeType)
+	targetResult, putErr := targetBackend.Put(ctx, obj.FilePath, source.Body, obj.FileSize, obj.MimeType)
+	closeErr := source.Body.Close()
+	if putErr != nil {
+		return fmt.Errorf("copy object %q: %w", obj.FilePath, putErr)
+	}
+	if closeErr != nil {
+		return fmt.Errorf("close source object %q: %w", obj.FilePath, closeErr)
+	}
+
+	// Data integrity check (SHA-256 hash verification)
+	if len(obj.Hash) == sha256HexLength {
+		task.AppendLog(ctx, "[校验中] 正在对目标文件进行数据一致性校验 (SHA-256): %s", targetResult.Key)
+		targetObj, getErr := targetBackend.Get(ctx, targetResult.Key)
+		if getErr != nil {
+			return fmt.Errorf("retrieve target object for verification %q: %w", obj.FilePath, getErr)
+		}
+		if targetObj == nil || targetObj.Body == nil {
+			return fmt.Errorf("retrieve target object for verification %q: object or body is nil", obj.FilePath)
+		}
+		h := sha256.New()
+		if _, copyErr := io.Copy(h, targetObj.Body); copyErr != nil {
+			_ = targetObj.Body.Close()
+			return fmt.Errorf("read target object for verification %q: %w", obj.FilePath, copyErr)
+		}
+		_ = targetObj.Body.Close()
+		computedHash := hex.EncodeToString(h.Sum(nil))
+		if computedHash != obj.Hash {
+			return fmt.Errorf("integrity check failed for %q: got hash %s, want %s", obj.FilePath, computedHash, obj.Hash)
+		}
+		task.AppendLog(ctx, "[校验通过] 文件一致性校验成功: %s", targetResult.Key)
+	}
+
+	task.AppendLog(ctx, "[更新数据库] 正在更新文件 %s 的存储路径与驱动信息为: %s (%s)", obj.FilePath, targetResult.Key, targetDriver)
+	if err := db.DB(ctx).Model(&model.Upload{}).
+		Where("storage_driver = ? AND file_path = ?", sourceDriver, obj.FilePath).
+		Updates(map[string]any{
+			colStorageDriver: targetDriver,
+			"file_path":      targetResult.Key,
+		}).Error; err != nil {
+		return fmt.Errorf("update migrated object %q: %w", obj.FilePath, err)
+	}
+	task.AppendLog(ctx, "[迁移成功] 文件已完成迁移: %s -> %s", obj.FilePath, targetResult.Key)
+	return nil
+}
+
+func shouldSkipMigration(
+	ctx context.Context,
+	targetBackend storage.Backend,
+	obj struct {
+		FilePath string `gorm:"column:file_path"`
+		FileSize int64  `gorm:"column:file_size"`
+		MimeType string `gorm:"column:mime_type"`
+		Hash     string `gorm:"column:hash"`
+	},
+) bool {
+	targetObj, err := targetBackend.Get(ctx, obj.FilePath)
+	if err != nil || targetObj == nil || targetObj.Body == nil {
+		return false
+	}
+	defer func() {
+		_ = targetObj.Body.Close()
+	}()
+
+	return targetObj.ContentLength == obj.FileSize
 }
 
 func isNotFoundError(err error) bool {
