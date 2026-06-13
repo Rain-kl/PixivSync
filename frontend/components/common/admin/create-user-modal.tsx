@@ -13,6 +13,7 @@ const emptyForm: CreateUserRequest = {
   username: "",
   password: "",
   nickname: "",
+  email: "",
   is_active: true,
   is_admin: false,
 }
@@ -46,6 +47,12 @@ export function CreateUserModal({
       newErrors.username = "用户名长度不能少于 3 位"
     }
 
+    if (!form.email.trim()) {
+      newErrors.email = "邮箱不能为空"
+    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email.trim())) {
+      newErrors.email = "邮箱格式不正确"
+    }
+
     if (!form.password) {
       newErrors.password = "密码不能为空"
     } else if (form.password.length < 8) {
@@ -66,6 +73,7 @@ export function CreateUserModal({
         ...form,
         username: form.username.trim(),
         nickname: form.nickname?.trim() || undefined,
+        email: form.email.trim(),
       })
       onClose()
     } catch {
@@ -107,6 +115,20 @@ export function CreateUserModal({
               onChange={(e) => setForm((prev) => ({ ...prev, nickname: e.target.value }))}
               placeholder="请输入昵称"
             />
+          </div>
+
+          <div className="space-y-1.5">
+            <Label htmlFor="email">邮箱</Label>
+            <Input
+              id="email"
+              type="email"
+              value={form.email}
+              onChange={(e) => setForm((prev) => ({ ...prev, email: e.target.value }))}
+              placeholder="请输入邮箱地址"
+            />
+            {errors.email && (
+              <p className="text-xs text-destructive">{errors.email}</p>
+            )}
           </div>
 
           <div className="space-y-1.5">

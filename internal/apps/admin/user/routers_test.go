@@ -313,6 +313,7 @@ func TestCreateUser(t *testing.T) {
 			Username: "newuser",
 			Password: "newpassword123",
 			Nickname: "New Nickname",
+			Email:    "newuser@example.com",
 			IsActive: true,
 			IsAdmin:  false,
 		}
@@ -350,6 +351,9 @@ func TestCreateUser(t *testing.T) {
 		if err := dbConn.Where("username = ?", "newuser").First(&dbUser).Error; err != nil {
 			t.Fatalf("failed to find user in db: %v", err)
 		}
+		if dbUser.Email != "newuser@example.com" {
+			t.Errorf("expected email 'newuser@example.com', got '%s'", dbUser.Email)
+		}
 		if !dbUser.CheckPassword("newpassword123") {
 			t.Error("password was not hashed correctly")
 		}
@@ -361,6 +365,7 @@ func TestCreateUser(t *testing.T) {
 			ID:       2001,
 			Username: "dupuser",
 			Nickname: "Dup User",
+			Email:    "dupuser@example.com",
 		}
 		dbConn.Create(&existing)
 
@@ -368,6 +373,7 @@ func TestCreateUser(t *testing.T) {
 			Username: "dupuser",
 			Password: "password123",
 			Nickname: "Another Nick",
+			Email:    "another@example.com",
 			IsActive: true,
 		}
 		body, _ := json.Marshal(payload)
@@ -387,11 +393,63 @@ func TestCreateUser(t *testing.T) {
 		}
 	})
 
+	t.Run("create user with duplicate email", func(t *testing.T) {
+		existing := model.User{
+			ID:       2002,
+			Username: "existingemail",
+			Nickname: "Existing Email",
+			Email:    "dupemail@example.com",
+		}
+		dbConn.Create(&existing)
+
+		payload := createUserRequest{
+			Username: "newuser2",
+			Password: "password123",
+			Nickname: "New User 2",
+			Email:    "dupemail@example.com",
+			IsActive: true,
+		}
+		body, _ := json.Marshal(payload)
+		req, _ := http.NewRequest("POST", "/api/v1/admin/users", bytes.NewBuffer(body))
+		req.Header.Set("Content-Type", "application/json")
+		w := httptest.NewRecorder()
+		router.ServeHTTP(w, req)
+
+		if w.Code != http.StatusBadRequest {
+			t.Errorf("expected 400 Bad Request, got %d. Body: %s", w.Code, w.Body.String())
+		}
+
+		var resp util.ResponseAny
+		_ = json.Unmarshal(w.Body.Bytes(), &resp)
+		if resp.ErrorMsg != emailExists {
+			t.Errorf("expected error '%s', got '%s'", emailExists, resp.ErrorMsg)
+		}
+	})
+
 	t.Run("validation error - password too short", func(t *testing.T) {
 		payload := createUserRequest{
 			Username: "shortpass",
 			Password: "123",
+			Email:    "shortpass@example.com",
 			IsActive: true,
+		}
+		body, _ := json.Marshal(payload)
+		req, _ := http.NewRequest("POST", "/api/v1/admin/users", bytes.NewBuffer(body))
+		req.Header.Set("Content-Type", "application/json")
+		w := httptest.NewRecorder()
+		router.ServeHTTP(w, req)
+
+		if w.Code != http.StatusBadRequest {
+			t.Errorf("expected 400 Bad Request, got %d. Body: %s", w.Code, w.Body.String())
+		}
+	})
+
+	t.Run("validation error - invalid email format", func(t *testing.T) {
+		payload := map[string]interface{}{
+			"username":  "bademail",
+			"password":  "password123",
+			"email":     "not-an-email",
+			"is_active": true,
 		}
 		body, _ := json.Marshal(payload)
 		req, _ := http.NewRequest("POST", "/api/v1/admin/users", bytes.NewBuffer(body))

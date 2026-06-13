@@ -314,6 +314,7 @@ type createUserRequest struct {
 	Username string `json:"username" binding:"required,min=3,max=64"`
 	Password string `json:"password" binding:"required,min=8,max=64"`
 	Nickname string `json:"nickname" binding:"omitempty,max=64"`
+	Email    string `json:"email" binding:"required,email,max=255"`
 	IsActive bool   `json:"is_active"`
 	IsAdmin  bool   `json:"is_admin"`
 }
@@ -342,9 +343,14 @@ func CreateUser(c *gin.Context) {
 	req.Username = strings.TrimSpace(req.Username)
 	req.Nickname = strings.TrimSpace(req.Nickname)
 	req.Password = strings.TrimSpace(req.Password)
+	req.Email = strings.TrimSpace(req.Email)
 
 	if req.Username == "" {
 		c.JSON(http.StatusBadRequest, util.Err(usernameRequired))
+		return
+	}
+	if req.Email == "" {
+		c.JSON(http.StatusBadRequest, util.Err(emailRequired))
 		return
 	}
 	if len(req.Password) < minPasswordLength {
@@ -363,10 +369,21 @@ func CreateUser(c *gin.Context) {
 		return
 	}
 
+	var emailCount int64
+	if err := db.DB(ctx).Model(&model.User{}).Where("email = ?", req.Email).Count(&emailCount).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, util.Err(err.Error()))
+		return
+	}
+	if emailCount > 0 {
+		c.JSON(http.StatusBadRequest, util.Err(emailExists))
+		return
+	}
+
 	newUser := model.User{
 		ID:          idgen.NextUint64ID(),
 		Username:    req.Username,
 		Nickname:    req.Nickname,
+		Email:       req.Email,
 		IsActive:    req.IsActive,
 		IsAdmin:     req.IsAdmin,
 		LastLoginAt: time.Time{},

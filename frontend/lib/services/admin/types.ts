@@ -340,6 +340,8 @@ export interface CreateUserRequest {
   password: string;
   /** 昵称 */
   nickname?: string;
+  /** 邮箱 */
+  email: string;
   /** 是否激活 */
   is_active?: boolean;
   /** 是否管理员 */
