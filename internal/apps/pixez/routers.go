@@ -5,13 +5,18 @@ package pixez
 
 import (
 	"context"
+	"crypto/rand"
 	//nolint:gosec // MD5 is used only for non-cryptographic checksums of sync data
 	"crypto/md5"
+	"crypto/sha256"
+	"encoding/base64"
 	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"math/big"
 	"net/http"
+	"net/url"
 	"sort"
 	"strings"
 
@@ -148,6 +153,113 @@ func AddUser(c *gin.Context) {
 	if err != nil {
 		logger.ErrorF(ctx, "[PixEz] add user by refresh token failed: %v", err)
 		c.JSON(http.StatusOK, util.Err(errAddUserFailed))
+		return
+	}
+
+	c.JSON(http.StatusOK, util.OK(user.ToSafeDTO()))
+}
+
+func generateVerifier() (string, error) {
+	const (
+		chars          = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-._~"
+		verifierLength = 128
+	)
+	result := make([]byte, verifierLength)
+	for i := 0; i < verifierLength; i++ {
+		num, err := rand.Int(rand.Reader, big.NewInt(int64(len(chars))))
+		if err != nil {
+			return "", err
+		}
+		result[i] = chars[num.Int64()]
+	}
+	return string(result), nil
+}
+
+func generateChallenge(verifier string) string {
+	hash := sha256.Sum256([]byte(verifier))
+	return base64.RawURLEncoding.EncodeToString(hash[:])
+}
+
+func extractCode(input string) string {
+	input = strings.TrimSpace(input)
+	if u, err := url.Parse(input); err == nil {
+		if code := u.Query().Get("code"); code != "" {
+			return code
+		}
+	}
+	for _, prefix := range []string{"?code=", "&code="} {
+		if idx := strings.Index(input, prefix); idx != -1 {
+			code := input[idx+len(prefix):]
+			if endIdx := strings.IndexAny(code, "&#"); endIdx != -1 {
+				code = code[:endIdx]
+			}
+			return code
+		}
+	}
+	if !strings.Contains(input, "/") && !strings.Contains(input, "?") {
+		return input
+	}
+	return ""
+}
+
+// GetLoginURL generates a Pixiv PKCE login URL.
+// @Summary Get Pixiv PKCE login URL
+// @Description Generates a PKCE code verifier and corresponding login URL to authenticate with Pixiv.
+// @Tags pixez
+// @Produce json
+// @Security SessionCookie
+// @Success 200 {object} util.ResponseAny
+// @Router /api/pixez/login-url [get]
+func GetLoginURL(c *gin.Context) {
+	verifier, err := generateVerifier()
+	if err != nil {
+		logger.ErrorF(c.Request.Context(), "[PixEz] failed to generate verifier: %v", err)
+		c.JSON(http.StatusOK, util.Err(errGenerateLoginURLFailed))
+		return
+	}
+
+	challenge := generateChallenge(verifier)
+	loginURL := fmt.Sprintf("https://app-api.pixiv.net/web/v1/login?code_challenge=%s&code_challenge_method=S256&client=pixiv-android", challenge)
+
+	c.JSON(http.StatusOK, util.OK(gin.H{
+		"code_verifier": verifier,
+		"login_url":     loginURL,
+	}))
+}
+
+type loginCallbackRequest struct {
+	Code         string `json:"code" binding:"required"`
+	CodeVerifier string `json:"code_verifier" binding:"required"`
+}
+
+// LoginCallback handles Pixiv authentication callback.
+// @Summary Handle Pixiv auth callback
+// @Description Exchanges authorization code and PKCE code verifier for Pixiv credentials, then registers/updates the user.
+// @Tags pixez
+// @Accept json
+// @Produce json
+// @Security SessionCookie
+// @Param payload body loginCallbackRequest true "Callback authorization code and code verifier"
+// @Success 200 {object} util.ResponseAny{data=model.PixezPixivUserSafeDTO}
+// @Router /api/pixez/login-callback [post]
+func LoginCallback(c *gin.Context) {
+	var req loginCallbackRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, util.Err(errInvalidRequestBody))
+		return
+	}
+
+	cleanCode := extractCode(req.Code)
+	if cleanCode == "" {
+		c.JSON(http.StatusBadRequest, util.Err("authorization code is required"))
+		return
+	}
+
+	ctx := c.Request.Context()
+	user, err := pixezsvc.DefaultClient.AddPixivUserByCode(ctx, cleanCode, req.CodeVerifier)
+	if err != nil {
+		logger.ErrorF(ctx, "[PixEz] login callback failed: %v", err)
+		c.JSON(http.StatusOK, util.Err(errAddUserByCodeFailed))
 		return
 	}
 

@@ -220,4 +220,64 @@ func TestGetUserProfile(t *testing.T) {
 	}
 }
 
+func TestAddPixivUserByCode(t *testing.T) {
+	_, _, cleanup := testhelper.SetupTestEnvironment(t)
+	defer cleanup()
+
+	ctx := context.Background()
+	client := NewClient(&http.Client{Transport: roundTripFunc(func(req *http.Request) (*http.Response, error) {
+		if req.URL.Host == "oauth.secure.pixiv.net" && req.URL.Path == "/auth/token" {
+			body, _ := io.ReadAll(req.Body)
+			bodyStr := string(body)
+			if !strings.Contains(bodyStr, "grant_type=authorization_code") {
+				t.Fatalf("unexpected grant_type: %s", bodyStr)
+			}
+			if !strings.Contains(bodyStr, "code=input-code") {
+				t.Fatalf("unexpected code: %s", bodyStr)
+			}
+			if !strings.Contains(bodyStr, "code_verifier=input-verifier") {
+				t.Fatalf("unexpected verifier: %s", bodyStr)
+			}
+			return jsonResponse(http.StatusOK, `{
+				"response": {
+					"access_token": "mock-access",
+					"refresh_token": "mock-refresh",
+					"user": {
+						"id": "12345",
+						"name": "Manually Added User By Code",
+						"account": "manual_account_code",
+						"mail_address": "manual_code@example.com",
+						"profile_image_urls": {
+							"px_170x170": "https://example.com/avatar_manual_code.png"
+						},
+						"is_premium": true,
+						"x_restrict": 1,
+						"is_mail_authorized": true
+					}
+				}
+			}`), nil
+		}
+		t.Fatalf("unexpected request: %s %s", req.Method, req.URL.String())
+		return nil, nil
+	})})
+
+	user, err := client.AddPixivUserByCode(ctx, "input-code", "input-verifier")
+	if err != nil {
+		t.Fatalf("AddPixivUserByCode() error = %v", err)
+	}
+
+	if user.PixivUserID != "12345" || user.Name != "Manually Added User By Code" || user.AccessToken != "mock-access" || user.RefreshToken != "mock-refresh" {
+		t.Fatalf("unexpected returned user: %+v", user)
+	}
+
+	// Verify persistence in DB
+	var dbUser model.PixezPixivUser
+	if err := db.DB(ctx).Where("pixiv_user_id = ?", "12345").First(&dbUser).Error; err != nil {
+		t.Fatalf("failed to find user in DB: %v", err)
+	}
+	if dbUser.Name != "Manually Added User By Code" || dbUser.AccessToken != "mock-access" || dbUser.RefreshToken != "mock-refresh" {
+		t.Fatalf("persisted credentials incorrect: %+v", dbUser)
+	}
+}
+
 

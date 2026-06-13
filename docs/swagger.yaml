@@ -734,6 +734,16 @@ definitions:
     required:
     - refresh_token
     type: object
+  pixez.loginCallbackRequest:
+    properties:
+      code:
+        type: string
+      code_verifier:
+        type: string
+    required:
+    - code
+    - code_verifier
+    type: object
   status.DatabaseInfoResponse:
     properties:
       name:
@@ -1563,6 +1573,52 @@ paths:
       security:
       - SessionCookie: []
       summary: PixEz management dashboard
+      tags:
+      - pixez
+  /api/pixez/login-callback:
+    post:
+      consumes:
+      - application/json
+      description: Exchanges authorization code and PKCE code verifier for Pixiv credentials,
+        then registers/updates the user.
+      parameters:
+      - description: Callback authorization code and code verifier
+        in: body
+        name: payload
+        required: true
+        schema:
+          $ref: '#/definitions/pixez.loginCallbackRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/util.ResponseAny'
+            - properties:
+                data:
+                  $ref: '#/definitions/model.PixezPixivUserSafeDTO'
+              type: object
+      security:
+      - SessionCookie: []
+      summary: Handle Pixiv auth callback
+      tags:
+      - pixez
+  /api/pixez/login-url:
+    get:
+      description: Generates a PKCE code verifier and corresponding login URL to authenticate
+        with Pixiv.
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/util.ResponseAny'
+      security:
+      - SessionCookie: []
+      summary: Get Pixiv PKCE login URL
       tags:
       - pixez
   /api/pixez/mirror/illusts:

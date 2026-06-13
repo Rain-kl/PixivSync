@@ -28,4 +28,6 @@ const (
 	errRefreshPixivAccountFailed   = "failed to refresh Pixiv account state"
 	errAddUserFailed               = "failed to add Pixiv user by refresh token"
 	errFetchProfileFailed          = "failed to fetch profile from Pixiv"
+	errGenerateLoginURLFailed      = "failed to generate Pixiv login URL"
+	errAddUserByCodeFailed         = "failed to add Pixiv user by authorization code"
 )

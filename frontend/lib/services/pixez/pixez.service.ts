@@ -147,4 +147,12 @@ export class PixezService extends BaseService {
   static async getUserProfile(pixivUserID: string): Promise<PixivProfileResponse> {
     return this.get<PixivProfileResponse>(`/users/${encodeURIComponent(pixivUserID)}/profile`)
   }
+
+  static async getLoginURL(): Promise<{ code_verifier: string; login_url: string }> {
+    return this.get<{ code_verifier: string; login_url: string }>("/login-url")
+  }
+
+  static async loginCallback(code: string, codeVerifier: string): Promise<PixezAccount> {
+    return this.post<PixezAccount>("/login-callback", { code, code_verifier: codeVerifier })
+  }
 }

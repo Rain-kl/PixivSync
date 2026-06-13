@@ -31,6 +31,8 @@ func registerCustomRoutes(apiV1Router *gin.RouterGroup) {
 		pixezRouter.GET("/bookmarks/novels/:novel_id/detail", pixez.GetBookmarkNovelDetail)
 		pixezRouter.GET("/users", pixez.ListUsers)
 		pixezRouter.POST("/users", pixez.AddUser)
+		pixezRouter.GET("/login-url", pixez.GetLoginURL)
+		pixezRouter.POST("/login-callback", pixez.LoginCallback)
 		pixezRouter.GET("/users/:pixiv_user_id", pixez.GetUser)
 		pixezRouter.GET("/users/:pixiv_user_id/profile", pixez.GetUserProfile)
 		pixezRouter.POST("/users/:pixiv_user_id/refresh-token", pixez.RefreshUserToken)

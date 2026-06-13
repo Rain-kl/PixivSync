@@ -468,6 +468,82 @@
                 }
             }
         },
+        "/api/pixez/login-callback": {
+            "post": {
+                "security": [
+                    {
+                        "SessionCookie": []
+                    }
+                ],
+                "description": "Exchanges authorization code and PKCE code verifier for Pixiv credentials, then registers/updates the user.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "pixez"
+                ],
+                "summary": "Handle Pixiv auth callback",
+                "parameters": [
+                    {
+                        "description": "Callback authorization code and code verifier",
+                        "name": "payload",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/pixez.loginCallbackRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/util.ResponseAny"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/model.PixezPixivUserSafeDTO"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                }
+            }
+        },
+        "/api/pixez/login-url": {
+            "get": {
+                "security": [
+                    {
+                        "SessionCookie": []
+                    }
+                ],
+                "description": "Generates a PKCE code verifier and corresponding login URL to authenticate with Pixiv.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "pixez"
+                ],
+                "summary": "Get Pixiv PKCE login URL",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/util.ResponseAny"
+                        }
+                    }
+                }
+            }
+        },
         "/api/pixez/mirror/illusts": {
             "get": {
                 "security": [
@@ -6923,6 +6999,21 @@
             ],
             "properties": {
                 "refresh_token": {
+                    "type": "string"
+                }
+            }
+        },
+        "pixez.loginCallbackRequest": {
+            "type": "object",
+            "required": [
+                "code",
+                "code_verifier"
+            ],
+            "properties": {
+                "code": {
+                    "type": "string"
+                },
+                "code_verifier": {
                     "type": "string"
                 }
             }

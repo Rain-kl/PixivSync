@@ -10,10 +10,12 @@ import (
 	"image"
 	"image/color"
 	"image/png"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
@@ -22,6 +24,7 @@ import (
 	"github.com/Rain-kl/Wavelet/internal/db"
 	"github.com/Rain-kl/Wavelet/internal/diskcache"
 	"github.com/Rain-kl/Wavelet/internal/model"
+	pixezsvc "github.com/Rain-kl/Wavelet/internal/service/pixez"
 	"github.com/Rain-kl/Wavelet/internal/storage"
 	"github.com/Rain-kl/Wavelet/internal/testhelper"
 	"github.com/Rain-kl/Wavelet/internal/util"
@@ -33,6 +36,20 @@ import (
 type testResponse struct {
 	ErrorMsg string          `json:"error_msg"`
 	Data     json.RawMessage `json:"data"`
+}
+
+type roundTripFunc func(*http.Request) (*http.Response, error)
+
+func (f roundTripFunc) RoundTrip(req *http.Request) (*http.Response, error) {
+	return f(req)
+}
+
+func jsonResponse(status int, body string) *http.Response {
+	return &http.Response{
+		StatusCode: status,
+		Header:     http.Header{"Content-Type": []string{"application/json"}},
+		Body:       io.NopCloser(strings.NewReader(body)),
+	}
 }
 
 func setupPixezTestRouter() *gin.Engine {
@@ -57,6 +74,8 @@ func setupPixezTestRouter() *gin.Engine {
 	group.GET("/bookmarks/novels/:novel_id/detail", GetBookmarkNovelDetail)
 	group.GET("/users", ListUsers)
 	group.POST("/users", AddUser)
+	group.GET("/login-url", GetLoginURL)
+	group.POST("/login-callback", LoginCallback)
 	group.GET("/users/:pixiv_user_id", GetUser)
 	group.GET("/users/:pixiv_user_id/profile", GetUserProfile)
 	group.POST("/users/:pixiv_user_id/refresh-token", RefreshUserToken)
@@ -827,4 +846,117 @@ func mustMarshalJSON(t *testing.T, value any) []byte {
 		t.Fatalf("marshal test JSON failed: %v", err)
 	}
 	return data
+}
+
+func TestPixezLoginEndpoints(t *testing.T) {
+	_, _, cleanup := testhelper.SetupTestEnvironment(t)
+	defer cleanup()
+
+	router := setupPixezTestRouter()
+	auth := authHeader(t, "pixez-login-test")
+
+	// 1. Test GET /login-url
+	w := performJSON(router, http.MethodGet, "/api/pixez/login-url", nil, auth)
+	if w.Code != http.StatusOK {
+		t.Fatalf("GetLoginURL status = %d, want 200", w.Code)
+	}
+	resp := decodeResponse(t, w)
+	if resp.ErrorMsg != "" {
+		t.Fatalf("GetLoginURL error_msg = %q", resp.ErrorMsg)
+	}
+	var loginData struct {
+		CodeVerifier string `json:"code_verifier"`
+		LoginURL     string `json:"login_url"`
+	}
+	if err := json.Unmarshal(resp.Data, &loginData); err != nil {
+		t.Fatalf("decode login URL data failed: %v", err)
+	}
+	if len(loginData.CodeVerifier) != 128 {
+		t.Errorf("verifier length = %d, want 128", len(loginData.CodeVerifier))
+	}
+	if !strings.Contains(loginData.LoginURL, "code_challenge=") || !strings.Contains(loginData.LoginURL, "code_challenge_method=S256") {
+		t.Errorf("unexpected login URL: %s", loginData.LoginURL)
+	}
+
+	// 2. Test POST /login-callback
+	oldTransport := pixezsvc.DefaultClient.HTTPClient.Transport
+	defer func() {
+		pixezsvc.DefaultClient.HTTPClient.Transport = oldTransport
+	}()
+	pixezsvc.DefaultClient.HTTPClient.Transport = roundTripFunc(func(req *http.Request) (*http.Response, error) {
+		if req.URL.Host == "oauth.secure.pixiv.net" && req.URL.Path == "/auth/token" {
+			return jsonResponse(http.StatusOK, `{
+				"response": {
+					"access_token": "mock-access-cb",
+					"refresh_token": "mock-refresh-cb",
+					"user": {
+						"id": "22222",
+						"name": "Callback User",
+						"account": "cb_account",
+						"mail_address": "cb@example.com",
+						"profile_image_urls": {
+							"px_170x170": "https://example.com/cb_avatar.png"
+						},
+						"is_premium": false,
+						"x_restrict": 0,
+						"is_mail_authorized": true
+					}
+				}
+			}`), nil
+		}
+		t.Fatalf("unexpected request: %s %s", req.Method, req.URL.String())
+		return nil, nil
+	})
+
+	// Test pasting full custom URL callback
+	callbackPayload := map[string]any{
+		"code":          "pixiv://account?code=mock-code-value",
+		"code_verifier": loginData.CodeVerifier,
+	}
+	w = performJSON(router, http.MethodPost, "/api/pixez/login-callback", callbackPayload, auth)
+	if w.Code != http.StatusOK {
+		t.Fatalf("LoginCallback status = %d, want 200. Body: %s", w.Code, w.Body.String())
+	}
+	resp = decodeResponse(t, w)
+	if resp.ErrorMsg != "" {
+		t.Fatalf("LoginCallback error_msg = %q", resp.ErrorMsg)
+	}
+
+	var safeUser model.PixezPixivUserSafeDTO
+	if err := json.Unmarshal(resp.Data, &safeUser); err != nil {
+		t.Fatalf("decode safe user failed: %v", err)
+	}
+	if safeUser.PixivUserID != "22222" || safeUser.Name != "Callback User" {
+		t.Fatalf("unexpected safe user: %+v", safeUser)
+	}
+
+	// Verify persistence in DB
+	var dbUser model.PixezPixivUser
+	if err := db.DB(context.Background()).Where("pixiv_user_id = ?", "22222").First(&dbUser).Error; err != nil {
+		t.Fatalf("failed to find user in DB: %v", err)
+	}
+	if dbUser.AccessToken != "mock-access-cb" || dbUser.RefreshToken != "mock-refresh-cb" {
+		t.Fatalf("persisted tokens incorrect: %+v", dbUser)
+	}
+}
+
+func TestExtractCode(t *testing.T) {
+	tests := []struct {
+		input    string
+		expected string
+	}{
+		{"my-raw-code-value", "my-raw-code-value"},
+		{"pixiv://account?code=mock-code-value", "mock-code-value"},
+		{"https://app-api.pixiv.net/web/v1/users/auth/pixiv/callback?code=another-code", "another-code"},
+		{"https://accounts.pixiv.net/post-redirect?return_to=https%3A%2F%2Fapp-api.pixiv.net%2Fweb%2Fv1%2Fusers%2Fauth%2Fpixiv%2Fstart%3Fcode_challenge%3DUJkziWHJaZK462K9HBRvE4jM2vLcDXW_RflVPu4ygVI%26code_challenge_method%3DS256%26client%3Dpixiv-android%26via%3Dlogin", ""},
+		{"https://some-other-url.com/index.html", ""},
+		{"pixiv://account?foo=bar&code=xyz123&test=1", "xyz123"},
+	}
+
+	for _, tc := range tests {
+		got := extractCode(tc.input)
+		if got != tc.expected {
+			t.Errorf("extractCode(%q) = %q; want %q", tc.input, got, tc.expected)
+		}
+	}
 }
