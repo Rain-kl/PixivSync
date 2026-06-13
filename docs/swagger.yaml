@@ -393,6 +393,29 @@ definitions:
       x_restrict:
         type: integer
     type: object
+  model.PixezPixivUserSafeDTO:
+    properties:
+      account:
+        type: string
+      created_at:
+        type: string
+      is_mail_authorized:
+        type: integer
+      is_premium:
+        type: integer
+      mail_address:
+        type: string
+      name:
+        type: string
+      pixiv_user_id:
+        type: string
+      updated_at:
+        type: string
+      user_image:
+        type: string
+      x_restrict:
+        type: integer
+    type: object
   model.PixezTagHistory:
     properties:
       name:
@@ -547,6 +570,8 @@ definitions:
     type: object
   model.Upload:
     properties:
+      access_mode:
+        type: integer
       created_at:
         type: string
       extension:
@@ -702,6 +727,13 @@ definitions:
       user:
         $ref: '#/definitions/oauth.BasicUserInfo'
     type: object
+  pixez.addUserRequest:
+    properties:
+      refresh_token:
+        type: string
+    required:
+    - refresh_token
+    type: object
   status.DatabaseInfoResponse:
     properties:
       name:
@@ -784,7 +816,6 @@ definitions:
         - business
         type: string
       value:
-        maxLength: 255
         type: string
       visibility:
         enum:
@@ -833,7 +864,6 @@ definitions:
         maxLength: 255
         type: string
       value:
-        maxLength: 255
         type: string
       visibility:
         enum:
@@ -1024,6 +1054,47 @@ definitions:
     required:
     - ids
     type: object
+  upload.distributionItem:
+    properties:
+      count:
+        type: integer
+      name:
+        type: string
+      size:
+        type: integer
+    type: object
+  upload.fileStatsResponse:
+    properties:
+      categories:
+        items:
+          $ref: '#/definitions/upload.distributionItem'
+        type: array
+      total_count:
+        type: integer
+      total_size:
+        type: integer
+      trend:
+        items:
+          $ref: '#/definitions/upload.trendItem'
+        type: array
+      types:
+        items:
+          $ref: '#/definitions/upload.distributionItem'
+        type: array
+    type: object
+  upload.listFilesResponse:
+    properties:
+      items:
+        items:
+          $ref: '#/definitions/model.Upload'
+        type: array
+      page:
+        type: integer
+      page_size:
+        type: integer
+      total:
+        type: integer
+    type: object
   upload.listMyFilesResponse:
     properties:
       items:
@@ -1036,6 +1107,26 @@ definitions:
         type: integer
       total:
         type: integer
+    type: object
+  upload.trendItem:
+    properties:
+      count:
+        type: integer
+      date:
+        type: string
+      size:
+        type: integer
+    type: object
+  upload.updateMyFileRequest:
+    properties:
+      access_mode:
+        enum:
+        - 0
+        - 1
+        type: integer
+      file_name:
+        maxLength: 255
+        type: string
     type: object
   user.changePasswordRequest:
     properties:
@@ -1053,6 +1144,9 @@ definitions:
     type: object
   user.createUserRequest:
     properties:
+      email:
+        maxLength: 255
+        type: string
       is_active:
         type: boolean
       is_admin:
@@ -1069,6 +1163,7 @@ definitions:
         minLength: 3
         type: string
     required:
+    - email
     - password
     - username
     type: object
@@ -1252,6 +1347,24 @@ paths:
       summary: 校验人机验证解答
       tags:
       - cap
+  /api/health:
+    get:
+      description: 检查服务是否正常运行，可用于负载均衡存活探测
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: 服务正常
+          schema:
+            allOf:
+            - $ref: '#/definitions/util.ResponseAny'
+            - properties:
+                data:
+                  type: string
+              type: object
+      summary: 健康检查
+      tags:
+      - health
   /api/pixez/bookmark-export-runs:
     get:
       description: Returns paginated bookmark export run records for PixEz management.
@@ -1618,6 +1731,35 @@ paths:
       security:
       - SessionCookie: []
       summary: List Pixiv users
+      tags:
+      - pixez
+    post:
+      consumes:
+      - application/json
+      description: Exchanges a refresh token for Pixiv user credentials and profile
+        information, then saves the user in the database.
+      parameters:
+      - description: Refresh token payload
+        in: body
+        name: payload
+        required: true
+        schema:
+          $ref: '#/definitions/pixez.addUserRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/util.ResponseAny'
+            - properties:
+                data:
+                  $ref: '#/definitions/model.PixezPixivUserSafeDTO'
+              type: object
+      security:
+      - SessionCookie: []
+      summary: Add Pixiv user by refresh token
       tags:
       - pixez
   /api/pixez/users/{pixiv_user_id}:
@@ -3303,6 +3445,190 @@ paths:
       summary: 下载并应用应用更新
       tags:
       - admin
+  /api/v1/admin/uploads:
+    get:
+      description: 分页获取系统上传的文件列表，支持文件名关键词、业务类型、扩展名、上传用户ID过滤
+      parameters:
+      - description: 页码（默认 1）
+        in: query
+        name: page
+        type: integer
+      - description: 每页数量（默认 20，最大 100）
+        in: query
+        name: page_size
+        type: integer
+      - description: 文件名关键词（模糊匹配）
+        in: query
+        name: keyword
+        type: string
+      - description: 业务分类过滤
+        in: query
+        name: type
+        type: string
+      - description: 扩展名过滤
+        in: query
+        name: extension
+        type: string
+      - description: 上传用户 ID
+        format: int64
+        in: query
+        name: user_id
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: 查询成功
+          schema:
+            allOf:
+            - $ref: '#/definitions/util.ResponseAny'
+            - properties:
+                data:
+                  $ref: '#/definitions/upload.listFilesResponse'
+              type: object
+        "401":
+          description: 未登录
+          schema:
+            $ref: '#/definitions/util.ResponseAny'
+        "403":
+          description: 无管理员权限
+          schema:
+            $ref: '#/definitions/util.ResponseAny'
+      security:
+      - SessionCookie: []
+      summary: 获取文件列表
+      tags:
+      - admin
+  /api/v1/admin/uploads/{id}:
+    delete:
+      description: 将文件状态置为 deleted（软删除），不会立即清理底层存储对象
+      parameters:
+      - description: 文件 ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: 删除成功
+          schema:
+            $ref: '#/definitions/util.ResponseAny'
+        "403":
+          description: 无权操作
+          schema:
+            $ref: '#/definitions/util.ResponseAny'
+        "404":
+          description: 文件不存在
+          schema:
+            $ref: '#/definitions/util.ResponseAny'
+      security:
+      - SessionCookie: []
+      summary: 删除文件
+      tags:
+      - admin
+  /api/v1/admin/uploads/download/{id}:
+    get:
+      description: 根据文件 ID 获取文件，以附件形式 (Attachment) 强制开启客户端浏览器下载
+      parameters:
+      - description: 文件 ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: 图片质量 (low, medium, high, origin)，默认为 origin
+        in: query
+        name: quality
+        type: string
+      produces:
+      - application/octet-stream
+      responses:
+        "200":
+          description: 成功下载文件
+          schema:
+            type: file
+        "400":
+          description: 参数错误
+          schema:
+            $ref: '#/definitions/util.ResponseAny'
+        "404":
+          description: 文件不存在
+          schema:
+            $ref: '#/definitions/util.ResponseAny'
+        "500":
+          description: 服务内部错误
+          schema:
+            $ref: '#/definitions/util.ResponseAny'
+      security:
+      - SessionCookie: []
+      summary: 下载单文件
+      tags:
+      - admin
+  /api/v1/admin/uploads/download/batch:
+    post:
+      consumes:
+      - application/json
+      description: 传入多个文件 ID，后台实时将其打包压缩为 ZIP 流并输出，自动处理文件名重复冲突
+      parameters:
+      - description: 包含文件 ID 数组 of string 的请求体
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/upload.batchDownloadRequest'
+      produces:
+      - application/octet-stream
+      responses:
+        "200":
+          description: 成功下载打包后的 ZIP
+          schema:
+            type: file
+        "400":
+          description: 参数错误
+          schema:
+            $ref: '#/definitions/util.ResponseAny'
+        "500":
+          description: 打包失败
+          schema:
+            $ref: '#/definitions/util.ResponseAny'
+      security:
+      - SessionCookie: []
+      summary: 批量打包下载
+      tags:
+      - admin
+  /api/v1/admin/uploads/stats:
+    get:
+      description: 返回系统级的总文件数、占用大小、最近 7 天新增趋势、文件类型/格式分布等数据
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: 获取成功
+          schema:
+            allOf:
+            - $ref: '#/definitions/util.ResponseAny'
+            - properties:
+                data:
+                  $ref: '#/definitions/upload.fileStatsResponse'
+              type: object
+        "401":
+          description: 未登录
+          schema:
+            $ref: '#/definitions/util.ResponseAny'
+        "403":
+          description: 无管理员权限
+          schema:
+            $ref: '#/definitions/util.ResponseAny'
+        "500":
+          description: 内部错误
+          schema:
+            $ref: '#/definitions/util.ResponseAny'
+      security:
+      - SessionCookie: []
+      summary: 获取文件统计数据
+      tags:
+      - admin
   /api/v1/admin/uploads/types:
     get:
       description: 返回数据库中所有已上传文件实际拥有的业务类型列表
@@ -3611,24 +3937,6 @@ paths:
       summary: Sample Hello API
       tags:
       - custom
-  /api/v1/health:
-    get:
-      description: 检查服务是否正常运行，可用于负载均衡存活探测
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: 服务正常
-          schema:
-            allOf:
-            - $ref: '#/definitions/util.ResponseAny'
-            - properties:
-                data:
-                  type: string
-              type: object
-      summary: 健康检查
-      tags:
-      - health
   /api/v1/oauth/{source}/authorize:
     get:
       description: 根据指定认证源名称发起 OAuth 授权，支持 purpose 参数用于区分登录和账号绑定场景。认证源必须已启用。
@@ -3794,7 +4102,7 @@ paths:
           schema:
             $ref: '#/definitions/util.ResponseAny'
         "500":
-          description: Redis 异常或构造 URL 失败
+          description: Redis 异常 or 构造 URL 失败
           schema:
             $ref: '#/definitions/util.ResponseAny'
       summary: 获取登录授权地址
@@ -3918,7 +4226,7 @@ paths:
       - upload
   /api/v1/upload/{id}:
     delete:
-      description: 将文件状态置为 deleted（软删除），不会立即清理底层存储对象
+      description: 将当前用户本人的文件状态置为 deleted（软删除）
       parameters:
       - description: 文件 ID
         in: path
@@ -3942,76 +4250,48 @@ paths:
             $ref: '#/definitions/util.ResponseAny'
       security:
       - SessionCookie: []
-      summary: 删除文件
+      summary: 删除我的文件
       tags:
       - upload
-  /api/v1/upload/download/{id}:
-    get:
-      description: 根据文件 ID 获取文件，以附件形式 (Attachment) 强制开启客户端浏览器下载
+    put:
+      consumes:
+      - application/json
+      description: 更新当前用户本人的文件名或访问权限模式 (AccessMode)
       parameters:
       - description: 文件 ID
         in: path
         name: id
         required: true
         type: string
-      - description: 图片质量 (low, medium, high, origin)，默认为 origin
-        in: query
-        name: quality
-        type: string
+      - description: 更新字段
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/upload.updateMyFileRequest'
       produces:
-      - application/octet-stream
+      - application/json
       responses:
         "200":
-          description: 成功下载文件
+          description: 更新成功
           schema:
-            type: file
-        "400":
-          description: 参数错误
+            allOf:
+            - $ref: '#/definitions/util.ResponseAny'
+            - properties:
+                data:
+                  $ref: '#/definitions/model.Upload'
+              type: object
+        "403":
+          description: 无权操作
           schema:
             $ref: '#/definitions/util.ResponseAny'
         "404":
           description: 文件不存在
           schema:
             $ref: '#/definitions/util.ResponseAny'
-        "500":
-          description: 服务内部错误
-          schema:
-            $ref: '#/definitions/util.ResponseAny'
       security:
       - SessionCookie: []
-      summary: 下载单文件
-      tags:
-      - upload
-  /api/v1/upload/download/batch:
-    post:
-      consumes:
-      - application/json
-      description: 传入多个文件 ID，后台实时将其打包压缩为 ZIP 流并输出，自动处理文件名重复冲突
-      parameters:
-      - description: 包含文件 ID 数组的请求体
-        in: body
-        name: request
-        required: true
-        schema:
-          $ref: '#/definitions/upload.batchDownloadRequest'
-      produces:
-      - application/octet-stream
-      responses:
-        "200":
-          description: 成功下载打包后的 ZIP
-          schema:
-            type: file
-        "400":
-          description: 参数错误
-          schema:
-            $ref: '#/definitions/util.ResponseAny'
-        "500":
-          description: 打包失败
-          schema:
-            $ref: '#/definitions/util.ResponseAny'
-      security:
-      - SessionCookie: []
-      summary: 批量打包下载
+      summary: 更新我的文件信息
       tags:
       - upload
   /api/v1/upload/my:

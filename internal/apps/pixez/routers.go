@@ -17,6 +17,7 @@ import (
 	"github.com/Rain-kl/Wavelet/internal/db"
 	"github.com/Rain-kl/Wavelet/internal/logger"
 	"github.com/Rain-kl/Wavelet/internal/model"
+	pixezsvc "github.com/Rain-kl/Wavelet/internal/service/pixez"
 	"github.com/Rain-kl/Wavelet/internal/util"
 	"github.com/gin-gonic/gin"
 	"gorm.io/gorm"
@@ -119,6 +120,39 @@ func UpsertUser(c *gin.Context) {
 	}
 	c.JSON(http.StatusOK, util.OKNil())
 }
+
+type addUserRequest struct {
+	RefreshToken string `json:"refresh_token" binding:"required"`
+}
+
+// AddUser manually creates or updates a Pixiv user by refresh token.
+// @Summary Add Pixiv user by refresh token
+// @Description Exchanges a refresh token for Pixiv user credentials and profile information, then saves the user in the database.
+// @Tags pixez
+// @Accept json
+// @Produce json
+// @Security SessionCookie
+// @Param payload body addUserRequest true "Refresh token payload"
+// @Success 200 {object} util.ResponseAny{data=model.PixezPixivUserSafeDTO}
+// @Router /api/pixez/users [post]
+func AddUser(c *gin.Context) {
+	var req addUserRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, util.Err(errInvalidRequestBody))
+		return
+	}
+
+	ctx := c.Request.Context()
+	user, err := pixezsvc.DefaultClient.AddPixivUserByRefreshToken(ctx, req.RefreshToken)
+	if err != nil {
+		logger.ErrorF(ctx, "[PixEz] add user by refresh token failed: %v", err)
+		c.JSON(http.StatusOK, util.Err(errAddUserFailed))
+		return
+	}
+
+	c.JSON(http.StatusOK, util.OK(user.ToSafeDTO()))
+}
+
 
 // DeleteUser removes a Pixiv user and synced backup data.
 // @Summary Delete Pixiv user

@@ -100,6 +100,38 @@
                 }
             }
         },
+        "/api/health": {
+            "get": {
+                "description": "检查服务是否正常运行，可用于负载均衡存活探测",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "health"
+                ],
+                "summary": "健康检查",
+                "responses": {
+                    "200": {
+                        "description": "服务正常",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/util.ResponseAny"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "string"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                }
+            }
+        },
         "/api/pixez/bookmark-export-runs": {
             "get": {
                 "security": [
@@ -709,6 +741,55 @@
                         "description": "OK",
                         "schema": {
                             "$ref": "#/definitions/util.ResponseAny"
+                        }
+                    }
+                }
+            },
+            "post": {
+                "security": [
+                    {
+                        "SessionCookie": []
+                    }
+                ],
+                "description": "Exchanges a refresh token for Pixiv user credentials and profile information, then saves the user in the database.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "pixez"
+                ],
+                "summary": "Add Pixiv user by refresh token",
+                "parameters": [
+                    {
+                        "description": "Refresh token payload",
+                        "name": "payload",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/pixez.addUserRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/util.ResponseAny"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/model.PixezPixivUserSafeDTO"
+                                        }
+                                    }
+                                }
+                            ]
                         }
                     }
                 }
@@ -3493,6 +3574,258 @@
                 }
             }
         },
+        "/api/v1/admin/uploads": {
+            "get": {
+                "security": [
+                    {
+                        "SessionCookie": []
+                    }
+                ],
+                "description": "分页获取系统上传的文件列表，支持文件名关键词、业务类型、扩展名、上传用户ID过滤",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "admin"
+                ],
+                "summary": "获取文件列表",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "页码（默认 1）",
+                        "name": "page",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "每页数量（默认 20，最大 100）",
+                        "name": "page_size",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "文件名关键词（模糊匹配）",
+                        "name": "keyword",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "业务分类过滤",
+                        "name": "type",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "扩展名过滤",
+                        "name": "extension",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "format": "int64",
+                        "description": "上传用户 ID",
+                        "name": "user_id",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "查询成功",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/util.ResponseAny"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/upload.listFilesResponse"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "401": {
+                        "description": "未登录",
+                        "schema": {
+                            "$ref": "#/definitions/util.ResponseAny"
+                        }
+                    },
+                    "403": {
+                        "description": "无管理员权限",
+                        "schema": {
+                            "$ref": "#/definitions/util.ResponseAny"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/admin/uploads/download/batch": {
+            "post": {
+                "security": [
+                    {
+                        "SessionCookie": []
+                    }
+                ],
+                "description": "传入多个文件 ID，后台实时将其打包压缩为 ZIP 流并输出，自动处理文件名重复冲突",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/octet-stream"
+                ],
+                "tags": [
+                    "admin"
+                ],
+                "summary": "批量打包下载",
+                "parameters": [
+                    {
+                        "description": "包含文件 ID 数组 of string 的请求体",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/upload.batchDownloadRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "成功下载打包后的 ZIP",
+                        "schema": {
+                            "type": "file"
+                        }
+                    },
+                    "400": {
+                        "description": "参数错误",
+                        "schema": {
+                            "$ref": "#/definitions/util.ResponseAny"
+                        }
+                    },
+                    "500": {
+                        "description": "打包失败",
+                        "schema": {
+                            "$ref": "#/definitions/util.ResponseAny"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/admin/uploads/download/{id}": {
+            "get": {
+                "security": [
+                    {
+                        "SessionCookie": []
+                    }
+                ],
+                "description": "根据文件 ID 获取文件，以附件形式 (Attachment) 强制开启客户端浏览器下载",
+                "produces": [
+                    "application/octet-stream"
+                ],
+                "tags": [
+                    "admin"
+                ],
+                "summary": "下载单文件",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "文件 ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "图片质量 (low, medium, high, origin)，默认为 origin",
+                        "name": "quality",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "成功下载文件",
+                        "schema": {
+                            "type": "file"
+                        }
+                    },
+                    "400": {
+                        "description": "参数错误",
+                        "schema": {
+                            "$ref": "#/definitions/util.ResponseAny"
+                        }
+                    },
+                    "404": {
+                        "description": "文件不存在",
+                        "schema": {
+                            "$ref": "#/definitions/util.ResponseAny"
+                        }
+                    },
+                    "500": {
+                        "description": "服务内部错误",
+                        "schema": {
+                            "$ref": "#/definitions/util.ResponseAny"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/admin/uploads/stats": {
+            "get": {
+                "security": [
+                    {
+                        "SessionCookie": []
+                    }
+                ],
+                "description": "返回系统级的总文件数、占用大小、最近 7 天新增趋势、文件类型/格式分布等数据",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "admin"
+                ],
+                "summary": "获取文件统计数据",
+                "responses": {
+                    "200": {
+                        "description": "获取成功",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/util.ResponseAny"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/upload.fileStatsResponse"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "401": {
+                        "description": "未登录",
+                        "schema": {
+                            "$ref": "#/definitions/util.ResponseAny"
+                        }
+                    },
+                    "403": {
+                        "description": "无管理员权限",
+                        "schema": {
+                            "$ref": "#/definitions/util.ResponseAny"
+                        }
+                    },
+                    "500": {
+                        "description": "内部错误",
+                        "schema": {
+                            "$ref": "#/definitions/util.ResponseAny"
+                        }
+                    }
+                }
+            }
+        },
         "/api/v1/admin/uploads/types": {
             "get": {
                 "security": [
@@ -3544,6 +3877,52 @@
                     },
                     "500": {
                         "description": "内部错误",
+                        "schema": {
+                            "$ref": "#/definitions/util.ResponseAny"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/admin/uploads/{id}": {
+            "delete": {
+                "security": [
+                    {
+                        "SessionCookie": []
+                    }
+                ],
+                "description": "将文件状态置为 deleted（软删除），不会立即清理底层存储对象",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "admin"
+                ],
+                "summary": "删除文件",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "文件 ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "删除成功",
+                        "schema": {
+                            "$ref": "#/definitions/util.ResponseAny"
+                        }
+                    },
+                    "403": {
+                        "description": "无权操作",
+                        "schema": {
+                            "$ref": "#/definitions/util.ResponseAny"
+                        }
+                    },
+                    "404": {
+                        "description": "文件不存在",
                         "schema": {
                             "$ref": "#/definitions/util.ResponseAny"
                         }
@@ -4003,38 +4382,6 @@
                 }
             }
         },
-        "/api/v1/health": {
-            "get": {
-                "description": "检查服务是否正常运行，可用于负载均衡存活探测",
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "health"
-                ],
-                "summary": "健康检查",
-                "responses": {
-                    "200": {
-                        "description": "服务正常",
-                        "schema": {
-                            "allOf": [
-                                {
-                                    "$ref": "#/definitions/util.ResponseAny"
-                                },
-                                {
-                                    "type": "object",
-                                    "properties": {
-                                        "data": {
-                                            "type": "string"
-                                        }
-                                    }
-                                }
-                            ]
-                        }
-                    }
-                }
-            }
-        },
         "/api/v1/oauth/callback": {
             "post": {
                 "description": "接收前端传回的 state 和 code，完成 OAuth/OIDC 认证并建立会话。支持登录（login）和账号绑定（bind）两种场景。",
@@ -4254,7 +4601,7 @@
                         }
                     },
                     "500": {
-                        "description": "Redis 异常或构造 URL 失败",
+                        "description": "Redis 异常 or 构造 URL 失败",
                         "schema": {
                             "$ref": "#/definitions/util.ResponseAny"
                         }
@@ -4521,115 +4868,6 @@
                 }
             }
         },
-        "/api/v1/upload/download/batch": {
-            "post": {
-                "security": [
-                    {
-                        "SessionCookie": []
-                    }
-                ],
-                "description": "传入多个文件 ID，后台实时将其打包压缩为 ZIP 流并输出，自动处理文件名重复冲突",
-                "consumes": [
-                    "application/json"
-                ],
-                "produces": [
-                    "application/octet-stream"
-                ],
-                "tags": [
-                    "upload"
-                ],
-                "summary": "批量打包下载",
-                "parameters": [
-                    {
-                        "description": "包含文件 ID 数组的请求体",
-                        "name": "request",
-                        "in": "body",
-                        "required": true,
-                        "schema": {
-                            "$ref": "#/definitions/upload.batchDownloadRequest"
-                        }
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "成功下载打包后的 ZIP",
-                        "schema": {
-                            "type": "file"
-                        }
-                    },
-                    "400": {
-                        "description": "参数错误",
-                        "schema": {
-                            "$ref": "#/definitions/util.ResponseAny"
-                        }
-                    },
-                    "500": {
-                        "description": "打包失败",
-                        "schema": {
-                            "$ref": "#/definitions/util.ResponseAny"
-                        }
-                    }
-                }
-            }
-        },
-        "/api/v1/upload/download/{id}": {
-            "get": {
-                "security": [
-                    {
-                        "SessionCookie": []
-                    }
-                ],
-                "description": "根据文件 ID 获取文件，以附件形式 (Attachment) 强制开启客户端浏览器下载",
-                "produces": [
-                    "application/octet-stream"
-                ],
-                "tags": [
-                    "upload"
-                ],
-                "summary": "下载单文件",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "description": "文件 ID",
-                        "name": "id",
-                        "in": "path",
-                        "required": true
-                    },
-                    {
-                        "type": "string",
-                        "description": "图片质量 (low, medium, high, origin)，默认为 origin",
-                        "name": "quality",
-                        "in": "query"
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "成功下载文件",
-                        "schema": {
-                            "type": "file"
-                        }
-                    },
-                    "400": {
-                        "description": "参数错误",
-                        "schema": {
-                            "$ref": "#/definitions/util.ResponseAny"
-                        }
-                    },
-                    "404": {
-                        "description": "文件不存在",
-                        "schema": {
-                            "$ref": "#/definitions/util.ResponseAny"
-                        }
-                    },
-                    "500": {
-                        "description": "服务内部错误",
-                        "schema": {
-                            "$ref": "#/definitions/util.ResponseAny"
-                        }
-                    }
-                }
-            }
-        },
         "/api/v1/upload/my": {
             "get": {
                 "security": [
@@ -4706,20 +4944,88 @@
             }
         },
         "/api/v1/upload/{id}": {
-            "delete": {
+            "put": {
                 "security": [
                     {
                         "SessionCookie": []
                     }
                 ],
-                "description": "将文件状态置为 deleted（软删除），不会立即清理底层存储对象",
+                "description": "更新当前用户本人的文件名或访问权限模式 (AccessMode)",
+                "consumes": [
+                    "application/json"
+                ],
                 "produces": [
                     "application/json"
                 ],
                 "tags": [
                     "upload"
                 ],
-                "summary": "删除文件",
+                "summary": "更新我的文件信息",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "文件 ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "更新字段",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/upload.updateMyFileRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "更新成功",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/util.ResponseAny"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/model.Upload"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "403": {
+                        "description": "无权操作",
+                        "schema": {
+                            "$ref": "#/definitions/util.ResponseAny"
+                        }
+                    },
+                    "404": {
+                        "description": "文件不存在",
+                        "schema": {
+                            "$ref": "#/definitions/util.ResponseAny"
+                        }
+                    }
+                }
+            },
+            "delete": {
+                "security": [
+                    {
+                        "SessionCookie": []
+                    }
+                ],
+                "description": "将当前用户本人的文件状态置为 deleted（软删除）",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "upload"
+                ],
+                "summary": "删除我的文件",
                 "parameters": [
                     {
                         "type": "string",
@@ -6082,6 +6388,41 @@
                 }
             }
         },
+        "model.PixezPixivUserSafeDTO": {
+            "type": "object",
+            "properties": {
+                "account": {
+                    "type": "string"
+                },
+                "created_at": {
+                    "type": "string"
+                },
+                "is_mail_authorized": {
+                    "type": "integer"
+                },
+                "is_premium": {
+                    "type": "integer"
+                },
+                "mail_address": {
+                    "type": "string"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "pixiv_user_id": {
+                    "type": "string"
+                },
+                "updated_at": {
+                    "type": "string"
+                },
+                "user_image": {
+                    "type": "string"
+                },
+                "x_restrict": {
+                    "type": "integer"
+                }
+            }
+        },
         "model.PixezTagHistory": {
             "type": "object",
             "properties": {
@@ -6312,6 +6653,9 @@
         "model.Upload": {
             "type": "object",
             "properties": {
+                "access_mode": {
+                    "type": "integer"
+                },
                 "created_at": {
                     "type": "string"
                 },
@@ -6538,6 +6882,17 @@
                 }
             }
         },
+        "pixez.addUserRequest": {
+            "type": "object",
+            "required": [
+                "refresh_token"
+            ],
+            "properties": {
+                "refresh_token": {
+                    "type": "string"
+                }
+            }
+        },
         "status.DatabaseInfoResponse": {
             "type": "object",
             "properties": {
@@ -6665,8 +7020,7 @@
                     ]
                 },
                 "value": {
-                    "type": "string",
-                    "maxLength": 255
+                    "type": "string"
                 },
                 "visibility": {
                     "type": "integer",
@@ -6732,8 +7086,7 @@
                     "maxLength": 255
                 },
                 "value": {
-                    "type": "string",
-                    "maxLength": 255
+                    "type": "string"
                 },
                 "visibility": {
                     "type": "integer",
@@ -7006,6 +7359,69 @@
                 }
             }
         },
+        "upload.distributionItem": {
+            "type": "object",
+            "properties": {
+                "count": {
+                    "type": "integer"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "size": {
+                    "type": "integer"
+                }
+            }
+        },
+        "upload.fileStatsResponse": {
+            "type": "object",
+            "properties": {
+                "categories": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/upload.distributionItem"
+                    }
+                },
+                "total_count": {
+                    "type": "integer"
+                },
+                "total_size": {
+                    "type": "integer"
+                },
+                "trend": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/upload.trendItem"
+                    }
+                },
+                "types": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/upload.distributionItem"
+                    }
+                }
+            }
+        },
+        "upload.listFilesResponse": {
+            "type": "object",
+            "properties": {
+                "items": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/model.Upload"
+                    }
+                },
+                "page": {
+                    "type": "integer"
+                },
+                "page_size": {
+                    "type": "integer"
+                },
+                "total": {
+                    "type": "integer"
+                }
+            }
+        },
         "upload.listMyFilesResponse": {
             "type": "object",
             "properties": {
@@ -7023,6 +7439,36 @@
                 },
                 "total": {
                     "type": "integer"
+                }
+            }
+        },
+        "upload.trendItem": {
+            "type": "object",
+            "properties": {
+                "count": {
+                    "type": "integer"
+                },
+                "date": {
+                    "type": "string"
+                },
+                "size": {
+                    "type": "integer"
+                }
+            }
+        },
+        "upload.updateMyFileRequest": {
+            "type": "object",
+            "properties": {
+                "access_mode": {
+                    "type": "integer",
+                    "enum": [
+                        0,
+                        1
+                    ]
+                },
+                "file_name": {
+                    "type": "string",
+                    "maxLength": 255
                 }
             }
         },
@@ -7051,10 +7497,15 @@
         "user.createUserRequest": {
             "type": "object",
             "required": [
+                "email",
                 "password",
                 "username"
             ],
             "properties": {
+                "email": {
+                    "type": "string",
+                    "maxLength": 255
+                },
                 "is_active": {
                     "type": "boolean"
                 },

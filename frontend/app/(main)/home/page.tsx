@@ -1,5 +1,7 @@
-import { HomeMain } from "@/components/common/home/home-main"
+"use client"
+
+import {PixEzDashboard} from "@/components/common/pixez/dashboard"
 
 export default function HomePage() {
-  return <HomeMain />
+  return <PixEzDashboard />
 }

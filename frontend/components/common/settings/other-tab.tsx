@@ -3,11 +3,11 @@
 import {useMemo} from "react"
 import {useMutation, useQueryClient} from "@tanstack/react-query"
 import {
+  BarChart3,
   CreditCard,
   Database,
   FileText,
   FolderOpen,
-  Home,
   Info,
   Layers,
   LayoutList,
@@ -28,7 +28,7 @@ const MENU_GROUPS = [
   {
     name: "基础菜单",
     items: [
-      { path: "/home", label: "首页", description: "系统控制台/个人首页", icon: Home },
+      { path: "/home", label: "看板", description: "同步看板、镜像统计与镜像批次", icon: BarChart3 },
     ]
   },
   {

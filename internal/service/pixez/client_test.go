@@ -126,3 +126,54 @@ func TestPixivPlaceholderAndImageURLCollection(t *testing.T) {
 		t.Fatalf("CollectIllustImageURLs() = %#v", urls)
 	}
 }
+
+func TestAddPixivUserByRefreshToken(t *testing.T) {
+	_, _, cleanup := testhelper.SetupTestEnvironment(t)
+	defer cleanup()
+
+	ctx := context.Background()
+	client := NewClient(&http.Client{Transport: roundTripFunc(func(req *http.Request) (*http.Response, error) {
+		if req.URL.Host == "oauth.secure.pixiv.net" && req.URL.Path == "/auth/token" {
+			return jsonResponse(http.StatusOK, `{
+				"response": {
+					"access_token": "mock-access",
+					"refresh_token": "mock-refresh",
+					"user": {
+						"id": "12345",
+						"name": "Manually Added User",
+						"account": "manual_account",
+						"mail_address": "manual@example.com",
+						"profile_image_urls": {
+							"px_170x170": "https://example.com/avatar_manual.png"
+						},
+						"is_premium": true,
+						"x_restrict": 1,
+						"is_mail_authorized": true
+					}
+				}
+			}`), nil
+		}
+		t.Fatalf("unexpected request: %s %s", req.Method, req.URL.String())
+		return nil, nil
+	})})
+
+	user, err := client.AddPixivUserByRefreshToken(ctx, "input-refresh-token")
+	if err != nil {
+		t.Fatalf("AddPixivUserByRefreshToken() error = %v", err)
+	}
+
+	if user.PixivUserID != "12345" || user.Name != "Manually Added User" || user.AccessToken != "mock-access" || user.RefreshToken != "mock-refresh" {
+		t.Fatalf("unexpected returned user: %+v", user)
+	}
+
+	// Verify persistence
+	var dbUser model.PixezPixivUser
+	if err := db.DB(ctx).Where("pixiv_user_id = ?", "12345").First(&dbUser).Error; err != nil {
+		t.Fatalf("failed to find user in DB: %v", err)
+	}
+
+	if dbUser.Name != "Manually Added User" || dbUser.RefreshToken != "mock-refresh" || dbUser.IsPremium != 1 {
+		t.Fatalf("unexpected persisted user: %+v", dbUser)
+	}
+}
+

@@ -2,16 +2,25 @@
 
 import {useState} from "react"
 import {useQueryClient} from "@tanstack/react-query"
-import {RefreshCw, UsersRound, Zap} from "lucide-react"
+import {Plus, RefreshCw, UsersRound, Zap} from "lucide-react"
 import {toast} from "sonner"
 
 import {Button} from "@/components/ui/button"
 import {Spinner} from "@/components/ui/spinner"
+import {Input} from "@/components/ui/input"
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog"
 import {EmptyStateWithBorder} from "@/components/layout/empty"
 import {ErrorInline} from "@/components/layout/error"
 import {LoadingStateWithBorder} from "@/components/layout/loading"
-import {AdminService, PixezService} from "@/lib/services"
 import type {PixezAccount} from "@/lib/services"
+import {AdminService, PixezService} from "@/lib/services"
 
 import {AccountCard} from "./AccountCard"
 import {usePixEzAccounts} from "./api/usePixEzAccounts"
@@ -23,7 +32,32 @@ export function PixEzAccounts() {
   const [syncingID, setSyncingID] = useState<string | null>(null)
   const [refreshingID, setRefreshingID] = useState<string | null>(null)
   const [deletingID, setDeletingID] = useState<string | null>(null)
+  const [isAddOpen, setIsAddOpen] = useState(false)
+  const [refreshToken, setRefreshToken] = useState("")
+  const [isAdding, setIsAdding] = useState(false)
   const accounts = accountsQuery.data ?? []
+
+  const handleAddAccount = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!refreshToken.trim()) {
+      toast.error("请输入刷新令牌")
+      return
+    }
+    setIsAdding(true)
+    try {
+      await PixezService.addAccount(refreshToken.trim())
+      toast.success("账号添加成功")
+      setIsAddOpen(false)
+      setRefreshToken("")
+      await queryClient.invalidateQueries({queryKey: ["pixez", "accounts"]})
+    } catch (error) {
+      toast.error("添加账号失败", {
+        description: error instanceof Error ? error.message : "未知错误",
+      })
+    } finally {
+      setIsAdding(false)
+    }
+  }
 
   const invalidatePixEz = async () => {
     await Promise.all([
@@ -114,6 +148,10 @@ export function PixEzAccounts() {
               {syncingID === "all" ? <Spinner /> : <Zap />}
               同步全部
             </Button>
+            <Button variant="outline" size="sm" onClick={() => setIsAddOpen(true)}>
+              <Plus />
+              添加账号
+            </Button>
           </div>
         </div>
 
@@ -142,6 +180,41 @@ export function PixEzAccounts() {
           </div>
         )}
       </div>
+
+      <Dialog open={isAddOpen} onOpenChange={(open) => !isAdding && setIsAddOpen(open)}>
+        <DialogContent className="sm:max-w-[425px]">
+          <DialogHeader>
+            <DialogTitle>手动添加 Pixiv 账号</DialogTitle>
+            <DialogDescription>
+              请输入 Pixiv 账号的刷新令牌 (Refresh Token) 以添加或更新账号凭证。
+            </DialogDescription>
+          </DialogHeader>
+          <form onSubmit={handleAddAccount} className="space-y-4 py-4">
+            <div className="space-y-2">
+              <label htmlFor="refresh-token" className="text-xs font-medium text-foreground">
+                刷新令牌 (Refresh Token)
+              </label>
+              <Input
+                id="refresh-token"
+                placeholder="输入 Pixiv 刷新令牌"
+                value={refreshToken}
+                onChange={(e) => setRefreshToken(e.target.value)}
+                disabled={isAdding}
+                required
+              />
+            </div>
+            <DialogFooter className="pt-2">
+              <Button type="button" variant="outline" size="sm" onClick={() => setIsAddOpen(false)} disabled={isAdding}>
+                取消
+              </Button>
+              <Button type="submit" size="sm" disabled={isAdding}>
+                {isAdding && <Spinner className="mr-2" />}
+                {isAdding ? "添加中..." : "确认"}
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

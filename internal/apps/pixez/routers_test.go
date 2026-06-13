@@ -56,6 +56,7 @@ func setupPixezTestRouter() *gin.Engine {
 	group.GET("/bookmarks/novels", ListBookmarkNovels)
 	group.GET("/bookmarks/novels/:novel_id/detail", GetBookmarkNovelDetail)
 	group.GET("/users", ListUsers)
+	group.POST("/users", AddUser)
 	group.GET("/users/:pixiv_user_id", GetUser)
 	group.POST("/users/:pixiv_user_id/refresh-token", RefreshUserToken)
 	group.PUT("/users/:pixiv_user_id", UpsertUser)

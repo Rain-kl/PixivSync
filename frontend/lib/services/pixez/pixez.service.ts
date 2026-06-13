@@ -55,6 +55,10 @@ export class PixezService extends BaseService {
     return this.get<PixezAccount[]>("/users")
   }
 
+  static async addAccount(refreshToken: string): Promise<PixezAccount> {
+    return this.post<PixezAccount>("/users", { refresh_token: refreshToken })
+  }
+
   static async refreshAccountToken(pixivUserID: string): Promise<void> {
     return this.post<void>(`/users/${encodeURIComponent(pixivUserID)}/refresh-token`)
   }

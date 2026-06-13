@@ -114,7 +114,7 @@ export const HeroSection = React.memo(function HeroSection({ className }: HeroSe
               transition={{ duration: 0.6, delay: 0.3, ease: [0.16, 1, 0.3, 1] }}
               className="flex flex-col gap-3 sm:flex-row"
             >
-              <Link href="/pixez/dashboard" className="w-full sm:w-auto">
+              <Link href="/home" className="w-full sm:w-auto">
                 <Button
                   size="lg"
                   className="w-full font-medium transition-all active:scale-95"

@@ -10,6 +10,7 @@ import (
 	"crypto/md5"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -21,6 +22,7 @@ import (
 	"github.com/Rain-kl/Wavelet/internal/db"
 	"github.com/Rain-kl/Wavelet/internal/logger"
 	"github.com/Rain-kl/Wavelet/internal/model"
+	"gorm.io/gorm"
 )
 
 const (
@@ -283,6 +285,141 @@ func (c *Client) RefreshPixivToken(ctx context.Context, userID string, refreshTo
 	}
 	return tokenResp.Response.AccessToken, nil
 }
+
+// AddPixivUserByRefreshToken exchanges a Pixiv refresh token for user credentials and creates or updates the user in the database.
+func (c *Client) AddPixivUserByRefreshToken(ctx context.Context, refreshToken string) (*model.PixezPixivUser, error) {
+	timeStr := pixivClientTime()
+	form := url.Values{}
+	form.Set("client_id", "MOBrBDS8blbauoSck0ZfDbtuzpyT")
+	form.Set("client_secret", "lsACyCD94FhDUtGTXi3QzcFE2uU1hqtDaKeqrdwj")
+	form.Set("grant_type", "refresh_token")
+	form.Set("refresh_token", refreshToken)
+	form.Set("include_policy", "true")
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, "https://oauth.secure.pixiv.net/auth/token", strings.NewReader(form.Encode()))
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	setPixivAppHeaders(req, "")
+	req.Header.Set("X-Client-Time", timeStr)
+	req.Header.Set("X-Client-Hash", pixivClientHash(timeStr))
+
+	resp, err := c.httpClient().Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer func() { _ = resp.Body.Close() }()
+
+	bodyBytes, readErr := io.ReadAll(resp.Body)
+	if readErr != nil {
+		return nil, readErr
+	}
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("request=%s status=%d response=%s", req.URL.String(), resp.StatusCode, string(bodyBytes))
+	}
+
+	var tokenResp struct {
+		Response struct {
+			AccessToken  string `json:"access_token"`
+			RefreshToken string `json:"refresh_token"`
+			User         struct {
+				ID               string `json:"id"`
+				Name             string `json:"name"`
+				Account          string `json:"account"`
+				MailAddress      string `json:"mail_address"`
+				ProfileImageUrls struct {
+					Px170x170 string `json:"px_170x170"`
+					Px50x50   string `json:"px_50x50"`
+					Px16x16   string `json:"px_16x16"`
+				} `json:"profile_image_urls"`
+				IsPremium        bool `json:"is_premium"`
+				XRestrict        int  `json:"x_restrict"`
+				IsMailAuthorized bool `json:"is_mail_authorized"`
+			} `json:"user"`
+		} `json:"response"`
+	}
+
+	if err := json.Unmarshal(bodyBytes, &tokenResp); err != nil {
+		return nil, err
+	}
+	if tokenResp.Response.AccessToken == "" {
+		return nil, fmt.Errorf("received empty access token")
+	}
+
+	resUser := tokenResp.Response.User
+	if resUser.ID == "" {
+		return nil, fmt.Errorf("received empty pixiv user id")
+	}
+
+	userImg := resUser.ProfileImageUrls.Px170x170
+	if userImg == "" {
+		userImg = resUser.ProfileImageUrls.Px50x50
+	}
+	if userImg == "" {
+		userImg = resUser.ProfileImageUrls.Px16x16
+	}
+
+	isPremiumVal := 0
+	if resUser.IsPremium {
+		isPremiumVal = 1
+	}
+	isMailAuthVal := 0
+	if resUser.IsMailAuthorized {
+		isMailAuthVal = 1
+	}
+
+	newRefreshToken := tokenResp.Response.RefreshToken
+	if newRefreshToken == "" {
+		newRefreshToken = refreshToken
+	}
+
+	var existing model.PixezPixivUser
+	tx := db.DB(ctx)
+	findErr := tx.Where("pixiv_user_id = ?", resUser.ID).First(&existing).Error
+	switch {
+	case findErr == nil:
+		// Update existing record
+		existing.Name = resUser.Name
+		existing.Account = resUser.Account
+		existing.MailAddress = resUser.MailAddress
+		existing.UserImage = userImg
+		existing.AccessToken = tokenResp.Response.AccessToken
+		existing.RefreshToken = newRefreshToken
+		existing.IsPremium = isPremiumVal
+		existing.XRestrict = resUser.XRestrict
+		existing.IsMailAuthorized = isMailAuthVal
+		existing.UpdatedAt = time.Now()
+		if saveErr := tx.Save(&existing).Error; saveErr != nil {
+			return nil, saveErr
+		}
+		return &existing, nil
+	case errors.Is(findErr, gorm.ErrRecordNotFound):
+		// Create new record
+		user := &model.PixezPixivUser{
+			PixivUserID:      resUser.ID,
+			Name:             resUser.Name,
+			Account:          resUser.Account,
+			MailAddress:      resUser.MailAddress,
+			UserImage:        userImg,
+			AccessToken:      tokenResp.Response.AccessToken,
+			RefreshToken:     newRefreshToken,
+			IsPremium:        isPremiumVal,
+			XRestrict:        resUser.XRestrict,
+			IsMailAuthorized: isMailAuthVal,
+			CreatedAt:        time.Now(),
+			UpdatedAt:        time.Now(),
+		}
+		if createErr := tx.Create(user).Error; createErr != nil {
+			return nil, createErr
+		}
+		return user, nil
+	default:
+		return nil, findErr
+	}
+}
+
 
 func (c *Client) doPixivGet(ctx context.Context, reqURL string, accessToken string) ([]byte, int, error) {
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, reqURL, nil)
