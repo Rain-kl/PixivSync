@@ -91,9 +91,9 @@ export const HeroSection = React.memo(function HeroSection({ className }: HeroSe
               transition={{ duration: 0.6, delay: 0.1, ease: [0.16, 1, 0.3, 1] }}
               className="mb-6 text-4xl font-semibold leading-[1.08] text-foreground md:text-5xl lg:text-6xl"
             >
-              Pixez Sync
+              Pixiv Sync
               <br />
-              <span className="text-primary">PixEz 的同步备份服务</span>
+              <span className="text-primary">Pixiv 的同步备份服务</span>
             </motion.h1>
 
             <motion.p
@@ -103,7 +103,7 @@ export const HeroSection = React.memo(function HeroSection({ className }: HeroSe
               transition={{ duration: 0.6, delay: 0.2, ease: [0.16, 1, 0.3, 1] }}
               className="mb-8 max-w-2xl text-sm leading-7 text-muted-foreground md:text-base"
             >
-              Pixez Sync 是专为 PixEz 用户打造的云端备份服务。无论你拥有几台设备，
+              Pixiv Sync 是专为 Pixiv / PixEz 用户打造的云端备份服务。无论你拥有几台设备，
               它都能让你的 Pixiv 账号凭证、浏览记录、屏蔽名单等关键数据无缝同步。
             </motion.p>
 
