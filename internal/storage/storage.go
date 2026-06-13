@@ -32,9 +32,15 @@ type Object struct {
 	ContentType   string
 }
 
+// PutResult describes the result of a successful Put operation.
+type PutResult struct {
+	Key    string
+	Bucket string
+}
+
 // Backend defines storage operations used by the upload domain.
 type Backend interface {
-	Put(ctx context.Context, key string, body io.Reader, size int64, contentType string) (string, error)
+	Put(ctx context.Context, key string, body io.Reader, size int64, contentType string) (PutResult, error)
 	Get(ctx context.Context, key string) (*Object, error)
 	Delete(ctx context.Context, key string) error
 	Test(ctx context.Context) error
@@ -173,11 +179,11 @@ type functionBackend struct {
 	delete func(context.Context, string) error
 }
 
-func (b *functionBackend) Put(ctx context.Context, key string, body io.Reader, size int64, contentType string) (string, error) {
+func (b *functionBackend) Put(ctx context.Context, key string, body io.Reader, size int64, contentType string) (PutResult, error) {
 	if err := b.put(ctx, key, body, size, contentType); err != nil {
-		return "", err
+		return PutResult{}, err
 	}
-	return key, nil
+	return PutResult{Key: key}, nil
 }
 
 func (b *functionBackend) Get(ctx context.Context, key string) (*Object, error) {

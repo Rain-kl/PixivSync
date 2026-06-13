@@ -13,6 +13,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"path/filepath"
 	"testing"
 	"time"
 
@@ -21,6 +22,7 @@ import (
 	"github.com/Rain-kl/Wavelet/internal/db"
 	"github.com/Rain-kl/Wavelet/internal/diskcache"
 	"github.com/Rain-kl/Wavelet/internal/model"
+	"github.com/Rain-kl/Wavelet/internal/storage"
 	"github.com/Rain-kl/Wavelet/internal/testhelper"
 	"github.com/Rain-kl/Wavelet/internal/util"
 	"github.com/gin-contrib/sessions"
@@ -745,17 +747,24 @@ func TestServeMirroredImageQuality(t *testing.T) {
 	if err := png.Encode(&imageBytes, source); err != nil {
 		t.Fatalf("encode test image failed: %v", err)
 	}
-	imagePath := t.TempDir() + "/76228932_p0.png"
+	ctx := context.Background()
+	tempDir := t.TempDir()
+	imagePath := filepath.Join(tempDir, "76228932_p0.png")
 	if err := os.WriteFile(imagePath, imageBytes.Bytes(), 0644); err != nil {
 		t.Fatalf("write test image failed: %v", err)
 	}
 
-	ctx := context.Background()
+	cfg := storage.DefaultConfig()
+	cfg.Local.Root = tempDir
+	if err := storage.SaveActiveConfig(ctx, cfg); err != nil {
+		t.Fatalf("save active config failed: %v", err)
+	}
+
 	upload := model.Upload{
 		ID:            76228932,
 		UserID:        1001,
 		FileName:      "76228932_p0.png",
-		FilePath:      imagePath,
+		FilePath:      "76228932_p0.png",
 		FileSize:      int64(imageBytes.Len()),
 		MimeType:      "image/png",
 		Extension:     "png",

@@ -56,7 +56,7 @@ func newR2Backend(ctx context.Context, cfg ObjectConfig) (*s3Backend, error) {
 	return newS3Backend(ctx, cfg)
 }
 
-func (b *s3Backend) Put(ctx context.Context, key string, body io.Reader, size int64, contentType string) (string, error) {
+func (b *s3Backend) Put(ctx context.Context, key string, body io.Reader, size int64, contentType string) (PutResult, error) {
 	key = b.key(key)
 	_, err := b.client.PutObject(ctx, &s3.PutObjectInput{
 		Bucket:        aws.String(b.bucket),
@@ -66,9 +66,9 @@ func (b *s3Backend) Put(ctx context.Context, key string, body io.Reader, size in
 		ContentType:   aws.String(contentType),
 	})
 	if err != nil {
-		return "", fmt.Errorf("put S3 object: %w", err)
+		return PutResult{}, fmt.Errorf("put S3 object: %w", err)
 	}
-	return key, nil
+	return PutResult{Key: key, Bucket: b.bucket}, nil
 }
 
 func (b *s3Backend) Get(ctx context.Context, key string) (*Object, error) {

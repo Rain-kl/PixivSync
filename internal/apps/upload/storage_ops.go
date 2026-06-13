@@ -67,21 +67,4 @@ func currentMigrationTargetConfig(ctx context.Context) (storage.Config, bool, er
 	return target, true, nil
 }
 
-func cfgBucket(ctx context.Context, driver storage.Driver) string {
-	cfg, err := storage.LoadConfig(ctx)
-	if err != nil {
-		return ""
-	}
-	switch driver {
-	case storage.DriverS3:
-		return cfg.S3.Bucket
-	case storage.DriverR2:
-		return cfg.R2.Bucket
-	case storage.DriverMinIO:
-		return cfg.MinIO.Bucket
-	case storage.DriverOSS:
-		return cfg.OSS.Bucket
-	default:
-		return ""
-	}
-}
+

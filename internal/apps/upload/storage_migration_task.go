@@ -287,7 +287,7 @@ func migrateObjects(
 					}
 					return fmt.Errorf("open source object %q: %w", obj.FilePath, err)
 				}
-				targetPath, putErr := targetBackend.Put(ctx, obj.FilePath, source.Body, obj.FileSize, obj.MimeType)
+				targetResult, putErr := targetBackend.Put(ctx, obj.FilePath, source.Body, obj.FileSize, obj.MimeType)
 				closeErr := source.Body.Close()
 				if putErr != nil {
 					return fmt.Errorf("copy object %q: %w", obj.FilePath, putErr)
@@ -298,7 +298,7 @@ func migrateObjects(
 
 				// Data integrity check (SHA-256 hash verification)
 				if len(obj.Hash) == sha256HexLength {
-					targetObj, getErr := targetBackend.Get(ctx, targetPath)
+					targetObj, getErr := targetBackend.Get(ctx, targetResult.Key)
 					if getErr != nil {
 						return fmt.Errorf("retrieve target object for verification %q: %w", obj.FilePath, getErr)
 					}
@@ -318,7 +318,7 @@ func migrateObjects(
 					Where("storage_driver = ? AND file_path = ?", sourceDriver, obj.FilePath).
 					Updates(map[string]any{
 						"storage_driver": targetDriver,
-						"file_path":      targetPath,
+						"file_path":      targetResult.Key,
 					}).Error; err != nil {
 					return fmt.Errorf("update migrated object %q: %w", obj.FilePath, err)
 				}

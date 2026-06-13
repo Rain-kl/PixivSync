@@ -14,16 +14,14 @@ import (
 	"mime"
 	"net/http"
 	"net/url"
-	"os"
 	"path"
-	"path/filepath"
 	"strconv"
 	"strings"
 	"time"
 
-	"github.com/Rain-kl/Wavelet/internal/config"
 	"github.com/Rain-kl/Wavelet/internal/db"
 	"github.com/Rain-kl/Wavelet/internal/db/idgen"
+	"github.com/Rain-kl/Wavelet/internal/logger"
 	"github.com/Rain-kl/Wavelet/internal/model"
 	"github.com/Rain-kl/Wavelet/internal/storage"
 	"github.com/Rain-kl/Wavelet/internal/task"
@@ -445,42 +443,32 @@ func registerMirrorUpload(ctx context.Context, pixivURL string, pageIndex int, d
 	}
 	id := idgen.NextUint64ID()
 	subPath := fmt.Sprintf("uploads/%s/%d.%s", time.Now().Format("2006/01/02"), id, ext)
-	storageDriver := "local"
-	filePath := subPath
+	driver, backend, err := storage.Active(ctx)
+	if err != nil {
+		return model.PixezMirrorImageFile{}, fmt.Errorf("active storage configuration: %w", err)
+	}
 
-	if storage.IsEnabled() {
-		storageDriver = "s3"
-		if err := storage.PutObject(ctx, storage.BuildKey(subPath), bytes.NewReader(data), size, mimeType); err != nil {
-			return model.PixezMirrorImageFile{}, fmt.Errorf("store mirrored Pixiv image to S3: %w", err)
-		}
-	} else {
-		localDir := filepath.Join("uploads", time.Now().Format("2006/01/02"))
-		if err := os.MkdirAll(localDir, localUploadDirPerm); err != nil {
-			return model.PixezMirrorImageFile{}, fmt.Errorf("create local upload dir: %w", err)
-		}
-		filePath = filepath.Join(localDir, fmt.Sprintf("%d.%s", id, ext))
-		//nolint:gosec // filePath is safely constructed inside the local uploads directory
-		if err := os.WriteFile(filePath, data, localUploadFilePerm); err != nil {
-			return model.PixezMirrorImageFile{}, fmt.Errorf("write mirrored Pixiv image: %w", err)
-		}
+	result, err := backend.Put(ctx, subPath, bytes.NewReader(data), size, mimeType)
+	if err != nil {
+		return model.PixezMirrorImageFile{}, fmt.Errorf("store mirrored Pixiv image: %w", err)
 	}
 
 	upload := model.Upload{
 		ID:            id,
 		UserID:        firstUploadOwnerID(ctx),
 		FileName:      fileName,
-		FilePath:      filePath,
+		FilePath:      result.Key,
 		FileSize:      size,
 		MimeType:      mimeType,
 		Extension:     ext,
 		Hash:          hash,
-		StorageDriver: storageDriver,
+		StorageDriver: string(driver),
 		Type:          pixezMirrorUploadType,
 		Status:        model.UploadStatusUsed,
 		AccessMode:    1,
 		Metadata: model.UploadMetadata{
 			OriginalMime: mimeType,
-			Bucket:       config.Config.S3.Bucket,
+			Bucket:       result.Bucket,
 			Extra: map[string]any{
 				"pixez_source_url": pixivURL,
 				"pixez_page":       pageIndex,
@@ -488,9 +476,8 @@ func registerMirrorUpload(ctx context.Context, pixivURL string, pageIndex int, d
 		},
 	}
 	if err := db.DB(ctx).Create(&upload).Error; err != nil {
-		if storageDriver == "local" {
-			//nolint:gosec // filePath is safely constructed inside the local uploads directory
-			_ = os.Remove(filePath)
+		if deleteErr := backend.Delete(ctx, result.Key); deleteErr != nil {
+			logger.WarnF(ctx, "failed to delete mirrored file on database error: %v", deleteErr)
 		}
 		return model.PixezMirrorImageFile{}, fmt.Errorf("create upload record: %w", err)
 	}

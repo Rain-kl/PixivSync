@@ -35,7 +35,7 @@ func newOSSBackend(cfg ObjectConfig) (*ossBackend, error) {
 	}, nil
 }
 
-func (b *ossBackend) Put(ctx context.Context, key string, body io.Reader, _ int64, _ string) (string, error) {
+func (b *ossBackend) Put(ctx context.Context, key string, body io.Reader, _ int64, _ string) (PutResult, error) {
 	key = b.key(key)
 	_, err := b.client.PutObject(ctx, &oss.PutObjectRequest{
 		Bucket: oss.Ptr(b.bucket),
@@ -43,9 +43,9 @@ func (b *ossBackend) Put(ctx context.Context, key string, body io.Reader, _ int6
 		Body:   body,
 	})
 	if err != nil {
-		return "", fmt.Errorf("put OSS object: %w", err)
+		return PutResult{}, fmt.Errorf("put OSS object: %w", err)
 	}
-	return key, nil
+	return PutResult{Key: key, Bucket: b.bucket}, nil
 }
 
 func (b *ossBackend) Get(ctx context.Context, key string) (*Object, error) {

@@ -137,7 +137,7 @@ func TestListSystemConfigs(t *testing.T) {
 		var configs []model.SystemConfig
 		_ = json.Unmarshal(dataBytes, &configs)
 
-		const expectedDefaultConfigCount = 32
+		const expectedDefaultConfigCount = 33
 		if len(configs) != expectedDefaultConfigCount {
 			t.Errorf("expected %d default configs, got %d", expectedDefaultConfigCount, len(configs))
 		}

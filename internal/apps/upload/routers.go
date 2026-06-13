@@ -404,22 +404,13 @@ func storeUploadFile(ctx context.Context, subPath string, size int64, mimeType s
 		logger.ErrorF(ctx, "初始化活动存储失败: %v", err)
 		return "", "", ErrSaveFileFailed
 	}
-	storedPath, err := backend.Put(ctx, subPath, bytes.NewReader(buf.Bytes()), size, mimeType)
+	result, err := backend.Put(ctx, subPath, bytes.NewReader(buf.Bytes()), size, mimeType)
 	if err != nil {
 		logger.ErrorF(ctx, "写入 %s 存储失败: %v", driver, err)
 		return "", "", ErrSaveFileFailed
 	}
-	switch driver {
-	case storage.DriverS3:
-		meta.Bucket = cfgBucket(ctx, driver)
-	case storage.DriverR2:
-		meta.Bucket = cfgBucket(ctx, driver)
-	case storage.DriverMinIO:
-		meta.Bucket = cfgBucket(ctx, driver)
-	case storage.DriverOSS:
-		meta.Bucket = cfgBucket(ctx, driver)
-	}
-	return string(driver), storedPath, ""
+	meta.Bucket = result.Bucket
+	return string(driver), result.Key, ""
 }
 
 // isImageExtension 判断文件扩展名是否属于常见图片格式

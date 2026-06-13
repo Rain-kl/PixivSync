@@ -25,13 +25,13 @@ func newLocalBackend(cfg LocalConfig) (*localBackend, error) {
 	return &localBackend{root: root}, nil
 }
 
-func (b *localBackend) Put(_ context.Context, key string, body io.Reader, _ int64, _ string) (string, error) {
+func (b *localBackend) Put(_ context.Context, key string, body io.Reader, _ int64, _ string) (PutResult, error) {
 	path, err := b.path(key)
 	if err != nil {
-		return "", err
+		return PutResult{}, err
 	}
 	if err := os.MkdirAll(filepath.Dir(path), storageDirPerm); err != nil {
-		return "", err
+		return PutResult{}, err
 	}
 	file, err := os.OpenFile( //nolint:gosec // path is constrained to the configured storage root.
 		path,
@@ -39,18 +39,18 @@ func (b *localBackend) Put(_ context.Context, key string, body io.Reader, _ int6
 		storageFilePerm,
 	)
 	if err != nil {
-		return "", err
+		return PutResult{}, err
 	}
 	if _, err := io.Copy(file, body); err != nil {
 		_ = file.Close()
 		_ = os.Remove(path)
-		return "", err
+		return PutResult{}, err
 	}
 	if err := file.Close(); err != nil {
 		_ = os.Remove(path)
-		return "", err
+		return PutResult{}, err
 	}
-	return filepath.ToSlash(key), nil
+	return PutResult{Key: filepath.ToSlash(key)}, nil
 }
 
 func (b *localBackend) Get(_ context.Context, key string) (*Object, error) {

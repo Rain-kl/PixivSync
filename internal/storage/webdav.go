@@ -28,17 +28,17 @@ func newWebDAVBackend(cfg WebDAVConfig) (*webDAVBackend, error) {
 	}, nil
 }
 
-func (b *webDAVBackend) Put(_ context.Context, key string, body io.Reader, size int64, _ string) (string, error) {
+func (b *webDAVBackend) Put(_ context.Context, key string, body io.Reader, size int64, _ string) (PutResult, error) {
 	key = b.key(key)
 	if dir := path.Dir(key); dir != "." && dir != "/" {
 		if err := b.client.MkdirAll(dir, storageDirPerm); err != nil {
-			return "", fmt.Errorf("create WebDAV directory: %w", err)
+			return PutResult{}, fmt.Errorf("create WebDAV directory: %w", err)
 		}
 	}
 	if err := b.client.WriteStreamWithLength(key, body, size, storageFilePerm); err != nil {
-		return "", fmt.Errorf("put WebDAV object: %w", err)
+		return PutResult{}, fmt.Errorf("put WebDAV object: %w", err)
 	}
-	return key, nil
+	return PutResult{Key: key}, nil
 }
 
 func (b *webDAVBackend) Get(_ context.Context, key string) (*Object, error) {

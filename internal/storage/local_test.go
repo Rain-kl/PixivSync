@@ -19,12 +19,12 @@ func TestLocalBackendRoundTrip(t *testing.T) {
 	const key = "uploads/2026/06/13/test.txt"
 	const content = "wavelet storage"
 
-	storedKey, err := backend.Put(ctx, key, bytes.NewBufferString(content), int64(len(content)), "text/plain")
+	storedResult, err := backend.Put(ctx, key, bytes.NewBufferString(content), int64(len(content)), "text/plain")
 	if err != nil {
 		t.Fatalf("Put(%q) returned error: %v", key, err)
 	}
-	if storedKey != key {
-		t.Errorf("Put(%q) key = %q, want %q", key, storedKey, key)
+	if storedResult.Key != key {
+		t.Errorf("Put(%q) key = %q, want %q", key, storedResult.Key, key)
 	}
 
 	object, err := backend.Get(ctx, key)
