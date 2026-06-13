@@ -25,7 +25,6 @@ import (
 	"github.com/gin-contrib/sessions/cookie"
 	"github.com/gin-gonic/gin"
 	"github.com/go-jose/go-jose/v4"
-	"github.com/google/uuid"
 	"github.com/redis/go-redis/v9"
 	"golang.org/x/oauth2"
 	"gorm.io/driver/sqlite"
@@ -245,7 +244,7 @@ func generateMockIDToken(issuer, sub, aud, nonce, username, email, name string) 
 
 // -----------------------------------------------------------------------------
 // Test Helpers
-func newMockOIDCClient(issuer, clientID, expectedState, sub, username, email, name string) *http.Client {
+func newMockOIDCClient(issuer, clientID string, expectedState *string, sub, username, email, name string) *http.Client {
 	cleanIssuer := strings.TrimRight(issuer, "/")
 	return &http.Client{
 		Transport: &mockRoundTripper{
@@ -276,7 +275,11 @@ func newMockOIDCClient(issuer, clientID, expectedState, sub, username, email, na
 					}, nil
 				}
 				if req.Method == http.MethodPost && (strings.Contains(urlStr, "/token") || strings.Contains(urlStr, "/access_token")) {
-					idToken := generateMockIDToken(issuer, sub, clientID, expectedState, username, email, name)
+					var stateVal string
+					if expectedState != nil {
+						stateVal = *expectedState
+					}
+					idToken := generateMockIDToken(issuer, sub, clientID, stateVal, username, email, name)
 					body := fmt.Sprintf(`{"access_token":"mock_access_token","token_type":"Bearer","expires_in":3600,"id_token":"%s"}`, idToken)
 					return &http.Response{
 						StatusCode: http.StatusOK,
@@ -564,8 +567,29 @@ func TestAuthorize(t *testing.T) {
 	util.SetHTTPClient(httpMock)
 	router := setupTestRouter(dbConn, mockRedis, httpMock)
 
-	// Case 1: Active Source Authorize with purpose=bind
-	w := performRequest(router, http.MethodGet, "/api/v1/oauth/github/authorize?purpose=bind", nil, nil, nil)
+	// Case 1a: Active Source Authorize with purpose=bind without login -> 401
+	wUnauth := performRequest(router, http.MethodGet, "/api/v1/oauth/github/authorize?purpose=bind", nil, nil, nil)
+	if wUnauth.Code != http.StatusUnauthorized {
+		t.Errorf("expected 401 for unauthorized bind authorize, got %d", wUnauth.Code)
+	}
+
+	// Case 1b: Active Source Authorize with purpose=bind (authenticated)
+	router.GET("/test-helper/login-777", func(c *gin.Context) {
+		session := sessions.Default(c)
+		session.Set(UserIDKey, uint64(777))
+		_ = session.Save()
+		c.String(200, "ok")
+	})
+	wLogin := performRequest(router, http.MethodGet, "/test-helper/login-777", nil, nil, nil)
+	var activeCookie *http.Cookie
+	for _, cookie := range wLogin.Result().Cookies() {
+		if cookie.Name == config.Config.App.SessionCookieName {
+			activeCookie = cookie
+			break
+		}
+	}
+
+	w := performRequest(router, http.MethodGet, "/api/v1/oauth/github/authorize?purpose=bind", nil, nil, []*http.Cookie{activeCookie})
 	if w.Code != http.StatusOK {
 		t.Fatalf("expected 200, got %d, body: %s", w.Code, w.Body.String())
 	}
@@ -573,6 +597,7 @@ func TestAuthorize(t *testing.T) {
 	var resp struct {
 		Data OAuthAuthorizeResponse `json:"data"`
 	}
+
 	_ = json.Unmarshal(w.Body.Bytes(), &resp)
 
 	parsedURL, _ := url.Parse(resp.Data.AuthorizeURL)
@@ -611,25 +636,44 @@ func TestCallbackLoginAndUserInfo(t *testing.T) {
 	dbConn := setupTestDB(t)
 	mockRedis := newMockRedisClient()
 	seedTestAuthSource(t, dbConn)
-	state := uuid.NewString()
+
+	var state string
 
 	// 1. Mock the outgoing HTTP client for token exchange and user info fetching
-	httpMock := newMockOIDCClient(testIssuerURL, testClientID, state, "88888", "test_oauth_user", "oauth@linux.do", "Oauth Test User")
+	httpMock := newMockOIDCClient(testIssuerURL, testClientID, &state, "88888", "test_oauth_user", "oauth@linux.do", "Oauth Test User")
 	util.SetHTTPClient(httpMock)
 	router := setupTestRouter(dbConn, mockRedis, httpMock)
 
-	// 2. Setup state in Redis
-	payloadValue, _ := encodeOAuthStatePayload(oauthStatePayload{
-		SourceName: testSourceName,
-		Purpose:    OAuthPurposeLogin,
-	})
-	mockRedis.Set(context.Background(), db.PrefixedKey(fmt.Sprintf(OAuthStateCacheKeyFormat, state)), payloadValue, OAuthStateCacheKeyExpiration)
+	// Get Login URL first to initialize the session and generate the state
+	wLogin := performRequest(router, http.MethodGet, "/api/v1/oauth/login?source="+testSourceName, nil, nil, nil)
+	if wLogin.Code != http.StatusOK {
+		t.Fatalf("failed to get login URL: %s", wLogin.Body.String())
+	}
+
+	var loginUrlResp struct {
+		Data OAuthAuthorizeResponse `json:"data"`
+	}
+	_ = json.Unmarshal(wLogin.Body.Bytes(), &loginUrlResp)
+
+	parsedURL, _ := url.Parse(loginUrlResp.Data.AuthorizeURL)
+	state = parsedURL.Query().Get("state")
+
+	var anonymousCookie *http.Cookie
+	for _, cookie := range wLogin.Result().Cookies() {
+		if cookie.Name == config.Config.App.SessionCookieName {
+			anonymousCookie = cookie
+			break
+		}
+	}
+	if anonymousCookie == nil {
+		t.Fatal("session cookie not found after login URL generation")
+	}
 
 	// 3. Trigger Callback (Login flow - new user)
 	reqBody := fmt.Sprintf(`{"state":"%s","code":"test_auth_code"}`, state)
 	w := performRequest(router, http.MethodPost, "/api/v1/oauth/callback", []byte(reqBody), map[string]string{
 		"Content-Type": "application/json",
-	}, nil)
+	}, []*http.Cookie{anonymousCookie})
 
 	if w.Code != http.StatusOK {
 		t.Fatalf("callback failed with status %d, body: %s", w.Code, w.Body.String())
@@ -674,20 +718,35 @@ func TestCallbackLoginAndUserInfo(t *testing.T) {
 	}
 
 	// 5. Test Callback (Login flow - existing user, username collision check)
-	state2 := uuid.NewString()
-	mockRedis.Set(context.Background(), db.PrefixedKey(fmt.Sprintf(OAuthStateCacheKeyFormat, state2)), payloadValue, OAuthStateCacheKeyExpiration)
-
+	var state2 string
 	// Callback with same username but different external ID (99999)
-	httpMock2 := newMockOIDCClient(testIssuerURL, testClientID, state2, "99999", "test_oauth_user", "another@linux.do", "Another User")
+	httpMock2 := newMockOIDCClient(testIssuerURL, testClientID, &state2, "99999", "test_oauth_user", "another@linux.do", "Another User")
 	util.SetHTTPClient(httpMock2)
 
 	// Create another router for this mock client
 	router2 := setupTestRouter(dbConn, mockRedis, httpMock2)
 
+	// Call login to get state2 and new anonymous session
+	wLogin2 := performRequest(router2, http.MethodGet, "/api/v1/oauth/login?source="+testSourceName, nil, nil, nil)
+	var loginUrlResp2 struct {
+		Data OAuthAuthorizeResponse `json:"data"`
+	}
+	_ = json.Unmarshal(wLogin2.Body.Bytes(), &loginUrlResp2)
+	parsedURL2, _ := url.Parse(loginUrlResp2.Data.AuthorizeURL)
+	state2 = parsedURL2.Query().Get("state")
+
+	var anonymousCookie2 *http.Cookie
+	for _, cookie := range wLogin2.Result().Cookies() {
+		if cookie.Name == config.Config.App.SessionCookieName {
+			anonymousCookie2 = cookie
+			break
+		}
+	}
+
 	reqBody2 := fmt.Sprintf(`{"state":"%s","code":"test_auth_code"}`, state2)
 	w3 := performRequest(router2, http.MethodPost, "/api/v1/oauth/callback", []byte(reqBody2), map[string]string{
 		"Content-Type": "application/json",
-	}, nil)
+	}, []*http.Cookie{anonymousCookie2})
 
 	if w3.Code != http.StatusOK {
 		t.Fatalf("callback for collision failed: %d, body: %s", w3.Code, w3.Body.String())
@@ -712,21 +771,31 @@ func TestCallbackLoginAndUserInfo(t *testing.T) {
 			dbConn.Where("key = ?", model.ConfigKeyRegistrationEnabled).Delete(&model.SystemConfig{})
 		}()
 
-		state4 := uuid.NewString()
-		payloadValue4, _ := encodeOAuthStatePayload(oauthStatePayload{
-			SourceName: testSourceName,
-			Purpose:    OAuthPurposeLogin,
-		})
-		mockRedis.Set(context.Background(), db.PrefixedKey(fmt.Sprintf(OAuthStateCacheKeyFormat, state4)), payloadValue4, OAuthStateCacheKeyExpiration)
-
-		httpMock4 := newMockOIDCClient(testIssuerURL, testClientID, state4, "77777", "need_bind_user", "needbind@linux.do", "Need Bind User")
+		var state4 string
+		httpMock4 := newMockOIDCClient(testIssuerURL, testClientID, &state4, "77777", "need_bind_user", "needbind@linux.do", "Need Bind User")
 		util.SetHTTPClient(httpMock4)
 		router4 := setupTestRouter(dbConn, mockRedis, httpMock4)
+
+		wLogin4 := performRequest(router4, http.MethodGet, "/api/v1/oauth/login?source="+testSourceName, nil, nil, nil)
+		var loginUrlResp4 struct {
+			Data OAuthAuthorizeResponse `json:"data"`
+		}
+		_ = json.Unmarshal(wLogin4.Body.Bytes(), &loginUrlResp4)
+		parsedURL4, _ := url.Parse(loginUrlResp4.Data.AuthorizeURL)
+		state4 = parsedURL4.Query().Get("state")
+
+		var anonymousCookie4 *http.Cookie
+		for _, cookie := range wLogin4.Result().Cookies() {
+			if cookie.Name == config.Config.App.SessionCookieName {
+				anonymousCookie4 = cookie
+				break
+			}
+		}
 
 		reqBody4 := fmt.Sprintf(`{"state":"%s","code":"test_auth_code"}`, state4)
 		w4 := performRequest(router4, http.MethodPost, "/api/v1/oauth/callback", []byte(reqBody4), map[string]string{
 			"Content-Type": "application/json",
-		}, nil)
+		}, []*http.Cookie{anonymousCookie4})
 
 		if w4.Code != http.StatusOK {
 			t.Fatalf("callback failed: %d, body: %s", w4.Code, w4.Body.String())
@@ -773,30 +842,13 @@ func TestCallbackBind(t *testing.T) {
 		OpenIDDiscoveryURL: "https://github.com",
 	})
 
-	// Inject state in Redis with purpose=bind
-	state := uuid.NewString()
-	payloadValue, _ := encodeOAuthStatePayload(oauthStatePayload{
-		SourceName: "github",
-		Purpose:    OAuthPurposeBind,
-	})
-	mockRedis.Set(context.Background(), db.PrefixedKey(fmt.Sprintf(OAuthStateCacheKeyFormat, state)), payloadValue, OAuthStateCacheKeyExpiration)
-
+	var state string
 	// Mock OIDC discovery, JWKS, and Token exchange for custom source (GitHub)
-	httpMock := newMockOIDCClient("https://github.com", "gh_client", state, "github_user_123", "github_tester", "tester@github.com", "GitHub Tester")
+	httpMock := newMockOIDCClient("https://github.com", "gh_client", &state, "github_user_123", "github_tester", "tester@github.com", "GitHub Tester")
 	util.SetHTTPClient(httpMock)
 	router := setupTestRouter(dbConn, mockRedis, httpMock)
 
-	// Case 1: Bind attempt without session -> 401
-	reqBody := fmt.Sprintf(`{"state":"%s","code":"test_code"}`, state)
-	w1 := performRequest(router, http.MethodPost, "/api/v1/oauth/callback", []byte(reqBody), map[string]string{
-		"Content-Type": "application/json",
-	}, nil)
-
-	if w1.Code != http.StatusUnauthorized {
-		t.Errorf("expected 401 for unauthenticated bind, got %d, body: %s", w1.Code, w1.Body.String())
-	}
-
-	// Case 2: Bind success (authenticated)
+	// Set up login helper
 	router.GET("/test-helper/login-777", func(c *gin.Context) {
 		session := sessions.Default(c)
 		session.Set(UserIDKey, uint64(777))
@@ -813,10 +865,54 @@ func TestCallbackBind(t *testing.T) {
 		}
 	}
 
-	// Restore state key in redis
-	mockRedis.Set(context.Background(), db.PrefixedKey(fmt.Sprintf(OAuthStateCacheKeyFormat, state)), payloadValue, OAuthStateCacheKeyExpiration)
+	// Generate OAuth authorize link (purpose=bind) to set state in Redis and Session
+	wAuth := performRequest(router, http.MethodGet, "/api/v1/oauth/github/authorize?purpose=bind", nil, nil, []*http.Cookie{activeCookie})
+	if wAuth.Code != http.StatusOK {
+		t.Fatalf("authorize failed: %d, body: %s", wAuth.Code, wAuth.Body.String())
+	}
+	// Extract the cookie from wAuth to get the session with the token!
+	for _, cookie := range wAuth.Result().Cookies() {
+		if cookie.Name == config.Config.App.SessionCookieName {
+			activeCookie = cookie
+			break
+		}
+	}
+	var authResp struct {
+		Data OAuthAuthorizeResponse `json:"data"`
+	}
+	_ = json.Unmarshal(wAuth.Body.Bytes(), &authResp)
+	parsedURL, _ := url.Parse(authResp.Data.AuthorizeURL)
+	state = parsedURL.Query().Get("state")
 
-	w2 := performRequest(router, http.MethodPost, "/api/v1/oauth/callback", []byte(reqBody), map[string]string{
+	// Case 1: Bind attempt without session -> 401
+	reqBody := fmt.Sprintf(`{"state":"%s","code":"test_code"}`, state)
+	w1 := performRequest(router, http.MethodPost, "/api/v1/oauth/callback", []byte(reqBody), map[string]string{
+		"Content-Type": "application/json",
+	}, nil)
+
+	if w1.Code != http.StatusUnauthorized {
+		t.Errorf("expected 401 for unauthenticated bind, got %d, body: %s", w1.Code, w1.Body.String())
+	}
+
+	// Case 2: Bind success (authenticated)
+	// Re-run authorize since state is consumed/deleted during Callback attempt
+	wAuth2 := performRequest(router, http.MethodGet, "/api/v1/oauth/github/authorize?purpose=bind", nil, nil, []*http.Cookie{activeCookie})
+	// Extract updated cookie from wAuth2
+	for _, cookie := range wAuth2.Result().Cookies() {
+		if cookie.Name == config.Config.App.SessionCookieName {
+			activeCookie = cookie
+			break
+		}
+	}
+	var authResp2 struct {
+		Data OAuthAuthorizeResponse `json:"data"`
+	}
+	_ = json.Unmarshal(wAuth2.Body.Bytes(), &authResp2)
+	parsedURL2, _ := url.Parse(authResp2.Data.AuthorizeURL)
+	state = parsedURL2.Query().Get("state")
+
+	reqBody2 := fmt.Sprintf(`{"state":"%s","code":"test_code"}`, state)
+	w2 := performRequest(router, http.MethodPost, "/api/v1/oauth/callback", []byte(reqBody2), map[string]string{
 		"Content-Type": "application/json",
 	}, []*http.Cookie{activeCookie})
 
@@ -865,13 +961,30 @@ func TestCallbackBind(t *testing.T) {
 		}
 	}
 
-	state3 := uuid.NewString()
-	mockRedis.Set(context.Background(), db.PrefixedKey(fmt.Sprintf(OAuthStateCacheKeyFormat, state3)), payloadValue, OAuthStateCacheKeyExpiration)
-
+	var state3 string
 	// Re-sign token for new state (since state serves as OIDC Nonce)
-	httpMock3 := newMockOIDCClient("https://github.com", "gh_client", state3, "github_user_123", "github_tester", "tester@github.com", "GitHub Tester")
+	httpMock3 := newMockOIDCClient("https://github.com", "gh_client", &state3, "github_user_123", "github_tester", "tester@github.com", "GitHub Tester")
 	util.SetHTTPClient(httpMock3)
 	router3 := setupTestRouter(dbConn, mockRedis, httpMock3)
+
+	// Generate state3 and SessionHash using activeCookie2
+	wAuth3 := performRequest(router3, http.MethodGet, "/api/v1/oauth/github/authorize?purpose=bind", nil, nil, []*http.Cookie{activeCookie2})
+	if wAuth3.Code != http.StatusOK {
+		t.Fatalf("authorize failed: %d, body: %s", wAuth3.Code, wAuth3.Body.String())
+	}
+	// Extract the cookie to get the updated session token
+	for _, cookie := range wAuth3.Result().Cookies() {
+		if cookie.Name == config.Config.App.SessionCookieName {
+			activeCookie2 = cookie
+			break
+		}
+	}
+	var authResp3 struct {
+		Data OAuthAuthorizeResponse `json:"data"`
+	}
+	_ = json.Unmarshal(wAuth3.Body.Bytes(), &authResp3)
+	parsedURL3, _ := url.Parse(authResp3.Data.AuthorizeURL)
+	state3 = parsedURL3.Query().Get("state")
 
 	reqBody3 := fmt.Sprintf(`{"state":"%s","code":"test_code"}`, state3)
 	w3 := performRequest(router3, http.MethodPost, "/api/v1/oauth/callback", []byte(reqBody3), map[string]string{
@@ -881,6 +994,7 @@ func TestCallbackBind(t *testing.T) {
 	if w3.Code != http.StatusBadRequest {
 		t.Errorf("expected 400 for already bound account, got %d, body: %s", w3.Code, w3.Body.String())
 	}
+
 }
 
 func TestExternalAccountsListAndDelete(t *testing.T) {
@@ -952,5 +1066,117 @@ func TestExternalAccountsListAndDelete(t *testing.T) {
 	dbConn.Model(&model.ExternalAccount{}).Where("id = ?", 2001).Count(&count)
 	if count != 0 {
 		t.Error("binding record was not deleted from DB")
+	}
+}
+
+func TestOIDCPolicyEnforcement(t *testing.T) {
+	initializeTestConfig()
+	dbConn := setupTestDB(t)
+	mockRedis := newMockRedisClient()
+	seedTestAuthSource(t, dbConn) // seeds testSourceName ("linuxdo") active=true
+
+	// Set up mock client & router
+	var state string
+	httpMock := newMockOIDCClient(testIssuerURL, testClientID, &state, "88888", "test_oauth_user", "oauth@linux.do", "Oauth Test User")
+	util.SetHTTPClient(httpMock)
+	router := setupTestRouter(dbConn, mockRedis, httpMock)
+
+	// --- 1. Test GetLoginURL enforcement ---
+	// Disable globally
+	dbConn.Create(&model.SystemConfig{
+		Key:   model.ConfigKeyOIDCLoginEnabled,
+		Value: "false",
+	})
+	mockRedis.Del(context.Background(), db.PrefixedKey(model.SystemConfigRedisHashKey)+":"+model.ConfigKeyOIDCLoginEnabled)
+	wLoginDisabled := performRequest(router, http.MethodGet, "/api/v1/oauth/login?source="+testSourceName, nil, nil, nil)
+	if wLoginDisabled.Code != http.StatusBadRequest {
+		t.Errorf("expected 400 when OIDC globally disabled, got %d", wLoginDisabled.Code)
+	}
+
+	// Re-enable globally, but deactivate source
+	dbConn.Model(&model.SystemConfig{}).Where("key = ?", model.ConfigKeyOIDCLoginEnabled).Update("value", "true")
+	mockRedis.Del(context.Background(), db.PrefixedKey(model.SystemConfigRedisHashKey)+":"+model.ConfigKeyOIDCLoginEnabled)
+	dbConn.Model(&model.AuthSource{}).Where("name = ?", testSourceName).Update("is_active", false)
+
+	wSourceInactive := performRequest(router, http.MethodGet, "/api/v1/oauth/login?source="+testSourceName, nil, nil, nil)
+	if wSourceInactive.Code != http.StatusBadRequest {
+		t.Errorf("expected 400 when OIDC source is inactive, got %d", wSourceInactive.Code)
+	}
+
+	// --- 2. Test Authorize enforcement ---
+	// Deactivate globally again
+	dbConn.Model(&model.SystemConfig{}).Where("key = ?", model.ConfigKeyOIDCLoginEnabled).Update("value", "false")
+	mockRedis.Del(context.Background(), db.PrefixedKey(model.SystemConfigRedisHashKey)+":"+model.ConfigKeyOIDCLoginEnabled)
+	dbConn.Model(&model.AuthSource{}).Where("name = ?", testSourceName).Update("is_active", true)
+
+	wAuthDisabled := performRequest(router, http.MethodGet, "/api/v1/oauth/"+testSourceName+"/authorize", nil, nil, nil)
+	if wAuthDisabled.Code != http.StatusBadRequest {
+		t.Errorf("expected 400 when OIDC globally disabled in Authorize, got %d", wAuthDisabled.Code)
+	}
+
+	// --- 3. Test Callback enforcement ---
+	// Set up a valid state beforehand (when enabled)
+	dbConn.Model(&model.SystemConfig{}).Where("key = ?", model.ConfigKeyOIDCLoginEnabled).Update("value", "true")
+	mockRedis.Del(context.Background(), db.PrefixedKey(model.SystemConfigRedisHashKey)+":"+model.ConfigKeyOIDCLoginEnabled)
+	dbConn.Model(&model.AuthSource{}).Where("name = ?", testSourceName).Update("is_active", true)
+
+	wLogin := performRequest(router, http.MethodGet, "/api/v1/oauth/login?source="+testSourceName, nil, nil, nil)
+
+	if wLogin.Code != http.StatusOK {
+		t.Fatalf("failed to setup login: %s", wLogin.Body.String())
+	}
+	var loginUrlResp struct {
+		Data OAuthAuthorizeResponse `json:"data"`
+	}
+	_ = json.Unmarshal(wLogin.Body.Bytes(), &loginUrlResp)
+	parsedURL, _ := url.Parse(loginUrlResp.Data.AuthorizeURL)
+	state = parsedURL.Query().Get("state")
+
+	var anonymousCookie *http.Cookie
+	for _, cookie := range wLogin.Result().Cookies() {
+		if cookie.Name == config.Config.App.SessionCookieName {
+			anonymousCookie = cookie
+			break
+		}
+	}
+
+	// Now disable OIDC globally and attempt callback
+	dbConn.Model(&model.SystemConfig{}).Where("key = ?", model.ConfigKeyOIDCLoginEnabled).Update("value", "false")
+	mockRedis.Del(context.Background(), db.PrefixedKey(model.SystemConfigRedisHashKey)+":"+model.ConfigKeyOIDCLoginEnabled)
+	reqBody := fmt.Sprintf(`{"state":"%s","code":"test_auth_code"}`, state)
+	wCallbackDisabled := performRequest(router, http.MethodPost, "/api/v1/oauth/callback", []byte(reqBody), map[string]string{
+		"Content-Type": "application/json",
+	}, []*http.Cookie{anonymousCookie})
+	if wCallbackDisabled.Code != http.StatusBadRequest {
+		t.Errorf("expected 400 for callback when OIDC globally disabled, got %d, body: %s", wCallbackDisabled.Code, wCallbackDisabled.Body.String())
+	}
+
+	// Enable globally but deactivate source and attempt callback
+	dbConn.Model(&model.SystemConfig{}).Where("key = ?", model.ConfigKeyOIDCLoginEnabled).Update("value", "true")
+	mockRedis.Del(context.Background(), db.PrefixedKey(model.SystemConfigRedisHashKey)+":"+model.ConfigKeyOIDCLoginEnabled)
+	dbConn.Model(&model.AuthSource{}).Where("name = ?", testSourceName).Update("is_active", false)
+
+	// Since callback deletes state, we need to generate state again
+	dbConn.Model(&model.AuthSource{}).Where("name = ?", testSourceName).Update("is_active", true)
+	wLogin2 := performRequest(router, http.MethodGet, "/api/v1/oauth/login?source="+testSourceName, nil, nil, nil)
+	_ = json.Unmarshal(wLogin2.Body.Bytes(), &loginUrlResp)
+	parsedURL, _ = url.Parse(loginUrlResp.Data.AuthorizeURL)
+	state = parsedURL.Query().Get("state")
+	var anonymousCookie2 *http.Cookie
+	for _, cookie := range wLogin2.Result().Cookies() {
+		if cookie.Name == config.Config.App.SessionCookieName {
+			anonymousCookie2 = cookie
+			break
+		}
+	}
+
+	// Deactivate source
+	dbConn.Model(&model.AuthSource{}).Where("name = ?", testSourceName).Update("is_active", false)
+	reqBody2 := fmt.Sprintf(`{"state":"%s","code":"test_auth_code"}`, state)
+	wCallbackSourceInactive := performRequest(router, http.MethodPost, "/api/v1/oauth/callback", []byte(reqBody2), map[string]string{
+		"Content-Type": "application/json",
+	}, []*http.Cookie{anonymousCookie2})
+	if wCallbackSourceInactive.Code != http.StatusBadRequest {
+		t.Errorf("expected 400 for callback when OIDC source deactivated, got %d, body: %s", wCallbackSourceInactive.Code, wCallbackSourceInactive.Body.String())
 	}
 }

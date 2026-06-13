@@ -18,4 +18,5 @@ const (
 	UsernameFromSourceFailed        = "无法从认证源获取用户名"
 	AuthSourceDisabled              = "认证源未启用"
 	InvalidExternalAccountBindingID = "绑定记录 ID 无效"
+	TokenAuthNotAllowed             = "该端点不允许使用访问令牌进行身份验证" //nolint:gosec // false positive: this is an error message, not hardcoded credentials
 )

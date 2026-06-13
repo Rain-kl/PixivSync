@@ -1,5 +1,5 @@
-import { clsx, type ClassValue } from "clsx"
-import { twMerge } from "tailwind-merge"
+import {type ClassValue, clsx} from "clsx"
+import {twMerge} from "tailwind-merge"
 
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs))
@@ -91,3 +91,54 @@ export function generateTransactionCacheKey(params: {
 
   return `${ typesKey }_${ statusesKey }_${ transferStatusKey }_${ clientIdKey }_${ params.page }_${ params.page_size }_${ startTimeKey }_${ endTimeKey }_${ idKey }_${ orderNameKey }_${ payerKey }_${ payeeKey }`
 }
+
+/**
+ * 验证并净化重定向目标 URL，防止 Open Redirect 和 XSS 攻击。
+ * 只允许以单个斜杠 "/" 开头的相对路径，拒绝 "//"、协议、反斜杠、控制字符等编码变体。
+ */
+export function safeRedirectTarget(url: string | null | undefined, fallback = "/home"): string {
+  if (!url) return fallback
+
+  // 1. 拒绝包含控制字符、空白字符或反斜杠的 URL
+  if (/[\u0000-\u001F\u007F-\u009F\s\\]/.test(url)) {
+    return fallback
+  }
+
+  // 2. 必须以单个 '/' 开头，且不能以 '//' 开头
+  if (!url.startsWith("/") || url.startsWith("//")) {
+    return fallback
+  }
+
+  // 3. 递归 URL 解码并检测潜在的绕过载荷
+  try {
+    let decoded = url
+    let prev = ""
+    let attempts = 0
+    while (decoded !== prev && decoded.includes("%") && attempts < 3) {
+      prev = decoded
+      decoded = decodeURIComponent(decoded)
+      attempts++
+    }
+
+    // 检查解码后的内容是否包含控制字符、空白字符或反斜杠
+    if (/[\u0000-\u001F\u007F-\u009F\s\\]/.test(decoded)) {
+      return fallback
+    }
+
+    // 检查解码后的内容是否以单个 '/' 开头，且不能以 '//' 开头
+    if (!decoded.startsWith("/") || decoded.startsWith("//")) {
+      return fallback
+    }
+
+    // 提取路径部分（即问号 ? 或井号 # 之前的内容），确保其中不含冒号（防止 scheme）、双斜杠或反斜杠
+    const pathPart = decoded.split(/[?#]/)[0]
+    if (pathPart.includes(":") || pathPart.includes("//") || pathPart.includes("\\")) {
+      return fallback
+    }
+  } catch {
+    return fallback
+  }
+
+  return url
+}
+

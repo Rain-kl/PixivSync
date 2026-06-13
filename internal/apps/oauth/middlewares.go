@@ -101,3 +101,14 @@ func LoginRequired() gin.HandlerFunc {
 		c.Next()
 	}
 }
+
+// DisallowTokenAuth 拒绝使用 Access Token 进行身份验证的请求访问该端点
+func DisallowTokenAuth() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		if tokenAuth, _ := util.GetFromContext[bool](c, TokenAuthKey); tokenAuth {
+			c.AbortWithStatusJSON(http.StatusForbidden, gin.H{"error_msg": TokenAuthNotAllowed, "data": nil})
+			return
+		}
+		c.Next()
+	}
+}

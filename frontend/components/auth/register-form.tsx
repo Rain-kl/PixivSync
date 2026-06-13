@@ -14,6 +14,7 @@ import {Field, FieldGroup, FieldLabel} from "@/components/ui/field"
 import {AuthHeading} from "@/components/auth/auth-shell"
 import services from "@/lib/services"
 import type {RegisterRequest} from "@/lib/services/auth/types"
+import {safeRedirectTarget} from "@/lib/utils"
 
 function getRedirectTarget(searchParams: ReturnType<typeof useSearchParams>) {
   const callbackUrl = searchParams.get("callbackUrl")
@@ -21,8 +22,9 @@ function getRedirectTarget(searchParams: ReturnType<typeof useSearchParams>) {
     typeof window === "undefined"
       ? null
       : sessionStorage.getItem("redirect_after_login")
-  return callbackUrl || storedRedirect || "/home"
+  return safeRedirectTarget(callbackUrl || storedRedirect || "/home")
 }
+
 
 function configBool(value: string | undefined, fallback: boolean) {
   if (value === undefined) return fallback

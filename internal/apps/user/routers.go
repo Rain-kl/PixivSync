@@ -164,9 +164,6 @@ func Login(c *gin.Context) {
 		return
 	}
 
-	// 检查是否有未完成 of OAuth/OIDC 绑定
-	completePendingOAuthBinding(ctx, session, &user)
-
 	c.JSON(http.StatusOK, util.OK(oauth.BuildBasicUserInfo(&user, needChangePassword)))
 }
 

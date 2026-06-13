@@ -443,3 +443,114 @@ func TestLoginEmailVerificationFallbackForEmptyEmail(t *testing.T) {
 		t.Errorf("expected login success, got error %q", successResp.ErrorMsg)
 	}
 }
+
+func TestAccessTokenEndpointsDisallowTokenAuth(t *testing.T) {
+	dbConn, _, cleanup := testhelper.SetupTestEnvironment(t)
+	defer cleanup()
+
+	// 1. Seed a user
+	const (
+		userID   = uint64(500)
+		username = "tokenuser"
+		password = "tokenpassword123"
+	)
+	now := time.Now()
+	userRecord := model.User{
+		ID:          userID,
+		Username:    username,
+		Nickname:    "Token User",
+		Email:       "tokenuser@example.com",
+		IsActive:    true,
+		IsAdmin:     true, // Make them an admin so we can test with is_admin=true token requests if needed
+		LastLoginAt: now,
+	}
+	if err := userRecord.SetEncryptedPassword(password); err != nil {
+		t.Fatalf("set encrypted password failed: %v", err)
+	}
+	if err := dbConn.Create(&userRecord).Error; err != nil {
+		t.Fatalf("create test user failed: %v", err)
+	}
+
+	// Seed an active AccessToken for this user
+	tokenStr, err := model.GenerateTokenString()
+	if err != nil {
+		t.Fatalf("generate token string failed: %v", err)
+	}
+	tokenHash := model.HashToken(tokenStr)
+	tokenRecord := model.AccessToken{
+		UserID:      userID,
+		Name:        "Test Token",
+		TokenHash:   tokenHash,
+		MaskedToken: model.MaskTokenString(tokenStr),
+		IsAdmin:     false,
+	}
+	if err := dbConn.Create(&tokenRecord).Error; err != nil {
+		t.Fatalf("create test access token failed: %v", err)
+	}
+
+	// 2. Set up router with access-token routes and oauth middlewares
+	gin.SetMode(gin.TestMode)
+	r := gin.New()
+	store := cookie.NewStore([]byte("test_session_secret"))
+	r.Use(sessions.Sessions("test_session_id", store))
+
+	apiV1Router := r.Group("/api/v1")
+	userRouter := apiV1Router.Group("/user")
+	tokenRouter := userRouter.Group("/access-tokens")
+	tokenRouter.Use(oauth.LoginRequired(), oauth.DisallowTokenAuth())
+	{
+		tokenRouter.GET("", ListAccessTokens)
+		tokenRouter.POST("", CreateAccessToken)
+		tokenRouter.DELETE("/:id", DeleteAccessToken)
+		tokenRouter.POST("/:id/rotate", RotateAccessToken)
+	}
+
+	// 3. Test that accessing using an Access Token fails with 403 Forbidden
+	req, _ := http.NewRequest(http.MethodGet, "/api/v1/user/access-tokens", nil)
+	req.Header.Set("X-Access-Token", tokenStr)
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+
+	if w.Code != http.StatusForbidden {
+		t.Errorf("expected status 403 Forbidden when accessing with Access Token, got %d. Body: %s", w.Code, w.Body.String())
+	}
+
+	var resp struct {
+		ErrorMsg string `json:"error_msg"`
+	}
+	if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("decode response failed: %v", err)
+	}
+	if resp.ErrorMsg != oauth.TokenAuthNotAllowed {
+		t.Errorf("expected error message %q, got %q", oauth.TokenAuthNotAllowed, resp.ErrorMsg)
+	}
+
+	// 4. Test that accessing using a Session succeeds
+	sessionCookieStore := cookie.NewStore([]byte("test_session_secret"))
+	rSession := gin.New()
+	rSession.Use(sessions.Sessions("test_session_id", sessionCookieStore))
+	rSession.GET("/api/v1/user/access-tokens", oauth.LoginRequired(), oauth.DisallowTokenAuth(), ListAccessTokens)
+
+	// We can login/register or just mock the session handler to set user ID
+	rSession.GET("/mock-login", func(c *gin.Context) {
+		session := sessions.Default(c)
+		session.Set(oauth.UserIDKey, userID)
+		session.Set(oauth.UserNameKey, username)
+		_ = session.Save()
+		c.String(http.StatusOK, "ok")
+	})
+
+	wMock := httptest.NewRecorder()
+	reqMock, _ := http.NewRequest(http.MethodGet, "/mock-login", nil)
+	rSession.ServeHTTP(wMock, reqMock)
+	cookieVal := wMock.Header().Get("Set-Cookie")
+
+	reqSession, _ := http.NewRequest(http.MethodGet, "/api/v1/user/access-tokens", nil)
+	reqSession.Header.Set("Cookie", cookieVal)
+	wSession := httptest.NewRecorder()
+	rSession.ServeHTTP(wSession, reqSession)
+
+	if wSession.Code != http.StatusOK {
+		t.Errorf("expected status 200 OK when accessing with Session, got %d. Body: %s", wSession.Code, wSession.Body.String())
+	}
+}

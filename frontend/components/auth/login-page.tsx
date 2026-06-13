@@ -11,6 +11,7 @@ import {Check} from "lucide-react"
 
 import services from "@/lib/services"
 import {useAuth} from "@/components/providers/auth-provider"
+import {safeRedirectTarget} from "@/lib/utils"
 
 
 /**
@@ -48,8 +49,9 @@ export function LoginPage() {
       sessionStorage.removeItem('redirect_after_login')
     }
 
-    return target
+    return safeRedirectTarget(target)
   }, [searchParams])
+
 
   /* 登录页兜底：已登录用户直接跳转 */
   useEffect(() => {

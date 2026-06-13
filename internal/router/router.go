@@ -188,7 +188,7 @@ func registerRoutes(r *gin.Engine) {
 
 				// Access Token
 				tokenRouter := userRouter.Group("/access-tokens")
-				tokenRouter.Use(oauth.LoginRequired())
+				tokenRouter.Use(oauth.LoginRequired(), oauth.DisallowTokenAuth())
 				{
 					tokenRouter.GET("", user.ListAccessTokens)
 					tokenRouter.POST("", user.CreateAccessToken)

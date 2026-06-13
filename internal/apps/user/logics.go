@@ -241,51 +241,6 @@ func validateRegisterEmailVerification(ctx context.Context, req *registerRequest
 	return nil
 }
 
-// completePendingOAuthBinding 完成登录后的 OAuth 待绑定绑定流程
-func completePendingOAuthBinding(ctx context.Context, session sessions.Session, user *model.User) {
-	pendingSourceID := session.Get(oauth.PendingOAuthSourceIDKey)
-	pendingExternalID := session.Get(oauth.PendingOAuthExternalIDKey)
-	pendingExternalUsername := session.Get(oauth.PendingOAuthExternalUsernameKey)
-	pendingEmail := session.Get(oauth.PendingOAuthEmailKey)
-
-	if pendingSourceID == nil || pendingExternalID == nil {
-		return
-	}
-
-	var sourceID uint64
-	switch v := pendingSourceID.(type) {
-	case uint64:
-		sourceID = v
-	case int:
-		if v >= 0 {
-			sourceID = uint64(v)
-		}
-	case float64:
-		if v >= 0 && v <= 18446744073709551615.0 {
-			sourceID = uint64(v)
-		}
-	}
-	externalID, _ := pendingExternalID.(string)
-	externalUsername, _ := pendingExternalUsername.(string)
-	email, _ := pendingEmail.(string)
-
-	if sourceID != 0 && externalID != "" {
-		_ = model.BindExternalAccount(ctx, &model.ExternalAccount{
-			AuthSourceID:     sourceID,
-			UserID:           user.ID,
-			ExternalID:       externalID,
-			ExternalUsername: externalUsername,
-			Email:            email,
-		})
-	}
-
-	session.Delete(oauth.PendingOAuthSourceIDKey)
-	session.Delete(oauth.PendingOAuthExternalIDKey)
-	session.Delete(oauth.PendingOAuthExternalUsernameKey)
-	session.Delete(oauth.PendingOAuthEmailKey)
-	_ = session.Save()
-}
-
 type updateProfileRequest struct {
 	Nickname  string `json:"nickname"`
 	Email     string `json:"email"`

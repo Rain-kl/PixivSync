@@ -5,13 +5,14 @@ package oauth
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"net/http"
+	"strconv"
 	"strings"
 	"time"
-
-	"strconv"
 
 	"github.com/Rain-kl/Wavelet/internal/common"
 	"github.com/Rain-kl/Wavelet/internal/config"
@@ -71,6 +72,30 @@ func GetUserIDFromSession(s sessions.Session) uint64 {
 func GetUserIDFromContext(c *gin.Context) uint64 {
 	session := sessions.Default(c)
 	return GetUserIDFromSession(session)
+}
+
+func ensureSessionToken(s sessions.Session) (string, bool) {
+	token, ok := s.Get(SessionTokenKey).(string)
+	if !ok || token == "" {
+		token = uuid.NewString()
+		s.Set(SessionTokenKey, token)
+		return token, true
+	}
+	return token, false
+}
+
+func hashSessionToken(token string) string {
+	h := sha256.New()
+	h.Write([]byte(token))
+	return hex.EncodeToString(h.Sum(nil))
+}
+
+func isOIDCLoginEnabled(ctx context.Context) bool {
+	enabled, err := model.GetBoolByKey(ctx, model.ConfigKeyOIDCLoginEnabled)
+	if err != nil {
+		return true
+	}
+	return enabled
 }
 
 func resolveAuthSource(sourceName string) (*model.AuthSource, error) {
@@ -330,15 +355,41 @@ func GetLoginSources(c *gin.Context) {
 // @Failure 500 {object} util.ResponseAny "Redis 异常或构造 URL 失败"
 // @Router /api/v1/oauth/login [get]
 func GetLoginURL(c *gin.Context) {
+	ctx := c.Request.Context()
+	if !isOIDCLoginEnabled(ctx) {
+		c.JSON(http.StatusBadRequest, util.Err(AuthSourceDisabled))
+		return
+	}
+
 	source, err := resolveAuthSource(c.Query("source"))
 	if err != nil {
 		c.JSON(http.StatusBadRequest, util.Err(err.Error()))
 		return
 	}
+
+	if !source.IsActive {
+		c.JSON(http.StatusBadRequest, util.Err(AuthSourceDisabled))
+		return
+	}
+
+	session := sessions.Default(c)
+	token, isNew := ensureSessionToken(session)
+	if isNew {
+		if err := session.Save(); err != nil {
+			c.JSON(http.StatusInternalServerError, util.Err(err.Error()))
+			return
+		}
+	}
+
+	userID := GetUserIDFromSession(session)
+	sessionHash := hashSessionToken(token)
+
 	state := uuid.NewString()
 	payloadValue, err := encodeOAuthStatePayload(oauthStatePayload{
-		SourceName: source.Name,
-		Purpose:    OAuthPurposeLogin,
+		SourceName:  source.Name,
+		Purpose:     OAuthPurposeLogin,
+		UserID:      userID,
+		SessionHash: sessionHash,
 	})
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, util.Err(err.Error()))
@@ -384,11 +435,18 @@ func buildAuthorizeURL(ctx context.Context, source *model.AuthSource, state stri
 // @Failure 500 {object} util.ResponseAny "Redis 异常或构造 URL 失败"
 // @Router /api/v1/oauth/{source}/authorize [get]
 func Authorize(c *gin.Context) {
+	ctx := c.Request.Context()
+	if !isOIDCLoginEnabled(ctx) {
+		c.JSON(http.StatusBadRequest, util.Err(AuthSourceDisabled))
+		return
+	}
+
 	source, err := resolveAuthSource(c.Param("source"))
 	if err != nil {
 		c.JSON(http.StatusBadRequest, util.Err(err.Error()))
 		return
 	}
+
 	if !source.IsActive {
 		c.JSON(http.StatusBadRequest, util.Err(AuthSourceDisabled))
 		return
@@ -397,10 +455,30 @@ func Authorize(c *gin.Context) {
 	if purpose != OAuthPurposeBind {
 		purpose = OAuthPurposeLogin
 	}
+
+	session := sessions.Default(c)
+	userID := GetUserIDFromSession(session)
+	if purpose == OAuthPurposeBind && userID == 0 {
+		c.JSON(http.StatusUnauthorized, util.Err(common.UnAuthorized))
+		return
+	}
+
+	token, isNew := ensureSessionToken(session)
+	if isNew {
+		if err := session.Save(); err != nil {
+			c.JSON(http.StatusInternalServerError, util.Err(err.Error()))
+			return
+		}
+	}
+
+	sessionHash := hashSessionToken(token)
+
 	state := uuid.NewString()
 	payloadValue, err := encodeOAuthStatePayload(oauthStatePayload{
-		SourceName: source.Name,
-		Purpose:    purpose,
+		SourceName:  source.Name,
+		Purpose:     purpose,
+		UserID:      userID,
+		SessionHash: sessionHash,
 	})
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, util.Err(err.Error()))
@@ -410,6 +488,7 @@ func Authorize(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, util.Err(err.Error()))
 		return
 	}
+
 	authorizeURL, err := buildAuthorizeURL(c.Request.Context(), source, state)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, util.Err(err.Error()))
@@ -452,9 +531,43 @@ func Callback(c *gin.Context) {
 		return
 	}
 
+	session := sessions.Default(c)
+	currentUserID := GetUserIDFromSession(session)
+
+	if payload.Purpose == OAuthPurposeBind && currentUserID == 0 {
+		c.JSON(http.StatusUnauthorized, util.Err(common.UnAuthorized))
+		return
+	}
+
+	token, ok := session.Get(SessionTokenKey).(string)
+	if !ok || token == "" {
+		c.JSON(http.StatusBadRequest, util.Err("invalid session context"))
+		return
+	}
+
+	if hashSessionToken(token) != payload.SessionHash {
+		c.JSON(http.StatusBadRequest, util.Err("session mismatch for oauth state"))
+		return
+	}
+
+	if payload.Purpose == OAuthPurposeBind && currentUserID != payload.UserID {
+		c.JSON(http.StatusBadRequest, util.Err("user context mismatch for oauth binding"))
+		return
+	}
+
+	if !isOIDCLoginEnabled(ctx) {
+		c.JSON(http.StatusBadRequest, util.Err(AuthSourceDisabled))
+		return
+	}
+
 	source, err := resolveAuthSource(payload.SourceName)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, util.Err(err.Error()))
+		return
+	}
+
+	if !source.IsActive {
+		c.JSON(http.StatusBadRequest, util.Err(AuthSourceDisabled))
 		return
 	}
 
@@ -552,15 +665,6 @@ func handleCallbackRegister(ctx context.Context, c *gin.Context, source *model.A
 	}
 
 	if !registrationEnabled {
-		session := sessions.Default(c)
-		session.Set(PendingOAuthSourceIDKey, source.ID)
-		session.Set(PendingOAuthExternalIDKey, userInfo.Sub)
-		session.Set(PendingOAuthExternalUsernameKey, userInfo.Username)
-		session.Set(PendingOAuthEmailKey, userInfo.Email)
-		if err := session.Save(); err != nil {
-			c.JSON(http.StatusInternalServerError, util.Err(err.Error()))
-			return model.User{}, false
-		}
 		c.JSON(http.StatusOK, util.OK(buildCallbackResult(nil, "need_bind")))
 		return model.User{}, false
 	}

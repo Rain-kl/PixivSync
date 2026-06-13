@@ -18,6 +18,7 @@ import {AuthHeading} from "@/components/auth/auth-shell"
 import {OTPForm} from "./otp-form"
 import services from "@/lib/services"
 import type {LoginRequest} from "@/lib/services/auth/types"
+import {safeRedirectTarget} from "@/lib/utils"
 
 function getRedirectTarget(searchParams: ReturnType<typeof useSearchParams>) {
   const callbackUrl = searchParams.get("callbackUrl")
@@ -31,15 +32,16 @@ function getRedirectTarget(searchParams: ReturnType<typeof useSearchParams>) {
     sessionStorage.removeItem("redirect_after_login")
   }
 
-  return target
+  return safeRedirectTarget(target)
 }
 
 function persistRedirectTarget(searchParams: ReturnType<typeof useSearchParams>) {
   const callbackUrl = searchParams.get("callbackUrl")
   if (callbackUrl && typeof window !== "undefined") {
-    sessionStorage.setItem("redirect_after_login", callbackUrl)
+    sessionStorage.setItem("redirect_after_login", safeRedirectTarget(callbackUrl))
   }
 }
+
 
 function configBool(value: string | undefined, fallback: boolean) {
   if (value === undefined) return fallback
