@@ -1,6 +1,6 @@
 "use client"
 
-import {useCallback, useEffect, useState} from "react"
+import {useCallback, useEffect, useRef, useState} from "react"
 import {AnimatePresence, motion} from "motion/react"
 import {useRouter, useSearchParams} from "next/navigation"
 import {toast} from "sonner"
@@ -27,7 +27,7 @@ import {safeRedirectTarget} from "@/lib/utils"
 export function LoginPage() {
   const router = useRouter()
   const searchParams = useSearchParams()
-  const { setUser } = useAuth()
+  const { user, setUser } = useAuth()
   const [showOTP, setShowOTP] = useState(false)
 
   /* 处理OAuth回调 */
@@ -39,6 +39,8 @@ export function LoginPage() {
   const [isCheckingSession, setIsCheckingSession] = useState(() => !searchParams.get('state') || !searchParams.get('code'))
 
   const [loginSuccess, setLoginSuccess] = useState(false)
+  const redirectedRef = useRef(false)
+  const callbackProcessedRef = useRef(false)
 
   const resolveRedirectTarget = useCallback(() => {
     const callbackUrl = searchParams.get('callbackUrl')
@@ -52,6 +54,11 @@ export function LoginPage() {
     return safeRedirectTarget(target)
   }, [searchParams])
 
+  const resolveRedirectTargetRef = useRef(resolveRedirectTarget)
+  useEffect(() => {
+    resolveRedirectTargetRef.current = resolveRedirectTarget
+  }, [resolveRedirectTarget])
+
 
   /* 登录页兜底：已登录用户直接跳转 */
   useEffect(() => {
@@ -60,6 +67,15 @@ export function LoginPage() {
 
     if (state && code) {
       setIsCheckingSession(false)
+      return
+    }
+
+    if (user) {
+      if (!redirectedRef.current) {
+        redirectedRef.current = true
+        router.replace(resolveRedirectTargetRef.current())
+        setIsCheckingSession(false)
+      }
       return
     }
 
@@ -81,7 +97,10 @@ export function LoginPage() {
           if (payload?.data) {
             setUser(payload.data)
           }
-          router.replace(resolveRedirectTarget())
+          if (!redirectedRef.current) {
+            redirectedRef.current = true
+            router.replace(resolveRedirectTargetRef.current())
+          }
           return
         }
       } catch (error) {
@@ -100,7 +119,7 @@ export function LoginPage() {
     return () => {
       cancelled = true
     }
-  }, [router, searchParams, resolveRedirectTarget, setUser])
+  }, [router, searchParams, setUser, user])
 
   /* 回调逻辑 */
   useEffect(() => {
@@ -109,6 +128,9 @@ export function LoginPage() {
       const code = searchParams.get('code')
 
       if (state && code) {
+        if (callbackProcessedRef.current) return
+        callbackProcessedRef.current = true
+
         setIsProcessingCallback(true)
         try {
           const result = await services.auth.handleCallback({ state, code })
@@ -125,7 +147,10 @@ export function LoginPage() {
           toast.success(result.status === "bound" ? "绑定成功" : "登录成功")
 
           setTimeout(() => {
-            router.replace(resolveRedirectTarget())
+            if (!redirectedRef.current) {
+              redirectedRef.current = true
+              router.replace(resolveRedirectTargetRef.current())
+            }
           }, 1500)
         } catch (error) {
           console.error('OAuth callback error:', error)
@@ -136,7 +161,7 @@ export function LoginPage() {
       }
     }
     handleOAuthCallback()
-  }, [searchParams, router, resolveRedirectTarget, setUser])
+  }, [router, searchParams, setUser])
 
   return (
     <AuthShell wide={showOTP}>

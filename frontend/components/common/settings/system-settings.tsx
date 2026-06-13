@@ -35,12 +35,6 @@ export function SystemSettingsMain() {
     enabled: !!user?.is_admin,
   })
 
-  const authSourcesQuery = useQuery({
-    queryKey: ["auth", "sources"],
-    queryFn: () => AdminService.listAuthSources(),
-    enabled: !!user?.is_admin,
-  })
-
   const configs = useMemo(
     () => systemConfigMap(systemConfigsQuery.data ?? []),
     [systemConfigsQuery.data],
@@ -112,10 +106,7 @@ export function SystemSettingsMain() {
           <OtherTab configs={configs} />
         </TabsContent>
         <TabsContent value="info" className="pt-4">
-          <InfoTab
-            systemConfigsLength={systemConfigsQuery.data?.length ?? 0}
-            authSourcesLength={authSourcesQuery.data?.length ?? 0}
-          />
+          <InfoTab />
         </TabsContent>
       </Tabs>
     </motion.div>

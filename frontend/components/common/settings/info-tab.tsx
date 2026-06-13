@@ -1,10 +1,10 @@
 "use client"
 
 import {useMutation, useQuery} from "@tanstack/react-query"
-import {ExternalLink, RefreshCw, Server, Sparkles} from "lucide-react"
+import {ExternalLink, RefreshCw, Sparkles} from "lucide-react"
 import {toast} from "sonner"
 
-import {AdminService, apiConfig} from "@/lib/services"
+import {AdminService} from "@/lib/services"
 import {
   AlertDialog,
   AlertDialogAction,
@@ -30,12 +30,7 @@ function InfoRow({ label, value }: { label: string; value: React.ReactNode }) {
   )
 }
 
-interface InfoTabProps {
-  systemConfigsLength: number
-  authSourcesLength: number
-}
-
-export function InfoTab({ systemConfigsLength, authSourcesLength }: InfoTabProps) {
+export function InfoTab() {
   const updateQuery = useQuery({
     queryKey: ["admin", "update"],
     queryFn: () => AdminService.getUpdateStatus(),
@@ -161,27 +156,6 @@ export function InfoTab({ systemConfigsLength, authSourcesLength }: InfoTabProps
               )}
             </>
           ) : null}
-        </CardContent>
-      </Card>
-
-      <Card className="border border-dashed shadow-sm">
-        <CardHeader className="border-b border-dashed pb-4">
-          <div className="flex items-center gap-2">
-            <div className="p-1.5 rounded-lg bg-muted text-muted-foreground">
-              <Server className="size-4" />
-            </div>
-            <div>
-              <CardTitle className="text-base font-semibold">服务连接</CardTitle>
-              <CardDescription className="text-xs">前端 API 客户端的基础连接参数</CardDescription>
-            </div>
-          </div>
-        </CardHeader>
-        <CardContent className="pt-4">
-          <InfoRow label="API Base URL" value={apiConfig.baseURL || "同源"} />
-          <InfoRow label="请求超时" value={`${apiConfig.timeout}ms`} />
-          <InfoRow label="携带凭证" value={apiConfig.withCredentials ? "是" : "否"} />
-          <InfoRow label="系统配置项" value={`${systemConfigsLength} 项`} />
-          <InfoRow label="认证源数量" value={`${authSourcesLength} 个`} />
         </CardContent>
       </Card>
     </div>
