@@ -45,7 +45,7 @@ func loggerMiddleware() gin.HandlerFunc {
 
 		// 打印日志
 		// 排除健康检查接口
-		healthPath := config.Config.App.APIPrefix + "/v1/health"
+		healthPath := config.Config.App.APIPrefix + "/health"
 		if c.Request.URL.Path != healthPath {
 			logger.InfoF(
 				ctx,
