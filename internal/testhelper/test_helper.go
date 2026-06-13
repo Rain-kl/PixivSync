@@ -296,6 +296,12 @@ func getSeedConfigsPart2() []model.SystemConfig {
 			Type:        configTypeSystem,
 			Description: "GitHub Actions Release 上游仓库（owner/repo 或 GitHub 仓库地址）",
 		},
+		{
+			Key:         model.ConfigKeyStorageConfig,
+			Value:       `{"driver":"local","local":{"root":"."},"s3":{"region":"us-east-1"},"r2":{"region":"auto"},"minio":{"region":"us-east-1","path_style":true},"oss":{},"webdav":{}}`,
+			Type:        configTypeSystem,
+			Description: "文件存储驱动及连接配置（JSON）",
+		},
 	}
 }
 

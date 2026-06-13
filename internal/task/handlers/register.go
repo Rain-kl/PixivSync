@@ -14,6 +14,9 @@ import (
 
 // Register registers all built-in task handlers and their metadata.
 func Register() {
+	task.RegisterHandler(upload.StorageMigrationTask, &upload.MigrationHandler{})
+	task.RegisterTaskMeta(upload.StorageMigrationMeta)
+
 	// upload
 	task.RegisterHandler(upload.CleanupUnusedUploadsTask, &upload.CleanupUnusedUploadsHandler{})
 	task.RegisterTaskMeta(upload.CleanupUnusedUploadsMeta)

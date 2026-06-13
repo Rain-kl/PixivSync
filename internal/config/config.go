@@ -224,16 +224,6 @@ func applyEnvOverrides(c *configModel) {
 	// ─── OTel ───
 	c.Otel.SamplingRate = envFloat64("OTEL_SAMPLING_RATE", c.Otel.SamplingRate)
 
-	// ─── S3 ───
-	c.S3.Endpoint = envStr("S3_ENDPOINT", c.S3.Endpoint)
-	c.S3.Region = envStr("S3_REGION", c.S3.Region)
-	c.S3.Bucket = envStr("S3_BUCKET", c.S3.Bucket)
-	c.S3.AccessKeyID = envStr("S3_ACCESS_KEY_ID", c.S3.AccessKeyID)
-	c.S3.SecretAccessKey = envStr("S3_SECRET_ACCESS_KEY", c.S3.SecretAccessKey)
-	c.S3.CdnURL = envStr("S3_CDN_URL", c.S3.CdnURL)
-	c.S3.PathStyle = envBool("S3_PATH_STYLE", c.S3.PathStyle)
-	c.S3.Enabled = envBool("S3_ENABLED", c.S3.Enabled)
-
 	// ─── Worker ───
 	c.Worker.Concurrency = envInt("WORKER_CONCURRENCY", c.Worker.Concurrency)
 	c.Worker.StrictPriority = envBool("WORKER_STRICT_PRIORITY", c.Worker.StrictPriority)

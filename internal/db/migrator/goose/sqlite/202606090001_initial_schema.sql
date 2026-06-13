@@ -54,7 +54,7 @@ CREATE UNIQUE INDEX IF NOT EXISTS idx_external_accounts_source_external ON exter
 
 CREATE TABLE IF NOT EXISTS system_configs (
     key VARCHAR(64) PRIMARY KEY,
-    value VARCHAR(255) NOT NULL,
+    value TEXT NOT NULL,
     type VARCHAR(32) NOT NULL DEFAULT 'system',
     visibility INTEGER NOT NULL DEFAULT 0,
     description VARCHAR(255),
@@ -160,8 +160,9 @@ INSERT INTO system_configs (key, value, type, visibility, description, created_a
     ('email_register_verification_enabled', 'false', 'system', 1, '是否开启邮箱注册验证（true/false）', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
     ('menu_display_config', '{}', 'system', 1, '目录显示配置（JSON 字符串，格式为 {url: enabled}）', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
     ('search_engine_indexing_enabled', 'false', 'system', 1, '是否允许搜索引擎爬取/检索该站点（true/false）', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
-    ('update_upstream_repository', 'Rain-kl/PixezSync', 'system', 0, 'GitHub Actions Release 上游仓库（owner/repo 或 GitHub 仓库地址）', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
-ON CONFLICT (key) DO NOTHING;
+    ('update_upstream_repository', 'Rain-kl/PixezSync', 'system', 0, 'GitHub Actions Release 上游仓库（owner/repo 或 GitHub 仓库地址）', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
+    ('storage_config', '{"driver":"local","local":{"root":"."},"s3":{"region":"us-east-1"},"r2":{"region":"auto"},"minio":{"region":"us-east-1","path_style":true},"oss":{},"webdav":{}}', 'system', 0, '文件存储驱动及连接配置（JSON）', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+    ON CONFLICT (key) DO NOTHING;
 
 INSERT INTO users (id, username, password, nickname, avatar_url, is_active, is_admin, last_login_at, created_at, updated_at)
 VALUES (1, 'admin', '12345678', 'Administrator', '', TRUE, TRUE, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)

@@ -81,6 +81,9 @@ type WarmImageCacheHandler struct{}
 
 // Execute 执行清理未使用上传文件的业务逻辑
 func (h *CleanupUnusedUploadsHandler) Execute(ctx context.Context, _ []byte) (*task.TaskResult, error) {
+	if storageReadOnly(ctx) {
+		return nil, errors.New(ErrStorageReadOnly)
+	}
 	const batchSize = 100 // 每批处理100个文件
 	var lastID uint64
 	var totalProcessed int
@@ -122,8 +125,15 @@ func (h *CleanupUnusedUploadsHandler) Execute(ctx context.Context, _ []byte) (*t
 					return err
 				}
 
-				// Delete from S3
-				if err := storage.DeleteObject(ctx, upload.FilePath); err != nil {
+				driver := storage.Driver(upload.StorageDriver)
+				if driver == "" {
+					driver = storage.DriverLocal
+				}
+				backend, err := storage.ForDriver(ctx, driver)
+				if err != nil {
+					return err
+				}
+				if err := backend.Delete(ctx, upload.FilePath); err != nil {
 					return err
 				}
 

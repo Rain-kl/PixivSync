@@ -26,7 +26,7 @@ export interface SystemConfig {
 export interface CreateSystemConfigRequest {
   /** 配置键（最大64字符） */
   key: string;
-  /** 配置值（最大255字符） */
+  /** 配置值 */
   value: string;
   /** 配置类型：'system' | 'business' */
   type: 'system' | 'business';
@@ -40,7 +40,7 @@ export interface CreateSystemConfigRequest {
  * 更新系统配置请求参数
  */
 export interface UpdateSystemConfigRequest {
-  /** 配置值（最大255字符） */
+  /** 配置值 */
   value: string;
   /** 是否对公共配置接口可见：0 不可见，1 可见 */
   visibility?: 0 | 1;
@@ -48,7 +48,34 @@ export interface UpdateSystemConfigRequest {
   description?: string;
 }
 
+export type StorageDriver = 'local' | 's3' | 'r2' | 'minio' | 'oss' | 'webdav';
 
+export interface ObjectStorageConfig {
+  endpoint: string;
+  region: string;
+  bucket: string;
+  access_key_id: string;
+  secret_access_key: string;
+  account_id?: string;
+  path_style: boolean;
+  key_prefix: string;
+  cdn_url: string;
+}
+
+export interface StorageConfig {
+  driver: StorageDriver;
+  local: { root: string };
+  s3: ObjectStorageConfig;
+  r2: ObjectStorageConfig;
+  minio: ObjectStorageConfig;
+  oss: ObjectStorageConfig;
+  webdav: {
+    endpoint: string;
+    username: string;
+    password: string;
+    base_path: string;
+  };
+}
 
 // ==================== 任务管理 ====================
 

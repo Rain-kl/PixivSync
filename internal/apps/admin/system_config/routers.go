@@ -5,11 +5,15 @@
 package system_config
 
 import (
+	"encoding/json"
 	"errors"
 	"net/http"
+	"time"
 
 	"github.com/Rain-kl/Wavelet/internal/db"
+	"github.com/Rain-kl/Wavelet/internal/logger"
 	"github.com/Rain-kl/Wavelet/internal/model"
+	"github.com/Rain-kl/Wavelet/internal/storage"
 	"github.com/Rain-kl/Wavelet/internal/util"
 	mail "github.com/Rain-kl/Wavelet/internal/util/mail"
 	"github.com/gin-gonic/gin"
@@ -21,7 +25,7 @@ const maskedConfigValue = "******"
 // CreateSystemConfigRequest 创建系统配置请求
 type CreateSystemConfigRequest struct {
 	Key         string `json:"key" binding:"required,max=64"`
-	Value       string `json:"value" binding:"required,max=255"`
+	Value       string `json:"value" binding:"required"`
 	Type        string `json:"type" binding:"required,oneof=system business"`
 	Visibility  int    `json:"visibility" binding:"oneof=0 1"`
 	Description string `json:"description" binding:"max=255"`
@@ -29,7 +33,7 @@ type CreateSystemConfigRequest struct {
 
 // UpdateSystemConfigRequest 更新系统配置请求
 type UpdateSystemConfigRequest struct {
-	Value       string `json:"value" binding:"required,max=255"`
+	Value       string `json:"value" binding:"required"`
 	Visibility  *int   `json:"visibility" binding:"omitempty,oneof=0 1"`
 	Description string `json:"description" binding:"max=255"`
 }
@@ -118,9 +122,7 @@ func ListSystemConfigs(c *gin.Context) {
 	}
 
 	for i := range configs {
-		if configs[i].Key == model.ConfigKeySMTPPassword && configs[i].Value != "" {
-			configs[i].Value = maskedConfigValue
-		}
+		configs[i].Value = maskSensitiveConfig(configs[i].Key, configs[i].Value)
 	}
 
 	c.JSON(http.StatusOK, util.OK(configs))
@@ -150,9 +152,7 @@ func GetSystemConfig(c *gin.Context) {
 		return
 	}
 
-	if config.Key == model.ConfigKeySMTPPassword && config.Value != "" {
-		config.Value = maskedConfigValue
-	}
+	config.Value = maskSensitiveConfig(config.Key, config.Value)
 
 	c.JSON(http.StatusOK, util.OK(config))
 }
@@ -193,6 +193,14 @@ func UpdateSystemConfig(c *gin.Context) {
 		return
 	}
 
+	var originalDriver storage.Driver
+	if key == model.ConfigKeyStorageConfig {
+		var currentCfg storage.Config
+		if err := json.Unmarshal([]byte(config.Value), &currentCfg); err == nil {
+			originalDriver = currentCfg.Driver
+		}
+	}
+
 	if err := db.DB(c.Request.Context()).Transaction(func(tx *gorm.DB) error {
 		// 更新配置
 		updates := map[string]interface{}{
@@ -212,6 +220,24 @@ func UpdateSystemConfig(c *gin.Context) {
 
 		if err := db.HSetJSON(c.Request.Context(), model.SystemConfigRedisHashKey, key, &config); err != nil {
 			return err
+		}
+
+		if key == model.ConfigKeyStorageConfig && originalDriver != "" {
+			var newCfg storage.Config
+			if err := json.Unmarshal([]byte(req.Value), &newCfg); err == nil {
+				if newCfg.Driver == originalDriver {
+					// Mark failed storage:migrate task execution as succeeded
+					if err := tx.Model(&model.TaskExecution{}).
+						Where("task_type = ? AND status = ?", "storage:migrate", model.TaskExecutionStatusFailed).
+						Updates(map[string]any{
+							"status":      model.TaskExecutionStatusSucceeded,
+							"result":      "存储配置直接更新，故障迁移任务自动标记为已解决",
+							"finished_at": time.Now(),
+						}).Error; err != nil {
+						logger.ErrorF(c.Request.Context(), "自动更新迁移任务状态失败: %v", err)
+					}
+				}
+			}
 		}
 
 		return nil
@@ -287,4 +313,23 @@ func TestSMTP(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, util.OK(resp))
+}
+
+func maskSensitiveConfig(key, value string) string {
+	if value == "" {
+		return value
+	}
+	switch key {
+	case model.ConfigKeySMTPPassword:
+		return maskedConfigValue
+	case model.ConfigKeyStorageConfig:
+		var cfg storage.Config
+		if err := json.Unmarshal([]byte(value), &cfg); err == nil {
+			masked := storage.MaskSecrets(cfg)
+			if val, err := json.Marshal(masked); err == nil {
+				return string(val)
+			}
+		}
+	}
+	return value
 }

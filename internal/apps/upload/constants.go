@@ -3,6 +3,8 @@
 
 package upload
 
+import "github.com/Rain-kl/Wavelet/internal/storage"
+
 const (
 	maxUploadSize      = 32 * 1024 * 1024 // 32MB
 	detectContentBytes = 512              // http.DetectContentType 需要的最小字节数
@@ -12,5 +14,5 @@ const (
 	imageQualityMedium = "medium"
 	imageQualityHigh   = "high"
 	imageQualityOrigin = "origin"
-	storageDriverLocal = "local"
+	storageDriverLocal = string(storage.DriverLocal)
 )

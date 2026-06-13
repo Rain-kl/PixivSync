@@ -105,12 +105,12 @@ func TestUploadFile(t *testing.T) {
 			putCount++
 			return nil
 		},
-		func(ctx context.Context, key string) (*storage.ObjectInfo, error) {
+		func(ctx context.Context, key string) (*storage.Object, error) {
 			data, ok := mockFiles[key]
 			if !ok {
 				return nil, os.ErrNotExist
 			}
-			return &storage.ObjectInfo{
+			return &storage.Object{
 				Body:          io.NopCloser(bytes.NewReader(data)),
 				ContentLength: int64(len(data)),
 				ContentType:   "application/octet-stream",

@@ -155,8 +155,6 @@ export class AdminService extends BaseService {
     return this.get<string[]>('/uploads/types');
   }
 
-
-
   // ==================== 认证源管理 ====================
 
   static async listAuthSources(): Promise<AuthSource[]> {

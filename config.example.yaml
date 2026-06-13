@@ -99,22 +99,6 @@ worker:
 otel:
   sampling_rate: 0.0           # Trace sampling rate (0.0 – 1.0)
 
-# ─── S3-Compatible File Storage ─────────────────────────────────────────────────
-# Compatible with AWS S3, MinIO, Cloudflare R2, Tencent COS, etc.
-s3:
-  enabled: false
-  endpoint: "https://<account-id>.r2.cloudflarestorage.com"
-  region: "auto"
-  bucket: "<bucket-name>"
-  access_key_id: "<S3_ACCESS_KEY_ID>"
-  secret_access_key: "<S3_SECRET_ACCESS_KEY>"
-  path_style: false            # Set true for self-hosted S3 (e.g. MinIO)
-  key_prefix: ""               # Optional prefix for all object keys, e.g. "uploads/"
-  cdn_url: ""                  # CDN base URL (e.g. https://cdn.example.com); falls back to S3 if empty
-  local_cache:
-    enabled: false
-    cache_dir: "./s3_cache"
-
 # ─── ClickHouse (optional) ──────────────────────────────────────────────────────
 clickhouse:
   enabled: false

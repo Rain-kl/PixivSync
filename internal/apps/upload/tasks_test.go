@@ -36,7 +36,7 @@ func TestCleanupUnusedUploadsHandler_Execute(t *testing.T) {
 		func(ctx context.Context, key string, body io.Reader, size int64, contentType string) error {
 			return nil
 		},
-		func(ctx context.Context, key string) (*storage.ObjectInfo, error) { return nil, nil },
+		func(ctx context.Context, key string) (*storage.Object, error) { return nil, nil },
 		func(ctx context.Context, key string) error { return nil },
 	)
 	defer storageMock()
@@ -113,7 +113,7 @@ func TestCleanupUnusedUploadsHandler_ExecuteNoFiles(t *testing.T) {
 		func(ctx context.Context, key string, body io.Reader, size int64, contentType string) error {
 			return nil
 		},
-		func(ctx context.Context, key string) (*storage.ObjectInfo, error) { return nil, nil },
+		func(ctx context.Context, key string) (*storage.Object, error) { return nil, nil },
 		func(ctx context.Context, key string) error { return nil },
 	)
 	defer storageMock()
@@ -204,6 +204,13 @@ func TestWarmImageCacheHandlerExecute(t *testing.T) {
 	})
 
 	testDir := t.TempDir()
+	ctx := context.Background()
+	active := storage.DefaultConfig()
+	active.Local.Root = testDir
+	if err := storage.SaveActiveConfig(ctx, active); err != nil {
+		t.Fatalf("SaveActiveConfig() returned error: %v", err)
+	}
+
 	firstPath := filepath.Join(testDir, "first.png")
 	secondPath := filepath.Join(testDir, "second.jpg")
 	writeTaskTestPNG(t, firstPath, color.RGBA{R: 255, A: 255})

@@ -12,7 +12,6 @@ import (
 	"fmt"
 	"io"
 	"net/http"
-	"os"
 	"strconv"
 	"strings"
 
@@ -22,7 +21,6 @@ import (
 	"github.com/Rain-kl/Wavelet/internal/diskcache"
 	"github.com/Rain-kl/Wavelet/internal/logger"
 	"github.com/Rain-kl/Wavelet/internal/model"
-	"github.com/Rain-kl/Wavelet/internal/storage"
 	"github.com/Rain-kl/Wavelet/internal/util"
 	"github.com/gin-gonic/gin"
 	"gorm.io/gorm"
@@ -236,48 +234,21 @@ func normalizeImageQuality(quality string) string {
 
 // serveOriginal 原始文件的流式响应逻辑
 func serveOriginal(c *gin.Context, upload *model.Upload) {
-	if upload.StorageDriver == storageDriverLocal || (upload.StorageDriver == "" && !storage.IsEnabled()) {
-		c.File(upload.FilePath)
-		return
-	}
-
-	// Retrieve file from S3 (via CDN if configured)
-	obj, err := storage.GetObjectViaCache(c.Request.Context(), upload.FilePath)
+	obj, err := openStoredObject(c.Request.Context(), upload)
 	if err != nil {
 		c.AbortWithStatus(http.StatusNotFound)
 		return
 	}
-
-	// Cachefile
-	if obj.CachePath != "" {
-		c.File(obj.CachePath)
-		return
-	}
-
-	// Stream from CDN/S3
 	defer func() { _ = obj.Body.Close() }()
-
-	// Respond with the file content
 	c.DataFromReader(http.StatusOK, obj.ContentLength, obj.ContentType, obj.Body, nil)
 }
 
 // getOriginalFileBytes 获取原始文件所有字节
 func getOriginalFileBytes(ctx context.Context, upload *model.Upload) ([]byte, error) {
-	if upload.StorageDriver == storageDriverLocal || (upload.StorageDriver == "" && !storage.IsEnabled()) {
-		return os.ReadFile(upload.FilePath)
-	}
-
-	// Retrieve file from S3 (via CDN if configured)
-	obj, err := storage.GetObjectViaCache(ctx, upload.FilePath)
+	obj, err := openStoredObject(ctx, upload)
 	if err != nil {
 		return nil, err
 	}
-
-	// Cachefile
-	if obj.CachePath != "" {
-		return os.ReadFile(obj.CachePath)
-	}
-
 	defer func() { _ = obj.Body.Close() }()
 	return io.ReadAll(obj.Body)
 }

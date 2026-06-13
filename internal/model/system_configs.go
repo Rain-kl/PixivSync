@@ -1,4 +1,3 @@
-// Copyright 2025 linux.do
 // Copyright 2026 Arctel.net
 // SPDX-License-Identifier: AGPL-3.0-only
 
@@ -52,6 +51,7 @@ const (
 	ConfigKeyPixezMirrorNovelConcurrency      = "pixez_mirror_novel_concurrency"         // Pixiv小说并发镜像限制数
 	ConfigKeyLoginSessionTTLHours             = "login_session_ttl_hours"                // 登录会话过期时间 (小时，0表示浏览器关闭后自动退出登录，-1表示永不过期)
 	ConfigKeyUpdateUpstreamRepository         = "update_upstream_repository"             // GitHub Actions Release 上游仓库
+	ConfigKeyStorageConfig                    = "storage_config"                         // 文件存储配置 (JSON)
 )
 
 const (
@@ -69,7 +69,7 @@ const (
 // SystemConfig 系统配置实体
 type SystemConfig struct {
 	Key         string    `json:"key" gorm:"primaryKey;size:64;not null"`
-	Value       string    `json:"value" gorm:"size:255;not null"`
+	Value       string    `json:"value" gorm:"type:text;not null"`
 	Type        string    `json:"type" gorm:"size:32;not null;default:'system'"`
 	Visibility  int       `json:"visibility" gorm:"not null;default:0"`
 	Description string    `json:"description" gorm:"size:255"`
