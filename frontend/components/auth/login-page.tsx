@@ -27,16 +27,13 @@ import {safeRedirectTarget} from "@/lib/utils"
 export function LoginPage() {
   const router = useRouter()
   const searchParams = useSearchParams()
-  const { user, setUser } = useAuth()
+  const { user, loading, setUser } = useAuth()
   const [showOTP, setShowOTP] = useState(false)
 
   /* 处理OAuth回调 */
-  const [isProcessingCallback, setIsProcessingCallback] = useState(() => {
-    const state = searchParams.get('state')
-    const code = searchParams.get('code')
-    return !!(state && code)
-  })
-  const [isCheckingSession, setIsCheckingSession] = useState(() => !searchParams.get('state') || !searchParams.get('code'))
+  const isOAuthCallback = !!(searchParams.get('state') && searchParams.get('code'))
+  const [isProcessingCallback, setIsProcessingCallback] = useState(isOAuthCallback)
+  const isCheckingSession = !isOAuthCallback && loading
 
   const [loginSuccess, setLoginSuccess] = useState(false)
   const redirectedRef = useRef(false)
@@ -65,61 +62,15 @@ export function LoginPage() {
     const state = searchParams.get('state')
     const code = searchParams.get('code')
 
-    if (state && code) {
-      setIsCheckingSession(false)
+    if ((state && code) || loading || !user) {
       return
     }
 
-    if (user) {
-      if (!redirectedRef.current) {
-        redirectedRef.current = true
-        router.replace(resolveRedirectTargetRef.current())
-        setIsCheckingSession(false)
-      }
-      return
+    if (!redirectedRef.current) {
+      redirectedRef.current = true
+      router.replace(resolveRedirectTargetRef.current())
     }
-
-    let cancelled = false
-
-    const checkExistingSession = async () => {
-      setIsCheckingSession(true)
-
-      try {
-        const response = await fetch('/api/v1/oauth/user-info', {
-          credentials: 'include',
-          cache: 'no-store',
-        })
-
-        if (cancelled) return
-
-        if (response.ok) {
-          const payload = await response.json()
-          if (payload?.data) {
-            setUser(payload.data)
-          }
-          if (!redirectedRef.current) {
-            redirectedRef.current = true
-            router.replace(resolveRedirectTargetRef.current())
-          }
-          return
-        }
-      } catch (error) {
-        if (!cancelled) {
-          console.error('Session probe error:', error)
-        }
-      } finally {
-        if (!cancelled) {
-          setIsCheckingSession(false)
-        }
-      }
-    }
-
-    checkExistingSession()
-
-    return () => {
-      cancelled = true
-    }
-  }, [router, searchParams, setUser, user])
+  }, [loading, router, searchParams, user])
 
   /* 回调逻辑 */
   useEffect(() => {

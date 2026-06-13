@@ -1,8 +1,8 @@
 "use client"
 
-import {useEffect, useMemo, useRef, useState} from "react"
+import {useEffect, useRef, useState} from "react"
 import {useMutation, useQuery} from "@tanstack/react-query"
-import {useRouter, useSearchParams} from "next/navigation"
+import {useSearchParams} from "next/navigation"
 import {EyeIcon, EyeOffIcon} from "lucide-react"
 import {toast} from "sonner"
 import Link from "next/link"
@@ -20,21 +20,6 @@ import services from "@/lib/services"
 import type {LoginRequest} from "@/lib/services/auth/types"
 import {safeRedirectTarget} from "@/lib/utils"
 
-function getRedirectTarget(searchParams: ReturnType<typeof useSearchParams>) {
-  const callbackUrl = searchParams.get("callbackUrl")
-  const storedRedirect =
-    typeof window === "undefined"
-      ? null
-      : sessionStorage.getItem("redirect_after_login")
-  const target = callbackUrl || storedRedirect || "/home"
-
-  if (storedRedirect && typeof window !== "undefined") {
-    sessionStorage.removeItem("redirect_after_login")
-  }
-
-  return safeRedirectTarget(target)
-}
-
 function persistRedirectTarget(searchParams: ReturnType<typeof useSearchParams>) {
   const callbackUrl = searchParams.get("callbackUrl")
   if (callbackUrl && typeof window !== "undefined") {
@@ -49,7 +34,6 @@ function configBool(value: string | undefined, fallback: boolean) {
 }
 
 export function LoginForm({ onOTPStateChange }: { onOTPStateChange?: (show: boolean) => void }) {
-  const router = useRouter()
   const searchParams = useSearchParams()
   const { setUser } = useAuth()
   const [username, setUsername] = useState("")
@@ -89,11 +73,6 @@ export function LoginForm({ onOTPStateChange }: { onOTPStateChange?: (show: bool
     enabled: configBool(publicConfigQuery.data?.oidc_login_enabled, true),
   })
 
-  const redirectTarget = useMemo(
-    () => getRedirectTarget(searchParams),
-    [searchParams],
-  )
-
   const capEnabled = configBool(publicConfigQuery.data?.cap_login_enabled, false)
   const capAutoSolve = configBool(publicConfigQuery.data?.cap_auto_solve, true)
 
@@ -110,7 +89,6 @@ export function LoginForm({ onOTPStateChange }: { onOTPStateChange?: (show: bool
     },
     onSuccess: (user) => {
       setUser(user)
-      router.replace(redirectTarget)
       toast.success("登录成功")
     },
     onError: (error: Error) => {

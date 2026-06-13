@@ -103,7 +103,7 @@ export function proxy(request: NextRequest) {
   }
 
   /* 页面请求：公共路由放行 */
-  const publicRoutes = ['/', '/login', '/register', '/callback', '/privacy', '/terms']
+  const publicRoutes = ['/', '/login', '/register', '/callback', '/privacy', '/terms', '/icon']
   const publicPrefixes = ['/docs/', '/epay/']
 
   if (publicRoutes.includes(pathname) || publicPrefixes.some(p => pathname.startsWith(p))) {

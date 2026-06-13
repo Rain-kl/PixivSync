@@ -8,6 +8,7 @@ import {
   NotFoundError,
   ServerError,
   TimeoutError,
+  UnauthorizedError,
   ValidationError,
 } from './errors';
 import {ApiError, ApiResponse} from './types';
@@ -80,13 +81,15 @@ apiClient.interceptors.request.use(
  * @param currentPath - 当前路径，用于登录成功后重定向回来
  */
 function initiateLogin(currentPath: string): Promise<never> {
-  if (!currentPath.startsWith('/login') && !currentPath.startsWith('/callback')) {
-    if (typeof window !== 'undefined') {
-      sessionStorage.setItem('redirect_after_login', currentPath);
-      const loginUrl = new URL('/login', window.location.origin);
-      loginUrl.searchParams.set('callbackUrl', currentPath);
-      window.location.href = loginUrl.toString();
-    }
+  if (currentPath.startsWith('/login') || currentPath.startsWith('/callback')) {
+    return Promise.reject(new UnauthorizedError());
+  }
+
+  if (typeof window !== 'undefined') {
+    sessionStorage.setItem('redirect_after_login', currentPath);
+    const loginUrl = new URL('/login', window.location.origin);
+    loginUrl.searchParams.set('callbackUrl', currentPath);
+    window.location.href = loginUrl.toString();
   }
 
   return new Promise<never>(() => { });
@@ -259,9 +262,10 @@ function createRequestMethod(
       const promise = apiClient[method]<T>(url, data, config);
       pendingRequests.set(requestKey, promise as Promise<AxiosResponse<ApiResponse>>);
 
-      promise.finally(() => {
-        pendingRequests.delete(requestKey);
-      });
+      promise.then(
+        () => pendingRequests.delete(requestKey),
+        () => pendingRequests.delete(requestKey),
+      );
 
       return promise;
     };
@@ -277,9 +281,10 @@ function createRequestMethod(
     const promise = apiClient[method]<T>(url, config);
     pendingRequests.set(requestKey, promise as Promise<AxiosResponse<ApiResponse>>);
 
-    promise.finally(() => {
-      pendingRequests.delete(requestKey);
-    });
+    promise.then(
+      () => pendingRequests.delete(requestKey),
+      () => pendingRequests.delete(requestKey),
+    );
 
     return promise;
   };
