@@ -55,7 +55,7 @@ const docTemplate = `{
                     "500": {
                         "description": "内部服务错误",
                         "schema": {
-                            "$ref": "#/definitions/cap.RedeemResponse"
+                            "$ref": "#/definitions/github_com_Rain-kl_Wavelet_internal_apps_cap.RedeemResponse"
                         }
                     }
                 }
@@ -89,19 +89,19 @@ const docTemplate = `{
                     "200": {
                         "description": "核销成功，返回 X-Cap-Token",
                         "schema": {
-                            "$ref": "#/definitions/cap.RedeemResponse"
+                            "$ref": "#/definitions/github_com_Rain-kl_Wavelet_internal_apps_cap.RedeemResponse"
                         }
                     },
                     "400": {
                         "description": "参数错误或核销失败",
                         "schema": {
-                            "$ref": "#/definitions/cap.RedeemResponse"
+                            "$ref": "#/definitions/github_com_Rain-kl_Wavelet_internal_apps_cap.RedeemResponse"
                         }
                     },
                     "500": {
                         "description": "内部服务错误",
                         "schema": {
-                            "$ref": "#/definitions/cap.RedeemResponse"
+                            "$ref": "#/definitions/github_com_Rain-kl_Wavelet_internal_apps_cap.RedeemResponse"
                         }
                     }
                 }
@@ -123,7 +123,7 @@ const docTemplate = `{
                         "schema": {
                             "allOf": [
                                 {
-                                    "$ref": "#/definitions/util.ResponseAny"
+                                    "$ref": "#/definitions/response.Any"
                                 },
                                 {
                                     "type": "object",
@@ -176,7 +176,7 @@ const docTemplate = `{
                         "schema": {
                             "allOf": [
                                 {
-                                    "$ref": "#/definitions/util.ResponseAny"
+                                    "$ref": "#/definitions/response.Any"
                                 },
                                 {
                                     "type": "object",
@@ -253,7 +253,7 @@ const docTemplate = `{
                         "schema": {
                             "allOf": [
                                 {
-                                    "$ref": "#/definitions/util.ResponseAny"
+                                    "$ref": "#/definitions/response.Any"
                                 },
                                 {
                                     "type": "object",
@@ -299,7 +299,7 @@ const docTemplate = `{
                         "schema": {
                             "allOf": [
                                 {
-                                    "$ref": "#/definitions/util.ResponseAny"
+                                    "$ref": "#/definitions/response.Any"
                                 },
                                 {
                                     "type": "object",
@@ -376,7 +376,7 @@ const docTemplate = `{
                         "schema": {
                             "allOf": [
                                 {
-                                    "$ref": "#/definitions/util.ResponseAny"
+                                    "$ref": "#/definitions/response.Any"
                                 },
                                 {
                                     "type": "object",
@@ -422,7 +422,7 @@ const docTemplate = `{
                         "schema": {
                             "allOf": [
                                 {
-                                    "$ref": "#/definitions/util.ResponseAny"
+                                    "$ref": "#/definitions/response.Any"
                                 },
                                 {
                                     "type": "object",
@@ -459,7 +459,7 @@ const docTemplate = `{
                         "schema": {
                             "allOf": [
                                 {
-                                    "$ref": "#/definitions/util.ResponseAny"
+                                    "$ref": "#/definitions/response.Any"
                                 },
                                 {
                                     "type": "object",
@@ -510,7 +510,7 @@ const docTemplate = `{
                         "schema": {
                             "allOf": [
                                 {
-                                    "$ref": "#/definitions/util.ResponseAny"
+                                    "$ref": "#/definitions/response.Any"
                                 },
                                 {
                                     "type": "object",
@@ -545,7 +545,7 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/util.ResponseAny"
+                            "$ref": "#/definitions/response.Any"
                         }
                     }
                 }
@@ -600,7 +600,7 @@ const docTemplate = `{
                         "schema": {
                             "allOf": [
                                 {
-                                    "$ref": "#/definitions/util.ResponseAny"
+                                    "$ref": "#/definitions/response.Any"
                                 },
                                 {
                                     "type": "object",
@@ -646,7 +646,7 @@ const docTemplate = `{
                         "schema": {
                             "allOf": [
                                 {
-                                    "$ref": "#/definitions/util.ResponseAny"
+                                    "$ref": "#/definitions/response.Any"
                                 },
                                 {
                                     "type": "object",
@@ -711,7 +711,7 @@ const docTemplate = `{
                         "schema": {
                             "allOf": [
                                 {
-                                    "$ref": "#/definitions/util.ResponseAny"
+                                    "$ref": "#/definitions/response.Any"
                                 },
                                 {
                                     "type": "object",
@@ -757,7 +757,7 @@ const docTemplate = `{
                         "schema": {
                             "allOf": [
                                 {
-                                    "$ref": "#/definitions/util.ResponseAny"
+                                    "$ref": "#/definitions/response.Any"
                                 },
                                 {
                                     "type": "object",
@@ -792,13 +792,13 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/util.ResponseAny"
+                            "$ref": "#/definitions/response.Any"
                         }
                     },
                     "401": {
                         "description": "Unauthorized",
                         "schema": {
-                            "$ref": "#/definitions/util.ResponseAny"
+                            "$ref": "#/definitions/response.Any"
                         }
                     }
                 }
@@ -823,7 +823,7 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/util.ResponseAny"
+                            "$ref": "#/definitions/response.Any"
                         }
                     }
                 }
@@ -862,7 +862,7 @@ const docTemplate = `{
                         "schema": {
                             "allOf": [
                                 {
-                                    "$ref": "#/definitions/util.ResponseAny"
+                                    "$ref": "#/definitions/response.Any"
                                 },
                                 {
                                     "type": "object",
@@ -906,13 +906,13 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/util.ResponseAny"
+                            "$ref": "#/definitions/response.Any"
                         }
                     },
                     "404": {
                         "description": "Not Found",
                         "schema": {
-                            "$ref": "#/definitions/util.ResponseAny"
+                            "$ref": "#/definitions/response.Any"
                         }
                     }
                 }
@@ -956,7 +956,7 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/util.ResponseAny"
+                            "$ref": "#/definitions/response.Any"
                         }
                     }
                 }
@@ -988,7 +988,7 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/util.ResponseAny"
+                            "$ref": "#/definitions/response.Any"
                         }
                     }
                 }
@@ -1022,7 +1022,7 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/util.ResponseAny"
+                            "$ref": "#/definitions/response.Any"
                         }
                     }
                 }
@@ -1056,7 +1056,7 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/util.ResponseAny"
+                            "$ref": "#/definitions/response.Any"
                         }
                     }
                 }
@@ -1096,7 +1096,7 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/util.ResponseAny"
+                            "$ref": "#/definitions/response.Any"
                         }
                     }
                 }
@@ -1140,7 +1140,7 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/util.ResponseAny"
+                            "$ref": "#/definitions/response.Any"
                         }
                     }
                 }
@@ -1174,7 +1174,7 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/util.ResponseAny"
+                            "$ref": "#/definitions/response.Any"
                         }
                     }
                 }
@@ -1201,7 +1201,7 @@ const docTemplate = `{
                         "schema": {
                             "allOf": [
                                 {
-                                    "$ref": "#/definitions/util.ResponseAny"
+                                    "$ref": "#/definitions/response.Any"
                                 },
                                 {
                                     "type": "object",
@@ -1220,19 +1220,19 @@ const docTemplate = `{
                     "401": {
                         "description": "未登录",
                         "schema": {
-                            "$ref": "#/definitions/util.ResponseAny"
+                            "$ref": "#/definitions/response.Any"
                         }
                     },
                     "403": {
                         "description": "无管理员权限",
                         "schema": {
-                            "$ref": "#/definitions/util.ResponseAny"
+                            "$ref": "#/definitions/response.Any"
                         }
                     },
                     "500": {
                         "description": "内部错误",
                         "schema": {
-                            "$ref": "#/definitions/util.ResponseAny"
+                            "$ref": "#/definitions/response.Any"
                         }
                     }
                 }
@@ -1271,7 +1271,7 @@ const docTemplate = `{
                         "schema": {
                             "allOf": [
                                 {
-                                    "$ref": "#/definitions/util.ResponseAny"
+                                    "$ref": "#/definitions/response.Any"
                                 },
                                 {
                                     "type": "object",
@@ -1287,19 +1287,19 @@ const docTemplate = `{
                     "400": {
                         "description": "参数错误或验证失败",
                         "schema": {
-                            "$ref": "#/definitions/util.ResponseAny"
+                            "$ref": "#/definitions/response.Any"
                         }
                     },
                     "401": {
                         "description": "未登录",
                         "schema": {
-                            "$ref": "#/definitions/util.ResponseAny"
+                            "$ref": "#/definitions/response.Any"
                         }
                     },
                     "403": {
                         "description": "无管理员权限",
                         "schema": {
-                            "$ref": "#/definitions/util.ResponseAny"
+                            "$ref": "#/definitions/response.Any"
                         }
                     }
                 }
@@ -1348,7 +1348,7 @@ const docTemplate = `{
                         "schema": {
                             "allOf": [
                                 {
-                                    "$ref": "#/definitions/util.ResponseAny"
+                                    "$ref": "#/definitions/response.Any"
                                 },
                                 {
                                     "type": "object",
@@ -1364,25 +1364,25 @@ const docTemplate = `{
                     "400": {
                         "description": "参数错误或验证失败",
                         "schema": {
-                            "$ref": "#/definitions/util.ResponseAny"
+                            "$ref": "#/definitions/response.Any"
                         }
                     },
                     "401": {
                         "description": "未登录",
                         "schema": {
-                            "$ref": "#/definitions/util.ResponseAny"
+                            "$ref": "#/definitions/response.Any"
                         }
                     },
                     "403": {
                         "description": "无管理员权限",
                         "schema": {
-                            "$ref": "#/definitions/util.ResponseAny"
+                            "$ref": "#/definitions/response.Any"
                         }
                     },
                     "500": {
                         "description": "内部错误",
                         "schema": {
-                            "$ref": "#/definitions/util.ResponseAny"
+                            "$ref": "#/definitions/response.Any"
                         }
                     }
                 }
@@ -1417,7 +1417,7 @@ const docTemplate = `{
                         "schema": {
                             "allOf": [
                                 {
-                                    "$ref": "#/definitions/util.ResponseAny"
+                                    "$ref": "#/definitions/response.Any"
                                 },
                                 {
                                     "type": "object",
@@ -1433,19 +1433,19 @@ const docTemplate = `{
                     "400": {
                         "description": "ID 无效或删除失败",
                         "schema": {
-                            "$ref": "#/definitions/util.ResponseAny"
+                            "$ref": "#/definitions/response.Any"
                         }
                     },
                     "401": {
                         "description": "未登录",
                         "schema": {
-                            "$ref": "#/definitions/util.ResponseAny"
+                            "$ref": "#/definitions/response.Any"
                         }
                     },
                     "403": {
                         "description": "无管理员权限",
                         "schema": {
-                            "$ref": "#/definitions/util.ResponseAny"
+                            "$ref": "#/definitions/response.Any"
                         }
                     }
                 }
@@ -1494,7 +1494,7 @@ const docTemplate = `{
                         "schema": {
                             "allOf": [
                                 {
-                                    "$ref": "#/definitions/util.ResponseAny"
+                                    "$ref": "#/definitions/response.Any"
                                 },
                                 {
                                     "type": "object",
@@ -1510,19 +1510,19 @@ const docTemplate = `{
                     "400": {
                         "description": "验证失败或认证源不存在",
                         "schema": {
-                            "$ref": "#/definitions/util.ResponseAny"
+                            "$ref": "#/definitions/response.Any"
                         }
                     },
                     "401": {
                         "description": "未登录",
                         "schema": {
-                            "$ref": "#/definitions/util.ResponseAny"
+                            "$ref": "#/definitions/response.Any"
                         }
                     },
                     "403": {
                         "description": "无管理员权限",
                         "schema": {
-                            "$ref": "#/definitions/util.ResponseAny"
+                            "$ref": "#/definitions/response.Any"
                         }
                     }
                 }
@@ -1547,25 +1547,25 @@ const docTemplate = `{
                     "200": {
                         "description": "清理成功",
                         "schema": {
-                            "$ref": "#/definitions/util.ResponseAny"
+                            "$ref": "#/definitions/response.Any"
                         }
                     },
                     "401": {
                         "description": "未登录",
                         "schema": {
-                            "$ref": "#/definitions/util.ResponseAny"
+                            "$ref": "#/definitions/response.Any"
                         }
                     },
                     "403": {
                         "description": "无管理员权限",
                         "schema": {
-                            "$ref": "#/definitions/util.ResponseAny"
+                            "$ref": "#/definitions/response.Any"
                         }
                     },
                     "500": {
                         "description": "服务内部错误",
                         "schema": {
-                            "$ref": "#/definitions/util.ResponseAny"
+                            "$ref": "#/definitions/response.Any"
                         }
                     }
                 }
@@ -1604,31 +1604,31 @@ const docTemplate = `{
                     "200": {
                         "description": "更新成功",
                         "schema": {
-                            "$ref": "#/definitions/util.ResponseAny"
+                            "$ref": "#/definitions/response.Any"
                         }
                     },
                     "400": {
                         "description": "参数错误",
                         "schema": {
-                            "$ref": "#/definitions/util.ResponseAny"
+                            "$ref": "#/definitions/response.Any"
                         }
                     },
                     "401": {
                         "description": "未登录",
                         "schema": {
-                            "$ref": "#/definitions/util.ResponseAny"
+                            "$ref": "#/definitions/response.Any"
                         }
                     },
                     "403": {
                         "description": "无管理员权限",
                         "schema": {
-                            "$ref": "#/definitions/util.ResponseAny"
+                            "$ref": "#/definitions/response.Any"
                         }
                     },
                     "500": {
                         "description": "服务内部错误",
                         "schema": {
-                            "$ref": "#/definitions/util.ResponseAny"
+                            "$ref": "#/definitions/response.Any"
                         }
                     }
                 }
@@ -1655,7 +1655,7 @@ const docTemplate = `{
                         "schema": {
                             "allOf": [
                                 {
-                                    "$ref": "#/definitions/util.ResponseAny"
+                                    "$ref": "#/definitions/response.Any"
                                 },
                                 {
                                     "type": "object",
@@ -1671,19 +1671,19 @@ const docTemplate = `{
                     "401": {
                         "description": "未登录",
                         "schema": {
-                            "$ref": "#/definitions/util.ResponseAny"
+                            "$ref": "#/definitions/response.Any"
                         }
                     },
                     "403": {
                         "description": "无管理员权限",
                         "schema": {
-                            "$ref": "#/definitions/util.ResponseAny"
+                            "$ref": "#/definitions/response.Any"
                         }
                     },
                     "500": {
                         "description": "内部错误",
                         "schema": {
-                            "$ref": "#/definitions/util.ResponseAny"
+                            "$ref": "#/definitions/response.Any"
                         }
                     }
                 }
@@ -1714,19 +1714,19 @@ const docTemplate = `{
                     "401": {
                         "description": "未登录",
                         "schema": {
-                            "$ref": "#/definitions/util.ResponseAny"
+                            "$ref": "#/definitions/response.Any"
                         }
                     },
                     "403": {
                         "description": "无管理员权限",
                         "schema": {
-                            "$ref": "#/definitions/util.ResponseAny"
+                            "$ref": "#/definitions/response.Any"
                         }
                     },
                     "500": {
                         "description": "导出失败",
                         "schema": {
-                            "$ref": "#/definitions/util.ResponseAny"
+                            "$ref": "#/definitions/response.Any"
                         }
                     }
                 }
@@ -1753,7 +1753,7 @@ const docTemplate = `{
                         "schema": {
                             "allOf": [
                                 {
-                                    "$ref": "#/definitions/util.ResponseAny"
+                                    "$ref": "#/definitions/response.Any"
                                 },
                                 {
                                     "type": "object",
@@ -1769,13 +1769,13 @@ const docTemplate = `{
                     "401": {
                         "description": "未登录",
                         "schema": {
-                            "$ref": "#/definitions/util.ResponseAny"
+                            "$ref": "#/definitions/response.Any"
                         }
                     },
                     "403": {
                         "description": "无管理员权限",
                         "schema": {
-                            "$ref": "#/definitions/util.ResponseAny"
+                            "$ref": "#/definitions/response.Any"
                         }
                     }
                 }
@@ -1802,7 +1802,7 @@ const docTemplate = `{
                         "schema": {
                             "allOf": [
                                 {
-                                    "$ref": "#/definitions/util.ResponseAny"
+                                    "$ref": "#/definitions/response.Any"
                                 },
                                 {
                                     "type": "object",
@@ -1818,19 +1818,19 @@ const docTemplate = `{
                     "401": {
                         "description": "未登录",
                         "schema": {
-                            "$ref": "#/definitions/util.ResponseAny"
+                            "$ref": "#/definitions/response.Any"
                         }
                     },
                     "403": {
                         "description": "无管理员权限",
                         "schema": {
-                            "$ref": "#/definitions/util.ResponseAny"
+                            "$ref": "#/definitions/response.Any"
                         }
                     },
                     "500": {
                         "description": "内部错误",
                         "schema": {
-                            "$ref": "#/definitions/util.ResponseAny"
+                            "$ref": "#/definitions/response.Any"
                         }
                     }
                 }
@@ -1871,7 +1871,7 @@ const docTemplate = `{
                         "schema": {
                             "allOf": [
                                 {
-                                    "$ref": "#/definitions/util.ResponseAny"
+                                    "$ref": "#/definitions/response.Any"
                                 },
                                 {
                                     "type": "object",
@@ -1887,25 +1887,25 @@ const docTemplate = `{
                     "400": {
                         "description": "SQL 语句错误",
                         "schema": {
-                            "$ref": "#/definitions/util.ResponseAny"
+                            "$ref": "#/definitions/response.Any"
                         }
                     },
                     "401": {
                         "description": "未登录",
                         "schema": {
-                            "$ref": "#/definitions/util.ResponseAny"
+                            "$ref": "#/definitions/response.Any"
                         }
                     },
                     "403": {
                         "description": "无管理员权限",
                         "schema": {
-                            "$ref": "#/definitions/util.ResponseAny"
+                            "$ref": "#/definitions/response.Any"
                         }
                     },
                     "500": {
                         "description": "内部错误",
                         "schema": {
-                            "$ref": "#/definitions/util.ResponseAny"
+                            "$ref": "#/definitions/response.Any"
                         }
                     }
                 }
@@ -1932,7 +1932,7 @@ const docTemplate = `{
                         "schema": {
                             "allOf": [
                                 {
-                                    "$ref": "#/definitions/util.ResponseAny"
+                                    "$ref": "#/definitions/response.Any"
                                 },
                                 {
                                     "type": "object",
@@ -1951,19 +1951,19 @@ const docTemplate = `{
                     "401": {
                         "description": "未登录",
                         "schema": {
-                            "$ref": "#/definitions/util.ResponseAny"
+                            "$ref": "#/definitions/response.Any"
                         }
                     },
                     "403": {
                         "description": "无管理员权限",
                         "schema": {
-                            "$ref": "#/definitions/util.ResponseAny"
+                            "$ref": "#/definitions/response.Any"
                         }
                     },
                     "500": {
                         "description": "内部错误",
                         "schema": {
-                            "$ref": "#/definitions/util.ResponseAny"
+                            "$ref": "#/definitions/response.Any"
                         }
                     }
                 }
@@ -2006,7 +2006,7 @@ const docTemplate = `{
                         "schema": {
                             "allOf": [
                                 {
-                                    "$ref": "#/definitions/util.ResponseAny"
+                                    "$ref": "#/definitions/response.Any"
                                 },
                                 {
                                     "type": "object",
@@ -2022,13 +2022,13 @@ const docTemplate = `{
                     "401": {
                         "description": "未登录",
                         "schema": {
-                            "$ref": "#/definitions/util.ResponseAny"
+                            "$ref": "#/definitions/response.Any"
                         }
                     },
                     "403": {
                         "description": "无管理员权限",
                         "schema": {
-                            "$ref": "#/definitions/util.ResponseAny"
+                            "$ref": "#/definitions/response.Any"
                         }
                     }
                 }
@@ -2095,7 +2095,7 @@ const docTemplate = `{
                         "schema": {
                             "allOf": [
                                 {
-                                    "$ref": "#/definitions/util.ResponseAny"
+                                    "$ref": "#/definitions/response.Any"
                                 },
                                 {
                                     "type": "object",
@@ -2111,19 +2111,19 @@ const docTemplate = `{
                     "400": {
                         "description": "ClickHouse 未启用或参数错误",
                         "schema": {
-                            "$ref": "#/definitions/util.ResponseAny"
+                            "$ref": "#/definitions/response.Any"
                         }
                     },
                     "401": {
                         "description": "未登录",
                         "schema": {
-                            "$ref": "#/definitions/util.ResponseAny"
+                            "$ref": "#/definitions/response.Any"
                         }
                     },
                     "403": {
                         "description": "无管理员权限",
                         "schema": {
-                            "$ref": "#/definitions/util.ResponseAny"
+                            "$ref": "#/definitions/response.Any"
                         }
                     }
                 }
@@ -2150,7 +2150,7 @@ const docTemplate = `{
                         "schema": {
                             "allOf": [
                                 {
-                                    "$ref": "#/definitions/util.ResponseAny"
+                                    "$ref": "#/definitions/response.Any"
                                 },
                                 {
                                     "type": "object",
@@ -2166,19 +2166,19 @@ const docTemplate = `{
                     "400": {
                         "description": "ClickHouse 未启用",
                         "schema": {
-                            "$ref": "#/definitions/util.ResponseAny"
+                            "$ref": "#/definitions/response.Any"
                         }
                     },
                     "401": {
                         "description": "未登录",
                         "schema": {
-                            "$ref": "#/definitions/util.ResponseAny"
+                            "$ref": "#/definitions/response.Any"
                         }
                     },
                     "403": {
                         "description": "无管理员权限",
                         "schema": {
-                            "$ref": "#/definitions/util.ResponseAny"
+                            "$ref": "#/definitions/response.Any"
                         }
                     }
                 }
@@ -2192,6 +2192,657 @@ const docTemplate = `{
                 ],
                 "summary": "系统日志实时推送",
                 "responses": {}
+            }
+        },
+        "/api/v1/admin/push/channels": {
+            "get": {
+                "security": [
+                    {
+                        "SessionCookie": []
+                    }
+                ],
+                "description": "返回系统配置的所有消息通道列表，需要管理员权限",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "admin-push"
+                ],
+                "summary": "获取所有消息通道",
+                "responses": {
+                    "200": {
+                        "description": "消息通道列表",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/response.Any"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "$ref": "#/definitions/model.PushChannel"
+                                            }
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                }
+            },
+            "post": {
+                "security": [
+                    {
+                        "SessionCookie": []
+                    }
+                ],
+                "description": "新建一个消息通道配置，需要管理员权限",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "admin-push"
+                ],
+                "summary": "创建消息通道",
+                "parameters": [
+                    {
+                        "description": "创建参数",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/push.CreateChannelRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "创建成功",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/response.Any"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/model.PushChannel"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/admin/push/channels/definitions": {
+            "get": {
+                "security": [
+                    {
+                        "SessionCookie": []
+                    }
+                ],
+                "description": "返回系统支持的所有消息通道类型（如飞书、邮件、自定义、Telegram）的动态表单定义，需要管理员权限",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "admin-push"
+                ],
+                "summary": "获取所有消息通道配置字段定义",
+                "responses": {
+                    "200": {
+                        "description": "通道配置定义列表",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/response.Any"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "$ref": "#/definitions/push.Definition"
+                                            }
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/admin/push/channels/test": {
+            "post": {
+                "security": [
+                    {
+                        "SessionCookie": []
+                    }
+                ],
+                "description": "触发一次临时的或现有的通道连通性推送测试，需要管理员权限",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "admin-push"
+                ],
+                "summary": "测试通道连通性",
+                "parameters": [
+                    {
+                        "description": "测试参数",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/push.TestChannelRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "测试触发成功",
+                        "schema": {
+                            "$ref": "#/definitions/response.Any"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/admin/push/channels/{id}": {
+            "put": {
+                "security": [
+                    {
+                        "SessionCookie": []
+                    }
+                ],
+                "description": "修改消息通道配置，需要管理员权限",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "admin-push"
+                ],
+                "summary": "更新消息通道",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "format": "int64",
+                        "description": "通道ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "更新参数",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/push.UpdateChannelRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "更新成功",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/response.Any"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/model.PushChannel"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                }
+            },
+            "delete": {
+                "security": [
+                    {
+                        "SessionCookie": []
+                    }
+                ],
+                "description": "根据ID删除消息通道，需要管理员权限",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "admin-push"
+                ],
+                "summary": "删除消息通道",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "format": "int64",
+                        "description": "通道ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "删除成功",
+                        "schema": {
+                            "$ref": "#/definitions/response.Any"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/admin/push/events": {
+            "get": {
+                "security": [
+                    {
+                        "SessionCookie": []
+                    }
+                ],
+                "description": "返回系统配置的通知事件列表，包括预置和自定义事件，需要管理员权限",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "admin-push"
+                ],
+                "summary": "获取所有通知事件",
+                "responses": {
+                    "200": {
+                        "description": "通知事件列表",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/response.Any"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "$ref": "#/definitions/model.PushEvent"
+                                            }
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                }
+            },
+            "post": {
+                "security": [
+                    {
+                        "SessionCookie": []
+                    }
+                ],
+                "description": "绑定系统内置事件或异步任务、推送渠道、接收目标并创建通知事件配置，需要管理员权限",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "admin-push"
+                ],
+                "summary": "创建通知事件",
+                "parameters": [
+                    {
+                        "description": "创建参数",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/push.CreateEventRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "创建成功",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/response.Any"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/model.PushEvent"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/admin/push/events/builtin": {
+            "get": {
+                "security": [
+                    {
+                        "SessionCookie": []
+                    }
+                ],
+                "description": "返回系统定义的所有内置通知事件元数据，供前端下拉框选择，需要管理员权限",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "admin-push"
+                ],
+                "summary": "获取所有内置通知事件",
+                "responses": {
+                    "200": {
+                        "description": "内置通知事件列表",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/response.Any"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "$ref": "#/definitions/push.EventMetadata"
+                                            }
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/admin/push/events/{id}": {
+            "put": {
+                "security": [
+                    {
+                        "SessionCookie": []
+                    }
+                ],
+                "description": "更新已有通知事件的推送渠道、接收目标和内容模板，需要管理员权限",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "admin-push"
+                ],
+                "summary": "更新通知事件",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "事件 ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "更新参数",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/push.UpdateEventRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "修改成功",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/response.Any"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "string"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                }
+            },
+            "delete": {
+                "security": [
+                    {
+                        "SessionCookie": []
+                    }
+                ],
+                "description": "删除数据库中的特定通知事件配置，需要管理员权限",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "admin-push"
+                ],
+                "summary": "删除通知事件配置",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "事件 ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "删除成功",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/response.Any"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "string"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/admin/push/events/{id}/toggle": {
+            "post": {
+                "security": [
+                    {
+                        "SessionCookie": []
+                    }
+                ],
+                "description": "启用或禁用指定的通知事件",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "admin-push"
+                ],
+                "summary": "快捷切换通知事件启用状态",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "事件 ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "切换成功",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/response.Any"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "string"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/admin/push/histories": {
+            "get": {
+                "security": [
+                    {
+                        "SessionCookie": []
+                    }
+                ],
+                "description": "返回分页的通知历史日志数据，需要管理员权限",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "admin-push"
+                ],
+                "summary": "分页获取通知推送历史",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "当前页码",
+                        "name": "page",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "分页大小",
+                        "name": "page_size",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "过滤事件名称",
+                        "name": "event_key",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "过滤发送状态",
+                        "name": "status",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "推送历史列表",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/response.Any"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/push.pushHistoriesResponse"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/admin/push/test": {
+            "post": {
+                "security": [
+                    {
+                        "SessionCookie": []
+                    }
+                ],
+                "description": "接收临时通知渠道配置并在本地同步调用 Pusher.Send 发送测试消息",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "admin-push"
+                ],
+                "summary": "测试推送通道发送",
+                "parameters": [
+                    {
+                        "description": "测试请求体",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/push.TestPushRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "测试成功",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/response.Any"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "string"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                }
             }
         },
         "/api/v1/admin/status": {
@@ -2215,7 +2866,7 @@ const docTemplate = `{
                         "schema": {
                             "allOf": [
                                 {
-                                    "$ref": "#/definitions/util.ResponseAny"
+                                    "$ref": "#/definitions/response.Any"
                                 },
                                 {
                                     "type": "object",
@@ -2231,13 +2882,13 @@ const docTemplate = `{
                     "401": {
                         "description": "未登录",
                         "schema": {
-                            "$ref": "#/definitions/util.ResponseAny"
+                            "$ref": "#/definitions/response.Any"
                         }
                     },
                     "403": {
                         "description": "无管理员权限",
                         "schema": {
-                            "$ref": "#/definitions/util.ResponseAny"
+                            "$ref": "#/definitions/response.Any"
                         }
                     }
                 }
@@ -2272,7 +2923,7 @@ const docTemplate = `{
                         "schema": {
                             "allOf": [
                                 {
-                                    "$ref": "#/definitions/util.ResponseAny"
+                                    "$ref": "#/definitions/response.Any"
                                 },
                                 {
                                     "type": "object",
@@ -2291,19 +2942,19 @@ const docTemplate = `{
                     "401": {
                         "description": "未登录",
                         "schema": {
-                            "$ref": "#/definitions/util.ResponseAny"
+                            "$ref": "#/definitions/response.Any"
                         }
                     },
                     "403": {
                         "description": "无管理员权限",
                         "schema": {
-                            "$ref": "#/definitions/util.ResponseAny"
+                            "$ref": "#/definitions/response.Any"
                         }
                     },
                     "500": {
                         "description": "内部错误",
                         "schema": {
-                            "$ref": "#/definitions/util.ResponseAny"
+                            "$ref": "#/definitions/response.Any"
                         }
                     }
                 }
@@ -2342,7 +2993,7 @@ const docTemplate = `{
                         "schema": {
                             "allOf": [
                                 {
-                                    "$ref": "#/definitions/util.ResponseAny"
+                                    "$ref": "#/definitions/response.Any"
                                 },
                                 {
                                     "type": "object",
@@ -2358,25 +3009,25 @@ const docTemplate = `{
                     "400": {
                         "description": "参数错误或配置键已存在",
                         "schema": {
-                            "$ref": "#/definitions/util.ResponseAny"
+                            "$ref": "#/definitions/response.Any"
                         }
                     },
                     "401": {
                         "description": "未登录",
                         "schema": {
-                            "$ref": "#/definitions/util.ResponseAny"
+                            "$ref": "#/definitions/response.Any"
                         }
                     },
                     "403": {
                         "description": "无管理员权限",
                         "schema": {
-                            "$ref": "#/definitions/util.ResponseAny"
+                            "$ref": "#/definitions/response.Any"
                         }
                     },
                     "500": {
                         "description": "内部错误",
                         "schema": {
-                            "$ref": "#/definitions/util.ResponseAny"
+                            "$ref": "#/definitions/response.Any"
                         }
                     }
                 }
@@ -2417,7 +3068,7 @@ const docTemplate = `{
                         "schema": {
                             "allOf": [
                                 {
-                                    "$ref": "#/definitions/util.ResponseAny"
+                                    "$ref": "#/definitions/response.Any"
                                 },
                                 {
                                     "type": "object",
@@ -2433,7 +3084,7 @@ const docTemplate = `{
                     "400": {
                         "description": "参数错误",
                         "schema": {
-                            "$ref": "#/definitions/util.ResponseAny"
+                            "$ref": "#/definitions/response.Any"
                         }
                     }
                 }
@@ -2469,7 +3120,7 @@ const docTemplate = `{
                         "schema": {
                             "allOf": [
                                 {
-                                    "$ref": "#/definitions/util.ResponseAny"
+                                    "$ref": "#/definitions/response.Any"
                                 },
                                 {
                                     "type": "object",
@@ -2485,25 +3136,25 @@ const docTemplate = `{
                     "401": {
                         "description": "未登录",
                         "schema": {
-                            "$ref": "#/definitions/util.ResponseAny"
+                            "$ref": "#/definitions/response.Any"
                         }
                     },
                     "403": {
                         "description": "无管理员权限",
                         "schema": {
-                            "$ref": "#/definitions/util.ResponseAny"
+                            "$ref": "#/definitions/response.Any"
                         }
                     },
                     "404": {
                         "description": "配置不存在",
                         "schema": {
-                            "$ref": "#/definitions/util.ResponseAny"
+                            "$ref": "#/definitions/response.Any"
                         }
                     },
                     "500": {
                         "description": "内部错误",
                         "schema": {
-                            "$ref": "#/definitions/util.ResponseAny"
+                            "$ref": "#/definitions/response.Any"
                         }
                     }
                 }
@@ -2549,7 +3200,7 @@ const docTemplate = `{
                         "schema": {
                             "allOf": [
                                 {
-                                    "$ref": "#/definitions/util.ResponseAny"
+                                    "$ref": "#/definitions/response.Any"
                                 },
                                 {
                                     "type": "object",
@@ -2565,31 +3216,31 @@ const docTemplate = `{
                     "400": {
                         "description": "参数错误",
                         "schema": {
-                            "$ref": "#/definitions/util.ResponseAny"
+                            "$ref": "#/definitions/response.Any"
                         }
                     },
                     "401": {
                         "description": "未登录",
                         "schema": {
-                            "$ref": "#/definitions/util.ResponseAny"
+                            "$ref": "#/definitions/response.Any"
                         }
                     },
                     "403": {
                         "description": "无管理员权限",
                         "schema": {
-                            "$ref": "#/definitions/util.ResponseAny"
+                            "$ref": "#/definitions/response.Any"
                         }
                     },
                     "404": {
                         "description": "配置不存在",
                         "schema": {
-                            "$ref": "#/definitions/util.ResponseAny"
+                            "$ref": "#/definitions/response.Any"
                         }
                     },
                     "500": {
                         "description": "内部错误",
                         "schema": {
-                            "$ref": "#/definitions/util.ResponseAny"
+                            "$ref": "#/definitions/response.Any"
                         }
                     }
                 }
@@ -2630,7 +3281,7 @@ const docTemplate = `{
                         "schema": {
                             "allOf": [
                                 {
-                                    "$ref": "#/definitions/util.ResponseAny"
+                                    "$ref": "#/definitions/response.Any"
                                 },
                                 {
                                     "type": "object",
@@ -2646,25 +3297,25 @@ const docTemplate = `{
                     "400": {
                         "description": "任务类型不存在或参数错误",
                         "schema": {
-                            "$ref": "#/definitions/util.ResponseAny"
+                            "$ref": "#/definitions/response.Any"
                         }
                     },
                     "401": {
                         "description": "未登录",
                         "schema": {
-                            "$ref": "#/definitions/util.ResponseAny"
+                            "$ref": "#/definitions/response.Any"
                         }
                     },
                     "403": {
                         "description": "无管理员权限",
                         "schema": {
-                            "$ref": "#/definitions/util.ResponseAny"
+                            "$ref": "#/definitions/response.Any"
                         }
                     },
                     "500": {
                         "description": "任务入队失败",
                         "schema": {
-                            "$ref": "#/definitions/util.ResponseAny"
+                            "$ref": "#/definitions/response.Any"
                         }
                     }
                 }
@@ -2719,7 +3370,7 @@ const docTemplate = `{
                         "schema": {
                             "allOf": [
                                 {
-                                    "$ref": "#/definitions/util.ResponseAny"
+                                    "$ref": "#/definitions/response.Any"
                                 },
                                 {
                                     "type": "object",
@@ -2735,13 +3386,13 @@ const docTemplate = `{
                     "401": {
                         "description": "未登录",
                         "schema": {
-                            "$ref": "#/definitions/util.ResponseAny"
+                            "$ref": "#/definitions/response.Any"
                         }
                     },
                     "403": {
                         "description": "无管理员权限",
                         "schema": {
-                            "$ref": "#/definitions/util.ResponseAny"
+                            "$ref": "#/definitions/response.Any"
                         }
                     }
                 }
@@ -2777,7 +3428,7 @@ const docTemplate = `{
                         "schema": {
                             "allOf": [
                                 {
-                                    "$ref": "#/definitions/util.ResponseAny"
+                                    "$ref": "#/definitions/response.Any"
                                 },
                                 {
                                     "type": "object",
@@ -2793,25 +3444,25 @@ const docTemplate = `{
                     "400": {
                         "description": "参数错误",
                         "schema": {
-                            "$ref": "#/definitions/util.ResponseAny"
+                            "$ref": "#/definitions/response.Any"
                         }
                     },
                     "401": {
                         "description": "未登录",
                         "schema": {
-                            "$ref": "#/definitions/util.ResponseAny"
+                            "$ref": "#/definitions/response.Any"
                         }
                     },
                     "403": {
                         "description": "无管理员权限",
                         "schema": {
-                            "$ref": "#/definitions/util.ResponseAny"
+                            "$ref": "#/definitions/response.Any"
                         }
                     },
                     "404": {
                         "description": "记录不存在",
                         "schema": {
-                            "$ref": "#/definitions/util.ResponseAny"
+                            "$ref": "#/definitions/response.Any"
                         }
                     }
                 }
@@ -2847,7 +3498,7 @@ const docTemplate = `{
                         "schema": {
                             "allOf": [
                                 {
-                                    "$ref": "#/definitions/util.ResponseAny"
+                                    "$ref": "#/definitions/response.Any"
                                 },
                                 {
                                     "type": "object",
@@ -2863,31 +3514,31 @@ const docTemplate = `{
                     "400": {
                         "description": "任务不支持重试或参数错误",
                         "schema": {
-                            "$ref": "#/definitions/util.ResponseAny"
+                            "$ref": "#/definitions/response.Any"
                         }
                     },
                     "401": {
                         "description": "未登录",
                         "schema": {
-                            "$ref": "#/definitions/util.ResponseAny"
+                            "$ref": "#/definitions/response.Any"
                         }
                     },
                     "403": {
                         "description": "无管理员权限",
                         "schema": {
-                            "$ref": "#/definitions/util.ResponseAny"
+                            "$ref": "#/definitions/response.Any"
                         }
                     },
                     "404": {
                         "description": "记录不存在",
                         "schema": {
-                            "$ref": "#/definitions/util.ResponseAny"
+                            "$ref": "#/definitions/response.Any"
                         }
                     },
                     "500": {
                         "description": "重试失败",
                         "schema": {
-                            "$ref": "#/definitions/util.ResponseAny"
+                            "$ref": "#/definitions/response.Any"
                         }
                     }
                 }
@@ -2914,7 +3565,7 @@ const docTemplate = `{
                         "schema": {
                             "allOf": [
                                 {
-                                    "$ref": "#/definitions/util.ResponseAny"
+                                    "$ref": "#/definitions/response.Any"
                                 },
                                 {
                                     "type": "object",
@@ -2933,13 +3584,13 @@ const docTemplate = `{
                     "401": {
                         "description": "未登录",
                         "schema": {
-                            "$ref": "#/definitions/util.ResponseAny"
+                            "$ref": "#/definitions/response.Any"
                         }
                     },
                     "403": {
                         "description": "无管理员权限",
                         "schema": {
-                            "$ref": "#/definitions/util.ResponseAny"
+                            "$ref": "#/definitions/response.Any"
                         }
                     }
                 }
@@ -2978,7 +3629,7 @@ const docTemplate = `{
                         "schema": {
                             "allOf": [
                                 {
-                                    "$ref": "#/definitions/util.ResponseAny"
+                                    "$ref": "#/definitions/response.Any"
                                 },
                                 {
                                     "type": "object",
@@ -2994,25 +3645,25 @@ const docTemplate = `{
                     "400": {
                         "description": "Cron 表达式无效、异步任务类型不存在或参数错误",
                         "schema": {
-                            "$ref": "#/definitions/util.ResponseAny"
+                            "$ref": "#/definitions/response.Any"
                         }
                     },
                     "401": {
                         "description": "未登录",
                         "schema": {
-                            "$ref": "#/definitions/util.ResponseAny"
+                            "$ref": "#/definitions/response.Any"
                         }
                     },
                     "403": {
                         "description": "无管理员权限",
                         "schema": {
-                            "$ref": "#/definitions/util.ResponseAny"
+                            "$ref": "#/definitions/response.Any"
                         }
                     },
                     "500": {
                         "description": "保存定时任务失败",
                         "schema": {
-                            "$ref": "#/definitions/util.ResponseAny"
+                            "$ref": "#/definitions/response.Any"
                         }
                     }
                 }
@@ -3060,7 +3711,7 @@ const docTemplate = `{
                         "schema": {
                             "allOf": [
                                 {
-                                    "$ref": "#/definitions/util.ResponseAny"
+                                    "$ref": "#/definitions/response.Any"
                                 },
                                 {
                                     "type": "object",
@@ -3076,31 +3727,31 @@ const docTemplate = `{
                     "400": {
                         "description": "Cron 表达式无效、参数错误",
                         "schema": {
-                            "$ref": "#/definitions/util.ResponseAny"
+                            "$ref": "#/definitions/response.Any"
                         }
                     },
                     "401": {
                         "description": "未登录",
                         "schema": {
-                            "$ref": "#/definitions/util.ResponseAny"
+                            "$ref": "#/definitions/response.Any"
                         }
                     },
                     "403": {
                         "description": "无管理员权限",
                         "schema": {
-                            "$ref": "#/definitions/util.ResponseAny"
+                            "$ref": "#/definitions/response.Any"
                         }
                     },
                     "404": {
                         "description": "定时任务不存在",
                         "schema": {
-                            "$ref": "#/definitions/util.ResponseAny"
+                            "$ref": "#/definitions/response.Any"
                         }
                     },
                     "500": {
                         "description": "修改定时任务失败",
                         "schema": {
-                            "$ref": "#/definitions/util.ResponseAny"
+                            "$ref": "#/definitions/response.Any"
                         }
                     }
                 }
@@ -3134,7 +3785,7 @@ const docTemplate = `{
                         "schema": {
                             "allOf": [
                                 {
-                                    "$ref": "#/definitions/util.ResponseAny"
+                                    "$ref": "#/definitions/response.Any"
                                 },
                                 {
                                     "type": "object",
@@ -3150,25 +3801,25 @@ const docTemplate = `{
                     "400": {
                         "description": "参数错误",
                         "schema": {
-                            "$ref": "#/definitions/util.ResponseAny"
+                            "$ref": "#/definitions/response.Any"
                         }
                     },
                     "401": {
                         "description": "未登录",
                         "schema": {
-                            "$ref": "#/definitions/util.ResponseAny"
+                            "$ref": "#/definitions/response.Any"
                         }
                     },
                     "403": {
                         "description": "无管理员权限",
                         "schema": {
-                            "$ref": "#/definitions/util.ResponseAny"
+                            "$ref": "#/definitions/response.Any"
                         }
                     },
                     "500": {
                         "description": "删除定时任务失败",
                         "schema": {
-                            "$ref": "#/definitions/util.ResponseAny"
+                            "$ref": "#/definitions/response.Any"
                         }
                     }
                 }
@@ -3195,7 +3846,7 @@ const docTemplate = `{
                         "schema": {
                             "allOf": [
                                 {
-                                    "$ref": "#/definitions/util.ResponseAny"
+                                    "$ref": "#/definitions/response.Any"
                                 },
                                 {
                                     "type": "object",
@@ -3214,13 +3865,13 @@ const docTemplate = `{
                     "401": {
                         "description": "未登录",
                         "schema": {
-                            "$ref": "#/definitions/util.ResponseAny"
+                            "$ref": "#/definitions/response.Any"
                         }
                     },
                     "403": {
                         "description": "无管理员权限",
                         "schema": {
-                            "$ref": "#/definitions/util.ResponseAny"
+                            "$ref": "#/definitions/response.Any"
                         }
                     }
                 }
@@ -3247,7 +3898,7 @@ const docTemplate = `{
                         "schema": {
                             "allOf": [
                                 {
-                                    "$ref": "#/definitions/util.ResponseAny"
+                                    "$ref": "#/definitions/response.Any"
                                 },
                                 {
                                     "type": "object",
@@ -3266,19 +3917,19 @@ const docTemplate = `{
                     "401": {
                         "description": "未登录",
                         "schema": {
-                            "$ref": "#/definitions/util.ResponseAny"
+                            "$ref": "#/definitions/response.Any"
                         }
                     },
                     "403": {
                         "description": "无管理员权限",
                         "schema": {
-                            "$ref": "#/definitions/util.ResponseAny"
+                            "$ref": "#/definitions/response.Any"
                         }
                     },
                     "500": {
                         "description": "内部错误",
                         "schema": {
-                            "$ref": "#/definitions/util.ResponseAny"
+                            "$ref": "#/definitions/response.Any"
                         }
                     }
                 }
@@ -3317,7 +3968,7 @@ const docTemplate = `{
                         "schema": {
                             "allOf": [
                                 {
-                                    "$ref": "#/definitions/util.ResponseAny"
+                                    "$ref": "#/definitions/response.Any"
                                 },
                                 {
                                     "type": "object",
@@ -3333,25 +3984,25 @@ const docTemplate = `{
                     "400": {
                         "description": "参数错误或模板标识符已存在",
                         "schema": {
-                            "$ref": "#/definitions/util.ResponseAny"
+                            "$ref": "#/definitions/response.Any"
                         }
                     },
                     "401": {
                         "description": "未登录",
                         "schema": {
-                            "$ref": "#/definitions/util.ResponseAny"
+                            "$ref": "#/definitions/response.Any"
                         }
                     },
                     "403": {
                         "description": "无管理员权限",
                         "schema": {
-                            "$ref": "#/definitions/util.ResponseAny"
+                            "$ref": "#/definitions/response.Any"
                         }
                     },
                     "500": {
                         "description": "内部错误",
                         "schema": {
-                            "$ref": "#/definitions/util.ResponseAny"
+                            "$ref": "#/definitions/response.Any"
                         }
                     }
                 }
@@ -3387,7 +4038,7 @@ const docTemplate = `{
                         "schema": {
                             "allOf": [
                                 {
-                                    "$ref": "#/definitions/util.ResponseAny"
+                                    "$ref": "#/definitions/response.Any"
                                 },
                                 {
                                     "type": "object",
@@ -3403,25 +4054,25 @@ const docTemplate = `{
                     "401": {
                         "description": "未登录",
                         "schema": {
-                            "$ref": "#/definitions/util.ResponseAny"
+                            "$ref": "#/definitions/response.Any"
                         }
                     },
                     "403": {
                         "description": "无管理员权限",
                         "schema": {
-                            "$ref": "#/definitions/util.ResponseAny"
+                            "$ref": "#/definitions/response.Any"
                         }
                     },
                     "404": {
                         "description": "模板不存在",
                         "schema": {
-                            "$ref": "#/definitions/util.ResponseAny"
+                            "$ref": "#/definitions/response.Any"
                         }
                     },
                     "500": {
                         "description": "内部错误",
                         "schema": {
-                            "$ref": "#/definitions/util.ResponseAny"
+                            "$ref": "#/definitions/response.Any"
                         }
                     }
                 }
@@ -3467,7 +4118,7 @@ const docTemplate = `{
                         "schema": {
                             "allOf": [
                                 {
-                                    "$ref": "#/definitions/util.ResponseAny"
+                                    "$ref": "#/definitions/response.Any"
                                 },
                                 {
                                     "type": "object",
@@ -3483,31 +4134,31 @@ const docTemplate = `{
                     "400": {
                         "description": "参数错误",
                         "schema": {
-                            "$ref": "#/definitions/util.ResponseAny"
+                            "$ref": "#/definitions/response.Any"
                         }
                     },
                     "401": {
                         "description": "未登录",
                         "schema": {
-                            "$ref": "#/definitions/util.ResponseAny"
+                            "$ref": "#/definitions/response.Any"
                         }
                     },
                     "403": {
                         "description": "无管理员权限",
                         "schema": {
-                            "$ref": "#/definitions/util.ResponseAny"
+                            "$ref": "#/definitions/response.Any"
                         }
                     },
                     "404": {
                         "description": "模板不存在",
                         "schema": {
-                            "$ref": "#/definitions/util.ResponseAny"
+                            "$ref": "#/definitions/response.Any"
                         }
                     },
                     "500": {
                         "description": "内部错误",
                         "schema": {
-                            "$ref": "#/definitions/util.ResponseAny"
+                            "$ref": "#/definitions/response.Any"
                         }
                     }
                 }
@@ -3541,7 +4192,7 @@ const docTemplate = `{
                         "schema": {
                             "allOf": [
                                 {
-                                    "$ref": "#/definitions/util.ResponseAny"
+                                    "$ref": "#/definitions/response.Any"
                                 },
                                 {
                                     "type": "object",
@@ -3557,31 +4208,31 @@ const docTemplate = `{
                     "400": {
                         "description": "不可删除系统模板",
                         "schema": {
-                            "$ref": "#/definitions/util.ResponseAny"
+                            "$ref": "#/definitions/response.Any"
                         }
                     },
                     "401": {
                         "description": "未登录",
                         "schema": {
-                            "$ref": "#/definitions/util.ResponseAny"
+                            "$ref": "#/definitions/response.Any"
                         }
                     },
                     "403": {
                         "description": "无管理员权限",
                         "schema": {
-                            "$ref": "#/definitions/util.ResponseAny"
+                            "$ref": "#/definitions/response.Any"
                         }
                     },
                     "404": {
                         "description": "模板不存在",
                         "schema": {
-                            "$ref": "#/definitions/util.ResponseAny"
+                            "$ref": "#/definitions/response.Any"
                         }
                     },
                     "500": {
                         "description": "内部错误",
                         "schema": {
-                            "$ref": "#/definitions/util.ResponseAny"
+                            "$ref": "#/definitions/response.Any"
                         }
                     }
                 }
@@ -3608,7 +4259,7 @@ const docTemplate = `{
                         "schema": {
                             "allOf": [
                                 {
-                                    "$ref": "#/definitions/util.ResponseAny"
+                                    "$ref": "#/definitions/response.Any"
                                 },
                                 {
                                     "type": "object",
@@ -3624,19 +4275,19 @@ const docTemplate = `{
                     "401": {
                         "description": "未登录",
                         "schema": {
-                            "$ref": "#/definitions/util.ResponseAny"
+                            "$ref": "#/definitions/response.Any"
                         }
                     },
                     "403": {
                         "description": "无管理员权限",
                         "schema": {
-                            "$ref": "#/definitions/util.ResponseAny"
+                            "$ref": "#/definitions/response.Any"
                         }
                     },
                     "500": {
                         "description": "查询失败",
                         "schema": {
-                            "$ref": "#/definitions/util.ResponseAny"
+                            "$ref": "#/definitions/response.Any"
                         }
                     }
                 }
@@ -3661,31 +4312,31 @@ const docTemplate = `{
                     "200": {
                         "description": "升级已准备并即将重启",
                         "schema": {
-                            "$ref": "#/definitions/util.ResponseAny"
+                            "$ref": "#/definitions/response.Any"
                         }
                     },
                     "400": {
                         "description": "当前版本不可升级",
                         "schema": {
-                            "$ref": "#/definitions/util.ResponseAny"
+                            "$ref": "#/definitions/response.Any"
                         }
                     },
                     "401": {
                         "description": "未登录",
                         "schema": {
-                            "$ref": "#/definitions/util.ResponseAny"
+                            "$ref": "#/definitions/response.Any"
                         }
                     },
                     "403": {
                         "description": "无管理员权限",
                         "schema": {
-                            "$ref": "#/definitions/util.ResponseAny"
+                            "$ref": "#/definitions/response.Any"
                         }
                     },
                     "500": {
                         "description": "升级准备失败",
                         "schema": {
-                            "$ref": "#/definitions/util.ResponseAny"
+                            "$ref": "#/definitions/response.Any"
                         }
                     }
                 }
@@ -3751,7 +4402,7 @@ const docTemplate = `{
                         "schema": {
                             "allOf": [
                                 {
-                                    "$ref": "#/definitions/util.ResponseAny"
+                                    "$ref": "#/definitions/response.Any"
                                 },
                                 {
                                     "type": "object",
@@ -3767,13 +4418,13 @@ const docTemplate = `{
                     "401": {
                         "description": "未登录",
                         "schema": {
-                            "$ref": "#/definitions/util.ResponseAny"
+                            "$ref": "#/definitions/response.Any"
                         }
                     },
                     "403": {
                         "description": "无管理员权限",
                         "schema": {
-                            "$ref": "#/definitions/util.ResponseAny"
+                            "$ref": "#/definitions/response.Any"
                         }
                     }
                 }
@@ -3818,13 +4469,13 @@ const docTemplate = `{
                     "400": {
                         "description": "参数错误",
                         "schema": {
-                            "$ref": "#/definitions/util.ResponseAny"
+                            "$ref": "#/definitions/response.Any"
                         }
                     },
                     "500": {
                         "description": "打包失败",
                         "schema": {
-                            "$ref": "#/definitions/util.ResponseAny"
+                            "$ref": "#/definitions/response.Any"
                         }
                     }
                 }
@@ -3870,19 +4521,19 @@ const docTemplate = `{
                     "400": {
                         "description": "参数错误",
                         "schema": {
-                            "$ref": "#/definitions/util.ResponseAny"
+                            "$ref": "#/definitions/response.Any"
                         }
                     },
                     "404": {
                         "description": "文件不存在",
                         "schema": {
-                            "$ref": "#/definitions/util.ResponseAny"
+                            "$ref": "#/definitions/response.Any"
                         }
                     },
                     "500": {
                         "description": "服务内部错误",
                         "schema": {
-                            "$ref": "#/definitions/util.ResponseAny"
+                            "$ref": "#/definitions/response.Any"
                         }
                     }
                 }
@@ -3909,7 +4560,7 @@ const docTemplate = `{
                         "schema": {
                             "allOf": [
                                 {
-                                    "$ref": "#/definitions/util.ResponseAny"
+                                    "$ref": "#/definitions/response.Any"
                                 },
                                 {
                                     "type": "object",
@@ -3925,19 +4576,19 @@ const docTemplate = `{
                     "401": {
                         "description": "未登录",
                         "schema": {
-                            "$ref": "#/definitions/util.ResponseAny"
+                            "$ref": "#/definitions/response.Any"
                         }
                     },
                     "403": {
                         "description": "无管理员权限",
                         "schema": {
-                            "$ref": "#/definitions/util.ResponseAny"
+                            "$ref": "#/definitions/response.Any"
                         }
                     },
                     "500": {
                         "description": "内部错误",
                         "schema": {
-                            "$ref": "#/definitions/util.ResponseAny"
+                            "$ref": "#/definitions/response.Any"
                         }
                     }
                 }
@@ -3964,7 +4615,7 @@ const docTemplate = `{
                         "schema": {
                             "allOf": [
                                 {
-                                    "$ref": "#/definitions/util.ResponseAny"
+                                    "$ref": "#/definitions/response.Any"
                                 },
                                 {
                                     "type": "object",
@@ -3983,19 +4634,19 @@ const docTemplate = `{
                     "401": {
                         "description": "未登录",
                         "schema": {
-                            "$ref": "#/definitions/util.ResponseAny"
+                            "$ref": "#/definitions/response.Any"
                         }
                     },
                     "403": {
                         "description": "无管理员权限",
                         "schema": {
-                            "$ref": "#/definitions/util.ResponseAny"
+                            "$ref": "#/definitions/response.Any"
                         }
                     },
                     "500": {
                         "description": "内部错误",
                         "schema": {
-                            "$ref": "#/definitions/util.ResponseAny"
+                            "$ref": "#/definitions/response.Any"
                         }
                     }
                 }
@@ -4029,19 +4680,19 @@ const docTemplate = `{
                     "200": {
                         "description": "删除成功",
                         "schema": {
-                            "$ref": "#/definitions/util.ResponseAny"
+                            "$ref": "#/definitions/response.Any"
                         }
                     },
                     "403": {
                         "description": "无权操作",
                         "schema": {
-                            "$ref": "#/definitions/util.ResponseAny"
+                            "$ref": "#/definitions/response.Any"
                         }
                     },
                     "404": {
                         "description": "文件不存在",
                         "schema": {
-                            "$ref": "#/definitions/util.ResponseAny"
+                            "$ref": "#/definitions/response.Any"
                         }
                     }
                 }
@@ -4093,7 +4744,7 @@ const docTemplate = `{
                         "schema": {
                             "allOf": [
                                 {
-                                    "$ref": "#/definitions/util.ResponseAny"
+                                    "$ref": "#/definitions/response.Any"
                                 },
                                 {
                                     "type": "object",
@@ -4109,25 +4760,25 @@ const docTemplate = `{
                     "400": {
                         "description": "参数错误",
                         "schema": {
-                            "$ref": "#/definitions/util.ResponseAny"
+                            "$ref": "#/definitions/response.Any"
                         }
                     },
                     "401": {
                         "description": "未登录",
                         "schema": {
-                            "$ref": "#/definitions/util.ResponseAny"
+                            "$ref": "#/definitions/response.Any"
                         }
                     },
                     "403": {
                         "description": "无管理员权限",
                         "schema": {
-                            "$ref": "#/definitions/util.ResponseAny"
+                            "$ref": "#/definitions/response.Any"
                         }
                     },
                     "500": {
                         "description": "内部错误",
                         "schema": {
-                            "$ref": "#/definitions/util.ResponseAny"
+                            "$ref": "#/definitions/response.Any"
                         }
                     }
                 }
@@ -4166,7 +4817,7 @@ const docTemplate = `{
                         "schema": {
                             "allOf": [
                                 {
-                                    "$ref": "#/definitions/util.ResponseAny"
+                                    "$ref": "#/definitions/response.Any"
                                 },
                                 {
                                     "type": "object",
@@ -4182,25 +4833,25 @@ const docTemplate = `{
                     "400": {
                         "description": "参数错误或用户名已存在",
                         "schema": {
-                            "$ref": "#/definitions/util.ResponseAny"
+                            "$ref": "#/definitions/response.Any"
                         }
                     },
                     "401": {
                         "description": "未登录",
                         "schema": {
-                            "$ref": "#/definitions/util.ResponseAny"
+                            "$ref": "#/definitions/response.Any"
                         }
                     },
                     "403": {
                         "description": "无管理员权限",
                         "schema": {
-                            "$ref": "#/definitions/util.ResponseAny"
+                            "$ref": "#/definitions/response.Any"
                         }
                     },
                     "500": {
                         "description": "内部错误",
                         "schema": {
-                            "$ref": "#/definitions/util.ResponseAny"
+                            "$ref": "#/definitions/response.Any"
                         }
                     }
                 }
@@ -4236,7 +4887,7 @@ const docTemplate = `{
                         "schema": {
                             "allOf": [
                                 {
-                                    "$ref": "#/definitions/util.ResponseAny"
+                                    "$ref": "#/definitions/response.Any"
                                 },
                                 {
                                     "type": "object",
@@ -4252,31 +4903,31 @@ const docTemplate = `{
                     "400": {
                         "description": "参数错误",
                         "schema": {
-                            "$ref": "#/definitions/util.ResponseAny"
+                            "$ref": "#/definitions/response.Any"
                         }
                     },
                     "401": {
                         "description": "未登录",
                         "schema": {
-                            "$ref": "#/definitions/util.ResponseAny"
+                            "$ref": "#/definitions/response.Any"
                         }
                     },
                     "403": {
                         "description": "无管理员权限",
                         "schema": {
-                            "$ref": "#/definitions/util.ResponseAny"
+                            "$ref": "#/definitions/response.Any"
                         }
                     },
                     "404": {
                         "description": "用户不存在",
                         "schema": {
-                            "$ref": "#/definitions/util.ResponseAny"
+                            "$ref": "#/definitions/response.Any"
                         }
                     },
                     "500": {
                         "description": "内部错误",
                         "schema": {
-                            "$ref": "#/definitions/util.ResponseAny"
+                            "$ref": "#/definitions/response.Any"
                         }
                     }
                 }
@@ -4310,7 +4961,7 @@ const docTemplate = `{
                         "schema": {
                             "allOf": [
                                 {
-                                    "$ref": "#/definitions/util.ResponseAny"
+                                    "$ref": "#/definitions/response.Any"
                                 },
                                 {
                                     "type": "object",
@@ -4326,31 +4977,31 @@ const docTemplate = `{
                     "400": {
                         "description": "参数错误",
                         "schema": {
-                            "$ref": "#/definitions/util.ResponseAny"
+                            "$ref": "#/definitions/response.Any"
                         }
                     },
                     "401": {
                         "description": "未登录",
                         "schema": {
-                            "$ref": "#/definitions/util.ResponseAny"
+                            "$ref": "#/definitions/response.Any"
                         }
                     },
                     "403": {
                         "description": "无管理员权限、尝试删除管理员或当前用户",
                         "schema": {
-                            "$ref": "#/definitions/util.ResponseAny"
+                            "$ref": "#/definitions/response.Any"
                         }
                     },
                     "404": {
                         "description": "用户不存在",
                         "schema": {
-                            "$ref": "#/definitions/util.ResponseAny"
+                            "$ref": "#/definitions/response.Any"
                         }
                     },
                     "500": {
                         "description": "内部错误",
                         "schema": {
-                            "$ref": "#/definitions/util.ResponseAny"
+                            "$ref": "#/definitions/response.Any"
                         }
                     }
                 }
@@ -4398,7 +5049,7 @@ const docTemplate = `{
                         "schema": {
                             "allOf": [
                                 {
-                                    "$ref": "#/definitions/util.ResponseAny"
+                                    "$ref": "#/definitions/response.Any"
                                 },
                                 {
                                     "type": "object",
@@ -4414,31 +5065,31 @@ const docTemplate = `{
                     "400": {
                         "description": "参数错误",
                         "schema": {
-                            "$ref": "#/definitions/util.ResponseAny"
+                            "$ref": "#/definitions/response.Any"
                         }
                     },
                     "401": {
                         "description": "未登录",
                         "schema": {
-                            "$ref": "#/definitions/util.ResponseAny"
+                            "$ref": "#/definitions/response.Any"
                         }
                     },
                     "403": {
                         "description": "无管理员权限或尝试禁用管理员",
                         "schema": {
-                            "$ref": "#/definitions/util.ResponseAny"
+                            "$ref": "#/definitions/response.Any"
                         }
                     },
                     "404": {
                         "description": "用户不存在",
                         "schema": {
-                            "$ref": "#/definitions/util.ResponseAny"
+                            "$ref": "#/definitions/response.Any"
                         }
                     },
                     "500": {
                         "description": "内部错误",
                         "schema": {
-                            "$ref": "#/definitions/util.ResponseAny"
+                            "$ref": "#/definitions/response.Any"
                         }
                     }
                 }
@@ -4461,7 +5112,7 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/util.ResponseAny"
+                            "$ref": "#/definitions/response.Any"
                         }
                     }
                 }
@@ -4483,7 +5134,7 @@ const docTemplate = `{
                         "schema": {
                             "allOf": [
                                 {
-                                    "$ref": "#/definitions/util.ResponseAny"
+                                    "$ref": "#/definitions/response.Any"
                                 },
                                 {
                                     "type": "object",
@@ -4529,7 +5180,7 @@ const docTemplate = `{
                         "schema": {
                             "allOf": [
                                 {
-                                    "$ref": "#/definitions/util.ResponseAny"
+                                    "$ref": "#/definitions/response.Any"
                                 },
                                 {
                                     "type": "object",
@@ -4545,19 +5196,19 @@ const docTemplate = `{
                     "400": {
                         "description": "state 无效、参数错误或认证源错误",
                         "schema": {
-                            "$ref": "#/definitions/util.ResponseAny"
+                            "$ref": "#/definitions/response.Any"
                         }
                     },
                     "401": {
                         "description": "绑定场景未登录",
                         "schema": {
-                            "$ref": "#/definitions/util.ResponseAny"
+                            "$ref": "#/definitions/response.Any"
                         }
                     },
                     "500": {
                         "description": "OAuth 认证失败或内部错误",
                         "schema": {
-                            "$ref": "#/definitions/util.ResponseAny"
+                            "$ref": "#/definitions/response.Any"
                         }
                     }
                 }
@@ -4584,7 +5235,7 @@ const docTemplate = `{
                         "schema": {
                             "allOf": [
                                 {
-                                    "$ref": "#/definitions/util.ResponseAny"
+                                    "$ref": "#/definitions/response.Any"
                                 },
                                 {
                                     "type": "object",
@@ -4603,13 +5254,13 @@ const docTemplate = `{
                     "401": {
                         "description": "未登录",
                         "schema": {
-                            "$ref": "#/definitions/util.ResponseAny"
+                            "$ref": "#/definitions/response.Any"
                         }
                     },
                     "500": {
                         "description": "内部错误",
                         "schema": {
-                            "$ref": "#/definitions/util.ResponseAny"
+                            "$ref": "#/definitions/response.Any"
                         }
                     }
                 }
@@ -4646,7 +5297,7 @@ const docTemplate = `{
                         "schema": {
                             "allOf": [
                                 {
-                                    "$ref": "#/definitions/util.ResponseAny"
+                                    "$ref": "#/definitions/response.Any"
                                 },
                                 {
                                     "type": "object",
@@ -4662,13 +5313,13 @@ const docTemplate = `{
                     "400": {
                         "description": "ID 无效或解除失败",
                         "schema": {
-                            "$ref": "#/definitions/util.ResponseAny"
+                            "$ref": "#/definitions/response.Any"
                         }
                     },
                     "401": {
                         "description": "未登录",
                         "schema": {
-                            "$ref": "#/definitions/util.ResponseAny"
+                            "$ref": "#/definitions/response.Any"
                         }
                     }
                 }
@@ -4698,7 +5349,7 @@ const docTemplate = `{
                         "schema": {
                             "allOf": [
                                 {
-                                    "$ref": "#/definitions/util.ResponseAny"
+                                    "$ref": "#/definitions/response.Any"
                                 },
                                 {
                                     "type": "object",
@@ -4714,13 +5365,13 @@ const docTemplate = `{
                     "400": {
                         "description": "认证源不存在或未配置",
                         "schema": {
-                            "$ref": "#/definitions/util.ResponseAny"
+                            "$ref": "#/definitions/response.Any"
                         }
                     },
                     "500": {
                         "description": "Redis 异常 or 构造 URL 失败",
                         "schema": {
-                            "$ref": "#/definitions/util.ResponseAny"
+                            "$ref": "#/definitions/response.Any"
                         }
                     }
                 }
@@ -4747,7 +5398,7 @@ const docTemplate = `{
                         "schema": {
                             "allOf": [
                                 {
-                                    "$ref": "#/definitions/util.ResponseAny"
+                                    "$ref": "#/definitions/response.Any"
                                 },
                                 {
                                     "type": "object",
@@ -4763,7 +5414,7 @@ const docTemplate = `{
                     "500": {
                         "description": "Session 清除失败",
                         "schema": {
-                            "$ref": "#/definitions/util.ResponseAny"
+                            "$ref": "#/definitions/response.Any"
                         }
                     }
                 }
@@ -4785,7 +5436,7 @@ const docTemplate = `{
                         "schema": {
                             "allOf": [
                                 {
-                                    "$ref": "#/definitions/util.ResponseAny"
+                                    "$ref": "#/definitions/response.Any"
                                 },
                                 {
                                     "type": "object",
@@ -4825,7 +5476,7 @@ const docTemplate = `{
                         "schema": {
                             "allOf": [
                                 {
-                                    "$ref": "#/definitions/util.ResponseAny"
+                                    "$ref": "#/definitions/response.Any"
                                 },
                                 {
                                     "type": "object",
@@ -4841,7 +5492,7 @@ const docTemplate = `{
                     "401": {
                         "description": "未登录",
                         "schema": {
-                            "$ref": "#/definitions/util.ResponseAny"
+                            "$ref": "#/definitions/response.Any"
                         }
                     }
                 }
@@ -4878,7 +5529,7 @@ const docTemplate = `{
                         "schema": {
                             "allOf": [
                                 {
-                                    "$ref": "#/definitions/util.ResponseAny"
+                                    "$ref": "#/definitions/response.Any"
                                 },
                                 {
                                     "type": "object",
@@ -4894,13 +5545,13 @@ const docTemplate = `{
                     "400": {
                         "description": "认证源不存在或未启用",
                         "schema": {
-                            "$ref": "#/definitions/util.ResponseAny"
+                            "$ref": "#/definitions/response.Any"
                         }
                     },
                     "500": {
                         "description": "Redis 异常或构造 URL 失败",
                         "schema": {
-                            "$ref": "#/definitions/util.ResponseAny"
+                            "$ref": "#/definitions/response.Any"
                         }
                     }
                 }
@@ -4951,7 +5602,7 @@ const docTemplate = `{
                         "schema": {
                             "allOf": [
                                 {
-                                    "$ref": "#/definitions/util.ResponseAny"
+                                    "$ref": "#/definitions/response.Any"
                                 },
                                 {
                                     "type": "object",
@@ -4967,19 +5618,19 @@ const docTemplate = `{
                     "400": {
                         "description": "请求参数错误或文件受限",
                         "schema": {
-                            "$ref": "#/definitions/util.ResponseAny"
+                            "$ref": "#/definitions/response.Any"
                         }
                     },
                     "401": {
                         "description": "未登录",
                         "schema": {
-                            "$ref": "#/definitions/util.ResponseAny"
+                            "$ref": "#/definitions/response.Any"
                         }
                     },
                     "500": {
                         "description": "内部错误",
                         "schema": {
-                            "$ref": "#/definitions/util.ResponseAny"
+                            "$ref": "#/definitions/response.Any"
                         }
                     }
                 }
@@ -5038,7 +5689,7 @@ const docTemplate = `{
                         "schema": {
                             "allOf": [
                                 {
-                                    "$ref": "#/definitions/util.ResponseAny"
+                                    "$ref": "#/definitions/response.Any"
                                 },
                                 {
                                     "type": "object",
@@ -5054,7 +5705,7 @@ const docTemplate = `{
                     "401": {
                         "description": "未登录",
                         "schema": {
-                            "$ref": "#/definitions/util.ResponseAny"
+                            "$ref": "#/definitions/response.Any"
                         }
                     }
                 }
@@ -5102,7 +5753,7 @@ const docTemplate = `{
                         "schema": {
                             "allOf": [
                                 {
-                                    "$ref": "#/definitions/util.ResponseAny"
+                                    "$ref": "#/definitions/response.Any"
                                 },
                                 {
                                     "type": "object",
@@ -5118,13 +5769,13 @@ const docTemplate = `{
                     "403": {
                         "description": "无权操作",
                         "schema": {
-                            "$ref": "#/definitions/util.ResponseAny"
+                            "$ref": "#/definitions/response.Any"
                         }
                     },
                     "404": {
                         "description": "文件不存在",
                         "schema": {
-                            "$ref": "#/definitions/util.ResponseAny"
+                            "$ref": "#/definitions/response.Any"
                         }
                     }
                 }
@@ -5156,19 +5807,19 @@ const docTemplate = `{
                     "200": {
                         "description": "删除成功",
                         "schema": {
-                            "$ref": "#/definitions/util.ResponseAny"
+                            "$ref": "#/definitions/response.Any"
                         }
                     },
                     "403": {
                         "description": "无权操作",
                         "schema": {
-                            "$ref": "#/definitions/util.ResponseAny"
+                            "$ref": "#/definitions/response.Any"
                         }
                     },
                     "404": {
                         "description": "文件不存在",
                         "schema": {
-                            "$ref": "#/definitions/util.ResponseAny"
+                            "$ref": "#/definitions/response.Any"
                         }
                     }
                 }
@@ -5195,7 +5846,7 @@ const docTemplate = `{
                         "schema": {
                             "allOf": [
                                 {
-                                    "$ref": "#/definitions/util.ResponseAny"
+                                    "$ref": "#/definitions/response.Any"
                                 },
                                 {
                                     "type": "object",
@@ -5211,7 +5862,7 @@ const docTemplate = `{
                     "401": {
                         "description": "未登录",
                         "schema": {
-                            "$ref": "#/definitions/util.ResponseAny"
+                            "$ref": "#/definitions/response.Any"
                         }
                     }
                 }
@@ -5238,7 +5889,7 @@ const docTemplate = `{
                         "schema": {
                             "allOf": [
                                 {
-                                    "$ref": "#/definitions/util.ResponseAny"
+                                    "$ref": "#/definitions/response.Any"
                                 },
                                 {
                                     "type": "object",
@@ -5257,7 +5908,7 @@ const docTemplate = `{
                     "401": {
                         "description": "未登录",
                         "schema": {
-                            "$ref": "#/definitions/util.ResponseAny"
+                            "$ref": "#/definitions/response.Any"
                         }
                     }
                 }
@@ -5296,7 +5947,7 @@ const docTemplate = `{
                         "schema": {
                             "allOf": [
                                 {
-                                    "$ref": "#/definitions/util.ResponseAny"
+                                    "$ref": "#/definitions/response.Any"
                                 },
                                 {
                                     "type": "object",
@@ -5312,7 +5963,7 @@ const docTemplate = `{
                     "400": {
                         "description": "参数错误或超限",
                         "schema": {
-                            "$ref": "#/definitions/util.ResponseAny"
+                            "$ref": "#/definitions/response.Any"
                         }
                     }
                 }
@@ -5348,7 +5999,7 @@ const docTemplate = `{
                         "schema": {
                             "allOf": [
                                 {
-                                    "$ref": "#/definitions/util.ResponseAny"
+                                    "$ref": "#/definitions/response.Any"
                                 },
                                 {
                                     "type": "object",
@@ -5364,7 +6015,7 @@ const docTemplate = `{
                     "400": {
                         "description": "参数错误",
                         "schema": {
-                            "$ref": "#/definitions/util.ResponseAny"
+                            "$ref": "#/definitions/response.Any"
                         }
                     }
                 }
@@ -5400,7 +6051,7 @@ const docTemplate = `{
                         "schema": {
                             "allOf": [
                                 {
-                                    "$ref": "#/definitions/util.ResponseAny"
+                                    "$ref": "#/definitions/response.Any"
                                 },
                                 {
                                     "type": "object",
@@ -5416,7 +6067,7 @@ const docTemplate = `{
                     "400": {
                         "description": "参数错误",
                         "schema": {
-                            "$ref": "#/definitions/util.ResponseAny"
+                            "$ref": "#/definitions/response.Any"
                         }
                     }
                 }
@@ -5452,7 +6103,7 @@ const docTemplate = `{
                         "schema": {
                             "allOf": [
                                 {
-                                    "$ref": "#/definitions/util.ResponseAny"
+                                    "$ref": "#/definitions/response.Any"
                                 },
                                 {
                                     "type": "object",
@@ -5468,13 +6119,13 @@ const docTemplate = `{
                     "400": {
                         "description": "原密码错误或新密码不符合要求",
                         "schema": {
-                            "$ref": "#/definitions/util.ResponseAny"
+                            "$ref": "#/definitions/response.Any"
                         }
                     },
                     "401": {
                         "description": "请先登录",
                         "schema": {
-                            "$ref": "#/definitions/util.ResponseAny"
+                            "$ref": "#/definitions/response.Any"
                         }
                     }
                 }
@@ -5510,7 +6161,7 @@ const docTemplate = `{
                         "schema": {
                             "allOf": [
                                 {
-                                    "$ref": "#/definitions/util.ResponseAny"
+                                    "$ref": "#/definitions/response.Any"
                                 },
                                 {
                                     "type": "object",
@@ -5526,13 +6177,13 @@ const docTemplate = `{
                     "400": {
                         "description": "用户名或密码错误、帐号已禁用等",
                         "schema": {
-                            "$ref": "#/definitions/util.ResponseAny"
+                            "$ref": "#/definitions/response.Any"
                         }
                     },
                     "500": {
                         "description": "服务内部错误",
                         "schema": {
-                            "$ref": "#/definitions/util.ResponseAny"
+                            "$ref": "#/definitions/response.Any"
                         }
                     }
                 }
@@ -5559,7 +6210,7 @@ const docTemplate = `{
                         "schema": {
                             "allOf": [
                                 {
-                                    "$ref": "#/definitions/util.ResponseAny"
+                                    "$ref": "#/definitions/response.Any"
                                 },
                                 {
                                     "type": "object",
@@ -5575,7 +6226,7 @@ const docTemplate = `{
                     "500": {
                         "description": "Session 清除失败",
                         "schema": {
-                            "$ref": "#/definitions/util.ResponseAny"
+                            "$ref": "#/definitions/response.Any"
                         }
                     }
                 }
@@ -5611,7 +6262,7 @@ const docTemplate = `{
                         "schema": {
                             "allOf": [
                                 {
-                                    "$ref": "#/definitions/util.ResponseAny"
+                                    "$ref": "#/definitions/response.Any"
                                 },
                                 {
                                     "type": "object",
@@ -5627,13 +6278,13 @@ const docTemplate = `{
                     "400": {
                         "description": "邮箱已被占用或参数错误",
                         "schema": {
-                            "$ref": "#/definitions/util.ResponseAny"
+                            "$ref": "#/definitions/response.Any"
                         }
                     },
                     "401": {
                         "description": "未登录",
                         "schema": {
-                            "$ref": "#/definitions/util.ResponseAny"
+                            "$ref": "#/definitions/response.Any"
                         }
                     }
                 }
@@ -5669,7 +6320,7 @@ const docTemplate = `{
                         "schema": {
                             "allOf": [
                                 {
-                                    "$ref": "#/definitions/util.ResponseAny"
+                                    "$ref": "#/definitions/response.Any"
                                 },
                                 {
                                     "type": "object",
@@ -5685,13 +6336,13 @@ const docTemplate = `{
                     "400": {
                         "description": "参数错误、用户名已存在或注册已关闭",
                         "schema": {
-                            "$ref": "#/definitions/util.ResponseAny"
+                            "$ref": "#/definitions/response.Any"
                         }
                     },
                     "500": {
                         "description": "服务内部错误",
                         "schema": {
-                            "$ref": "#/definitions/util.ResponseAny"
+                            "$ref": "#/definitions/response.Any"
                         }
                     }
                 }
@@ -5718,7 +6369,7 @@ const docTemplate = `{
                         "schema": {
                             "allOf": [
                                 {
-                                    "$ref": "#/definitions/util.ResponseAny"
+                                    "$ref": "#/definitions/response.Any"
                                 },
                                 {
                                     "type": "object",
@@ -5734,7 +6385,7 @@ const docTemplate = `{
                     "401": {
                         "description": "未登录",
                         "schema": {
-                            "$ref": "#/definitions/util.ResponseAny"
+                            "$ref": "#/definitions/response.Any"
                         }
                     }
                 }
@@ -5768,13 +6419,13 @@ const docTemplate = `{
                     "200": {
                         "description": "发送成功",
                         "schema": {
-                            "$ref": "#/definitions/util.ResponseAny"
+                            "$ref": "#/definitions/response.Any"
                         }
                     },
                     "400": {
                         "description": "参数错误",
                         "schema": {
-                            "$ref": "#/definitions/util.ResponseAny"
+                            "$ref": "#/definitions/response.Any"
                         }
                     }
                 }
@@ -5815,25 +6466,25 @@ const docTemplate = `{
                     "400": {
                         "description": "文件 ID 格式错误",
                         "schema": {
-                            "$ref": "#/definitions/util.ResponseAny"
+                            "$ref": "#/definitions/response.Any"
                         }
                     },
                     "401": {
                         "description": "未登录",
                         "schema": {
-                            "$ref": "#/definitions/util.ResponseAny"
+                            "$ref": "#/definitions/response.Any"
                         }
                     },
                     "404": {
                         "description": "文件未找到",
                         "schema": {
-                            "$ref": "#/definitions/util.ResponseAny"
+                            "$ref": "#/definitions/response.Any"
                         }
                     },
                     "500": {
                         "description": "服务内部错误",
                         "schema": {
-                            "$ref": "#/definitions/util.ResponseAny"
+                            "$ref": "#/definitions/response.Any"
                         }
                     }
                 }
@@ -5993,23 +6644,6 @@ const docTemplate = `{
                 }
             }
         },
-        "cap.RedeemResponse": {
-            "type": "object",
-            "properties": {
-                "error": {
-                    "type": "string"
-                },
-                "expires": {
-                    "type": "integer"
-                },
-                "success": {
-                    "type": "boolean"
-                },
-                "token": {
-                    "type": "string"
-                }
-            }
-        },
         "cap.challengeRequest": {
             "type": "object",
             "properties": {
@@ -6121,6 +6755,23 @@ const docTemplate = `{
                 },
                 "ttl_minutes": {
                     "type": "integer"
+                }
+            }
+        },
+        "github_com_Rain-kl_Wavelet_internal_apps_cap.RedeemResponse": {
+            "type": "object",
+            "properties": {
+                "error": {
+                    "type": "string"
+                },
+                "expires": {
+                    "type": "integer"
+                },
+                "success": {
+                    "type": "boolean"
+                },
+                "token": {
+                    "type": "string"
                 }
             }
         },
@@ -6601,6 +7252,132 @@ const docTemplate = `{
                 }
             }
         },
+        "model.PushChannel": {
+            "type": "object",
+            "properties": {
+                "created_at": {
+                    "type": "string"
+                },
+                "description": {
+                    "description": "备注",
+                    "type": "string"
+                },
+                "enabled": {
+                    "description": "通道是否启用",
+                    "type": "boolean"
+                },
+                "id": {
+                    "type": "integer"
+                },
+                "name": {
+                    "description": "通道名称，仅英文字母和下划线，唯一",
+                    "type": "string"
+                },
+                "other": {
+                    "description": "请求体/SMTP 密码等",
+                    "type": "string"
+                },
+                "token": {
+                    "description": "鉴权令牌或发信用户名等",
+                    "type": "string"
+                },
+                "type": {
+                    "description": "通道类型：custom, lark, email",
+                    "type": "string"
+                },
+                "updated_at": {
+                    "type": "string"
+                },
+                "url": {
+                    "description": "请求地址，HTTPS 协议或 SMTP 地址",
+                    "type": "string"
+                }
+            }
+        },
+        "model.PushEvent": {
+            "type": "object",
+            "properties": {
+                "channels": {
+                    "description": "推送渠道列表，如 [\"lark\"]",
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "created_at": {
+                    "type": "string"
+                },
+                "enabled": {
+                    "description": "是否启用",
+                    "type": "boolean"
+                },
+                "event_key": {
+                    "description": "如 admin_login",
+                    "type": "string"
+                },
+                "id": {
+                    "type": "integer"
+                },
+                "name": {
+                    "description": "如 管理员登录",
+                    "type": "string"
+                },
+                "targets": {
+                    "description": "推送目标用户/邮箱列表",
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "task_type": {
+                    "description": "关联的异步任务类型",
+                    "type": "string"
+                },
+                "template": {
+                    "description": "消息模板 JSON",
+                    "type": "string"
+                },
+                "updated_at": {
+                    "type": "string"
+                }
+            }
+        },
+        "model.PushHistory": {
+            "type": "object",
+            "properties": {
+                "channel": {
+                    "type": "string"
+                },
+                "content": {
+                    "type": "string"
+                },
+                "created_at": {
+                    "type": "string"
+                },
+                "error_msg": {
+                    "type": "string"
+                },
+                "event_key": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "integer"
+                },
+                "level": {
+                    "type": "string"
+                },
+                "status": {
+                    "description": "success / failed",
+                    "type": "string"
+                },
+                "target": {
+                    "type": "string"
+                },
+                "title": {
+                    "type": "string"
+                }
+            }
+        },
         "model.Schedule": {
             "type": "object",
             "properties": {
@@ -7022,6 +7799,293 @@ const docTemplate = `{
                 },
                 "code_verifier": {
                     "type": "string"
+                }
+            }
+        },
+        "push.Config": {
+            "type": "object",
+            "properties": {
+                "channel": {
+                    "description": "渠道名称，例如 \"lark\", \"custom\", \"email\" 等，唯一标识",
+                    "type": "string"
+                },
+                "ext": {
+                    "description": "预留拓展 JSON 配置",
+                    "type": "object",
+                    "additionalProperties": {}
+                },
+                "key": {
+                    "description": "AppID 或 SMTP 用户名",
+                    "type": "string"
+                },
+                "secret": {
+                    "description": "签名密钥或 SMTP 密码/Token",
+                    "type": "string"
+                },
+                "url": {
+                    "description": "Webhook 地址或 SMTP 地址",
+                    "type": "string"
+                }
+            }
+        },
+        "push.CreateChannelRequest": {
+            "type": "object",
+            "required": [
+                "name",
+                "type"
+            ],
+            "properties": {
+                "description": {
+                    "type": "string"
+                },
+                "enabled": {
+                    "type": "boolean"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "other": {
+                    "type": "string"
+                },
+                "token": {
+                    "type": "string"
+                },
+                "type": {
+                    "type": "string"
+                },
+                "url": {
+                    "type": "string"
+                }
+            }
+        },
+        "push.CreateEventRequest": {
+            "type": "object",
+            "properties": {
+                "channels": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "enabled": {
+                    "type": "boolean"
+                },
+                "event_key": {
+                    "type": "string"
+                },
+                "targets": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "task_type": {
+                    "description": "关联的异步任务类型",
+                    "type": "string"
+                },
+                "template": {
+                    "type": "string"
+                }
+            }
+        },
+        "push.Definition": {
+            "type": "object",
+            "properties": {
+                "description": {
+                    "description": "short description",
+                    "type": "string"
+                },
+                "fields": {
+                    "description": "form fields",
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/push.Field"
+                    }
+                },
+                "name": {
+                    "description": "display name",
+                    "type": "string"
+                },
+                "type": {
+                    "description": "channel type (e.g., custom, lark, email)",
+                    "type": "string"
+                }
+            }
+        },
+        "push.EventMetadata": {
+            "type": "object",
+            "properties": {
+                "default_template": {
+                    "$ref": "#/definitions/push.NotificationMessage"
+                },
+                "description": {
+                    "type": "string"
+                },
+                "key": {
+                    "type": "string"
+                },
+                "name": {
+                    "type": "string"
+                }
+            }
+        },
+        "push.Field": {
+            "type": "object",
+            "properties": {
+                "description": {
+                    "description": "field explanation/help text",
+                    "type": "string"
+                },
+                "key": {
+                    "description": "unique key for the field (e.g. url, token, other)",
+                    "type": "string"
+                },
+                "label": {
+                    "description": "human readable label (e.g. \"Webhook 地址\")",
+                    "type": "string"
+                },
+                "placeholder": {
+                    "description": "input placeholder",
+                    "type": "string"
+                },
+                "required": {
+                    "description": "whether this field is required",
+                    "type": "boolean"
+                },
+                "type": {
+                    "description": "input type: \"text\" | \"password\" | \"textarea\"",
+                    "type": "string"
+                }
+            }
+        },
+        "push.NotificationMessage": {
+            "type": "object",
+            "properties": {
+                "content": {
+                    "type": "string"
+                },
+                "ext": {
+                    "type": "object",
+                    "additionalProperties": {}
+                },
+                "level": {
+                    "type": "string"
+                },
+                "title": {
+                    "type": "string"
+                }
+            }
+        },
+        "push.TestChannelRequest": {
+            "type": "object",
+            "properties": {
+                "name": {
+                    "type": "string"
+                },
+                "other": {
+                    "type": "string"
+                },
+                "target": {
+                    "type": "string"
+                },
+                "token": {
+                    "type": "string"
+                },
+                "type": {
+                    "type": "string"
+                },
+                "url": {
+                    "type": "string"
+                }
+            }
+        },
+        "push.TestPushRequest": {
+            "type": "object",
+            "required": [
+                "config"
+            ],
+            "properties": {
+                "config": {
+                    "$ref": "#/definitions/push.Config"
+                },
+                "target": {
+                    "type": "string"
+                }
+            }
+        },
+        "push.UpdateChannelRequest": {
+            "type": "object",
+            "required": [
+                "type"
+            ],
+            "properties": {
+                "description": {
+                    "type": "string"
+                },
+                "enabled": {
+                    "type": "boolean"
+                },
+                "other": {
+                    "type": "string"
+                },
+                "token": {
+                    "type": "string"
+                },
+                "type": {
+                    "type": "string"
+                },
+                "url": {
+                    "type": "string"
+                }
+            }
+        },
+        "push.UpdateEventRequest": {
+            "type": "object",
+            "required": [
+                "template"
+            ],
+            "properties": {
+                "channels": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "enabled": {
+                    "type": "boolean"
+                },
+                "targets": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "template": {
+                    "type": "string"
+                }
+            }
+        },
+        "push.pushHistoriesResponse": {
+            "type": "object",
+            "properties": {
+                "results": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/model.PushHistory"
+                    }
+                },
+                "total": {
+                    "type": "integer"
+                }
+            }
+        },
+        "response.Any": {
+            "type": "object",
+            "properties": {
+                "data": {},
+                "error_msg": {
+                    "type": "string",
+                    "example": ""
                 }
             }
         },
@@ -7821,16 +8885,6 @@ const docTemplate = `{
                 },
                 "website": {
                     "type": "string"
-                }
-            }
-        },
-        "util.ResponseAny": {
-            "type": "object",
-            "properties": {
-                "data": {},
-                "error_msg": {
-                    "type": "string",
-                    "example": ""
                 }
             }
         }

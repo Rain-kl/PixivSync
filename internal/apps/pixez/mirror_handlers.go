@@ -16,12 +16,12 @@ import (
 
 	uploadapp "github.com/Rain-kl/Wavelet/internal/apps/upload"
 	"github.com/Rain-kl/Wavelet/internal/db"
-	"github.com/Rain-kl/Wavelet/internal/logger"
+	"github.com/Rain-kl/Wavelet/pkg/logger"
 	"github.com/Rain-kl/Wavelet/internal/model"
 	pixezsvc "github.com/Rain-kl/Wavelet/internal/service/pixez"
 	"github.com/Rain-kl/Wavelet/internal/storage"
 	"github.com/Rain-kl/Wavelet/internal/task"
-	"github.com/Rain-kl/Wavelet/internal/util"
+	"github.com/Rain-kl/Wavelet/internal/common/response"
 	"github.com/gin-gonic/gin"
 	"gorm.io/gorm"
 )
@@ -115,10 +115,10 @@ func MirrorIllust(c *gin.Context) {
 	}
 	record, err := dispatchIllustMirrorIfNeeded(c, illustID)
 	if err != nil {
-		c.JSON(http.StatusOK, util.Err(errDispatchMirrorTaskFailed))
+		c.JSON(http.StatusOK, response.Err(errDispatchMirrorTaskFailed))
 		return
 	}
-	c.JSON(http.StatusOK, util.OK(pixezsvc.MirrorIllustStatus(record)))
+	c.JSON(http.StatusOK, response.OK(pixezsvc.MirrorIllustStatus(record)))
 }
 
 // CheckIllustMirror returns illustration mirror status.
@@ -129,20 +129,20 @@ func CheckIllustMirror(c *gin.Context) {
 	}
 	record, err := pixezsvc.GetMirrorIllust(c.Request.Context(), illustID)
 	if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
-		c.JSON(http.StatusOK, util.Err(errQueryMirrorStatusFailed))
+		c.JSON(http.StatusOK, response.Err(errQueryMirrorStatusFailed))
 		return
 	}
 	if errors.Is(err, gorm.ErrRecordNotFound) {
 		record = model.PixezMirrorIllust{IllustID: illustID, Status: ""}
 	}
-	c.JSON(http.StatusOK, util.OK(pixezsvc.MirrorIllustStatus(record)))
+	c.JSON(http.StatusOK, response.OK(pixezsvc.MirrorIllustStatus(record)))
 }
 
 // BatchCheckIllustMirror returns mirrored illustration IDs.
 func BatchCheckIllustMirror(c *gin.Context) {
 	var req batchIllustMirrorRequest
 	if err := c.ShouldBindJSON(&req); err != nil || len(req.IllustIDs) == 0 {
-		c.JSON(http.StatusBadRequest, util.Err(errInvalidRequestBody))
+		c.JSON(http.StatusBadRequest, response.Err(errInvalidRequestBody))
 		return
 	}
 	respondBatchMirror(c, req.IllustIDs, mirroredIllustIDs)
@@ -156,10 +156,10 @@ func MirrorNovel(c *gin.Context) {
 	}
 	record, err := dispatchNovelMirrorIfNeeded(c, novelID)
 	if err != nil {
-		c.JSON(http.StatusOK, util.Err(errDispatchMirrorTaskFailed))
+		c.JSON(http.StatusOK, response.Err(errDispatchMirrorTaskFailed))
 		return
 	}
-	c.JSON(http.StatusOK, util.OK(pixezsvc.MirrorNovelStatus(record)))
+	c.JSON(http.StatusOK, response.OK(pixezsvc.MirrorNovelStatus(record)))
 }
 
 // CheckNovelMirror returns novel mirror status.
@@ -170,20 +170,20 @@ func CheckNovelMirror(c *gin.Context) {
 	}
 	record, err := pixezsvc.GetMirrorNovel(c.Request.Context(), novelID)
 	if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
-		c.JSON(http.StatusOK, util.Err(errQueryMirrorStatusFailed))
+		c.JSON(http.StatusOK, response.Err(errQueryMirrorStatusFailed))
 		return
 	}
 	if errors.Is(err, gorm.ErrRecordNotFound) {
 		record = model.PixezMirrorNovel{NovelID: novelID, Status: ""}
 	}
-	c.JSON(http.StatusOK, util.OK(pixezsvc.MirrorNovelStatus(record)))
+	c.JSON(http.StatusOK, response.OK(pixezsvc.MirrorNovelStatus(record)))
 }
 
 // BatchCheckNovelMirror returns mirrored novel IDs.
 func BatchCheckNovelMirror(c *gin.Context) {
 	var req batchNovelMirrorRequest
 	if err := c.ShouldBindJSON(&req); err != nil || len(req.NovelIDs) == 0 {
-		c.JSON(http.StatusBadRequest, util.Err(errInvalidRequestBody))
+		c.JSON(http.StatusBadRequest, response.Err(errInvalidRequestBody))
 		return
 	}
 	respondBatchMirror(c, req.NovelIDs, mirroredNovelIDs)
@@ -191,15 +191,15 @@ func BatchCheckNovelMirror(c *gin.Context) {
 
 func respondBatchMirror(c *gin.Context, requestedIDs []int64, query func(context.Context, []int64) ([]int64, error)) {
 	if len(requestedIDs) > maxBatchMirrorIDs {
-		c.JSON(http.StatusBadRequest, util.Err(errTooManyMirrorIDs))
+		c.JSON(http.StatusBadRequest, response.Err(errTooManyMirrorIDs))
 		return
 	}
 	ids, err := query(c.Request.Context(), requestedIDs)
 	if err != nil {
-		c.JSON(http.StatusOK, util.Err(errQueryMirrorStatusFailed))
+		c.JSON(http.StatusOK, response.Err(errQueryMirrorStatusFailed))
 		return
 	}
-	c.JSON(http.StatusOK, util.OK(gin.H{"mirrored_ids": ids}))
+	c.JSON(http.StatusOK, response.OK(gin.H{"mirrored_ids": ids}))
 }
 
 func mirroredIllustIDs(ctx context.Context, requestedIDs []int64) ([]int64, error) {
@@ -347,17 +347,17 @@ func GetMirroredNovelText(c *gin.Context) {
 // @Param status query string false "Mirror status: success, processing, failed"
 // @Param page query int false "Page number" default(1)
 // @Param page_size query int false "Page size" default(24)
-// @Success 200 {object} util.ResponseAny{data=object}
+// @Success 200 {object} response.Any{data=object}
 // @Router /api/pixez/mirror/illusts [get]
 func ListMirroredIllusts(c *gin.Context) {
 	page, pageSize := parseManagementPage(c)
 	items, total, err := listMirroredIllusts(c.Request.Context(), bindMirrorListRequest(c), page, pageSize)
 	if err != nil {
 		logger.ErrorF(c.Request.Context(), "[PixEz] list mirrored illustrations failed: %v", err)
-		c.JSON(http.StatusOK, util.Err(errQueryMirrorStatusFailed))
+		c.JSON(http.StatusOK, response.Err(errQueryMirrorStatusFailed))
 		return
 	}
-	c.JSON(http.StatusOK, util.OK(gin.H{keyItems: items, keyTotal: total, keyPage: page, keyPageSize: pageSize}))
+	c.JSON(http.StatusOK, response.OK(gin.H{keyItems: items, keyTotal: total, keyPage: page, keyPageSize: pageSize}))
 }
 
 // ListMirroredNovels returns paginated mirrored novel read-model rows.
@@ -370,17 +370,17 @@ func ListMirroredIllusts(c *gin.Context) {
 // @Param status query string false "Mirror status: success, processing, failed"
 // @Param page query int false "Page number" default(1)
 // @Param page_size query int false "Page size" default(24)
-// @Success 200 {object} util.ResponseAny{data=object}
+// @Success 200 {object} response.Any{data=object}
 // @Router /api/pixez/mirror/novels [get]
 func ListMirroredNovels(c *gin.Context) {
 	page, pageSize := parseManagementPage(c)
 	items, total, err := listMirroredNovels(c.Request.Context(), bindMirrorListRequest(c), page, pageSize)
 	if err != nil {
 		logger.ErrorF(c.Request.Context(), "[PixEz] list mirrored novels failed: %v", err)
-		c.JSON(http.StatusOK, util.Err(errQueryMirrorStatusFailed))
+		c.JSON(http.StatusOK, response.Err(errQueryMirrorStatusFailed))
 		return
 	}
-	c.JSON(http.StatusOK, util.OK(gin.H{keyItems: items, keyTotal: total, keyPage: page, keyPageSize: pageSize}))
+	c.JSON(http.StatusOK, response.OK(gin.H{keyItems: items, keyTotal: total, keyPage: page, keyPageSize: pageSize}))
 }
 
 // GetMirroredIllustManagementDetail returns one illustration mirror read-model.
@@ -390,7 +390,7 @@ func ListMirroredNovels(c *gin.Context) {
 // @Produce json
 // @Security SessionCookie
 // @Param illust_id path int true "Pixiv illustration ID"
-// @Success 200 {object} util.ResponseAny{data=object}
+// @Success 200 {object} response.Any{data=object}
 // @Router /api/pixez/mirror/illusts/{illust_id}/detail [get]
 func GetMirroredIllustManagementDetail(c *gin.Context) {
 	illustID, ok := parsePositiveIDParam(c, "illust_id")
@@ -400,10 +400,10 @@ func GetMirroredIllustManagementDetail(c *gin.Context) {
 	detail, err := getMirroredIllustManagementDetail(c.Request.Context(), illustID)
 	if err != nil {
 		logger.ErrorF(c.Request.Context(), "[PixEz] get mirrored illustration detail failed illust_id=%d: %v", illustID, err)
-		c.JSON(http.StatusOK, util.Err(errFetchMirrorDetailFailed))
+		c.JSON(http.StatusOK, response.Err(errFetchMirrorDetailFailed))
 		return
 	}
-	c.JSON(http.StatusOK, util.OK(detail))
+	c.JSON(http.StatusOK, response.OK(detail))
 }
 
 // GetMirroredNovelManagementDetail returns one novel mirror read-model.
@@ -413,7 +413,7 @@ func GetMirroredIllustManagementDetail(c *gin.Context) {
 // @Produce json
 // @Security SessionCookie
 // @Param novel_id path int true "Pixiv novel ID"
-// @Success 200 {object} util.ResponseAny{data=object}
+// @Success 200 {object} response.Any{data=object}
 // @Router /api/pixez/mirror/novels/{novel_id}/detail [get]
 func GetMirroredNovelManagementDetail(c *gin.Context) {
 	novelID, ok := parsePositiveIDParam(c, "novel_id")
@@ -423,10 +423,10 @@ func GetMirroredNovelManagementDetail(c *gin.Context) {
 	detail, err := getMirroredNovelManagementDetail(c.Request.Context(), novelID)
 	if err != nil {
 		logger.ErrorF(c.Request.Context(), "[PixEz] get mirrored novel detail failed novel_id=%d: %v", novelID, err)
-		c.JSON(http.StatusOK, util.Err(errFetchMirrorDetailFailed))
+		c.JSON(http.StatusOK, response.Err(errFetchMirrorDetailFailed))
 		return
 	}
-	c.JSON(http.StatusOK, util.OK(detail))
+	c.JSON(http.StatusOK, response.OK(detail))
 }
 
 //nolint:dupl // Illustration and novel mirror lists intentionally keep explicit DTO and model types.
@@ -641,10 +641,10 @@ func DeleteMirroredIllust(c *gin.Context) {
 	}
 	deleted, err := deleteMirroredIllust(c.Request.Context(), illustID)
 	if err != nil {
-		c.JSON(http.StatusOK, util.Err(errDeleteMirrorFailed))
+		c.JSON(http.StatusOK, response.Err(errDeleteMirrorFailed))
 		return
 	}
-	c.JSON(http.StatusOK, util.OK(gin.H{"deleted": deleted, "illust_id": illustID}))
+	c.JSON(http.StatusOK, response.OK(gin.H{"deleted": deleted, "illust_id": illustID}))
 }
 
 // DeleteMirroredNovel deletes one mirrored novel read-model.
@@ -654,10 +654,10 @@ func DeleteMirroredNovel(c *gin.Context) {
 		return
 	}
 	if err := db.DB(c.Request.Context()).Where("novel_id = ?", novelID).Delete(&model.PixezMirrorNovel{}).Error; err != nil {
-		c.JSON(http.StatusOK, util.Err(errDeleteMirrorFailed))
+		c.JSON(http.StatusOK, response.Err(errDeleteMirrorFailed))
 		return
 	}
-	c.JSON(http.StatusOK, util.OK(gin.H{"deleted": true, "novel_id": novelID}))
+	c.JSON(http.StatusOK, response.OK(gin.H{"deleted": true, "novel_id": novelID}))
 }
 
 // BatchDeleteMirroredItems deletes mirrored items by target type.
@@ -667,7 +667,7 @@ func BatchDeleteMirroredItems(c *gin.Context) {
 		IDs        []int64 `json:"ids"`
 	}
 	if err := c.ShouldBindJSON(&req); err != nil || len(req.IDs) == 0 {
-		c.JSON(http.StatusBadRequest, util.Err(errInvalidRequestBody))
+		c.JSON(http.StatusBadRequest, response.Err(errInvalidRequestBody))
 		return
 	}
 	deleted := 0
@@ -676,7 +676,7 @@ func BatchDeleteMirroredItems(c *gin.Context) {
 		for _, id := range req.IDs {
 			ok, err := deleteMirroredIllust(c.Request.Context(), id)
 			if err != nil {
-				c.JSON(http.StatusOK, util.Err(errDeleteMirrorFailed))
+				c.JSON(http.StatusOK, response.Err(errDeleteMirrorFailed))
 				return
 			}
 			if ok {
@@ -686,15 +686,15 @@ func BatchDeleteMirroredItems(c *gin.Context) {
 	case model.PixezMirrorTargetNovel:
 		result := db.DB(c.Request.Context()).Where("novel_id IN ?", req.IDs).Delete(&model.PixezMirrorNovel{})
 		if result.Error != nil {
-			c.JSON(http.StatusOK, util.Err(errDeleteMirrorFailed))
+			c.JSON(http.StatusOK, response.Err(errDeleteMirrorFailed))
 			return
 		}
 		deleted = int(result.RowsAffected)
 	default:
-		c.JSON(http.StatusBadRequest, util.Err(errInvalidRequestBody))
+		c.JSON(http.StatusBadRequest, response.Err(errInvalidRequestBody))
 		return
 	}
-	c.JSON(http.StatusOK, util.OK(gin.H{"deleted_count": deleted}))
+	c.JSON(http.StatusOK, response.OK(gin.H{"deleted_count": deleted}))
 }
 
 //nolint:dupl // Illust and novel mirror dispatch flows keep parallel structures for distinct model types
@@ -735,7 +735,7 @@ func parsePositiveIDParam(c *gin.Context, key string) (int64, bool) {
 	raw := c.Param(key)
 	id, err := strconv.ParseInt(raw, 10, 64)
 	if raw == "" || err != nil || id <= 0 {
-		c.JSON(http.StatusBadRequest, util.Err(fmt.Sprintf("%s is required", key)))
+		c.JSON(http.StatusBadRequest, response.Err(fmt.Sprintf("%s is required", key)))
 		return 0, false
 	}
 	return id, true

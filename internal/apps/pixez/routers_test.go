@@ -27,7 +27,6 @@ import (
 	pixezsvc "github.com/Rain-kl/Wavelet/internal/service/pixez"
 	"github.com/Rain-kl/Wavelet/internal/storage"
 	"github.com/Rain-kl/Wavelet/internal/testhelper"
-	"github.com/Rain-kl/Wavelet/internal/util"
 	"github.com/gin-contrib/sessions"
 	"github.com/gin-contrib/sessions/cookie"
 	"github.com/gin-gonic/gin"
@@ -60,7 +59,7 @@ func setupPixezTestRouter() *gin.Engine {
 
 	r := gin.New()
 	store := cookie.NewStore([]byte(config.Config.App.SessionSecret))
-	store.Options(util.GetSessionOptions(config.Config.App.SessionAge))
+	store.Options(oauth.GetSessionOptions(config.Config.App.SessionAge))
 	r.Use(sessions.Sessions(config.Config.App.SessionCookieName, store))
 
 	group := r.Group("/api/pixez")

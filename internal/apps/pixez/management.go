@@ -14,10 +14,10 @@ import (
 	"time"
 
 	"github.com/Rain-kl/Wavelet/internal/db"
-	"github.com/Rain-kl/Wavelet/internal/logger"
+	"github.com/Rain-kl/Wavelet/pkg/logger"
 	"github.com/Rain-kl/Wavelet/internal/model"
 	pixezsvc "github.com/Rain-kl/Wavelet/internal/service/pixez"
-	"github.com/Rain-kl/Wavelet/internal/util"
+	"github.com/Rain-kl/Wavelet/internal/common/response"
 	"github.com/gin-gonic/gin"
 	"gorm.io/gorm"
 )
@@ -156,16 +156,16 @@ type pixezMirrorDetailDTO struct {
 // @Tags pixez
 // @Produce json
 // @Security SessionCookie
-// @Success 200 {object} util.ResponseAny{data=object}
+// @Success 200 {object} response.Any{data=object}
 // @Router /api/pixez/dashboard [get]
 func GetDashboard(c *gin.Context) {
 	payload, err := buildDashboard(c.Request.Context())
 	if err != nil {
 		logger.ErrorF(c.Request.Context(), "[PixEz] fetch dashboard failed: %v", err)
-		c.JSON(http.StatusOK, util.Err(errFetchDashboardFailed))
+		c.JSON(http.StatusOK, response.Err(errFetchDashboardFailed))
 		return
 	}
-	c.JSON(http.StatusOK, util.OK(payload))
+	c.JSON(http.StatusOK, response.OK(payload))
 }
 
 // RefreshUserToken refreshes stored Pixiv credentials for one account.
@@ -175,7 +175,7 @@ func GetDashboard(c *gin.Context) {
 // @Produce json
 // @Security SessionCookie
 // @Param pixiv_user_id path string true "Pixiv user ID"
-// @Success 200 {object} util.ResponseAny
+// @Success 200 {object} response.Any
 // @Router /api/pixez/users/{pixiv_user_id}/refresh-token [post]
 func RefreshUserToken(c *gin.Context) {
 	userID, ok := pixivUserIDParam(c)
@@ -186,16 +186,16 @@ func RefreshUserToken(c *gin.Context) {
 	var user model.PixezPixivUser
 	if err := db.DB(c.Request.Context()).Where("pixiv_user_id = ?", userID).First(&user).Error; err != nil {
 		logger.ErrorF(c.Request.Context(), "[PixEz] fetch user for token refresh failed pixiv_user_id=%s: %v", userID, err)
-		c.JSON(http.StatusOK, util.Err(errFetchUserFailed))
+		c.JSON(http.StatusOK, response.Err(errFetchUserFailed))
 		return
 	}
 	if _, err := pixezsvc.DefaultClient.RefreshPixivToken(c.Request.Context(), userID, user.RefreshToken); err != nil {
 		logger.ErrorF(c.Request.Context(), "[PixEz] refresh token failed pixiv_user_id=%s: %v", userID, err)
-		c.JSON(http.StatusOK, util.Err(errRefreshPixivAccountFailed))
+		c.JSON(http.StatusOK, response.Err(errRefreshPixivAccountFailed))
 		return
 	}
 
-	c.JSON(http.StatusOK, util.OKNil())
+	c.JSON(http.StatusOK, response.OKNil())
 }
 
 // ListBookmarkExportRuns returns recent PixEz bookmark export batches.
@@ -206,7 +206,7 @@ func RefreshUserToken(c *gin.Context) {
 // @Security SessionCookie
 // @Param page query int false "Page number" default(1)
 // @Param page_size query int false "Page size" default(20)
-// @Success 200 {object} util.ResponseAny{data=object}
+// @Success 200 {object} response.Any{data=object}
 // @Router /api/pixez/bookmark-export-runs [get]
 func ListBookmarkExportRuns(c *gin.Context) {
 	page, pageSize := parsePage(c)
@@ -216,10 +216,10 @@ func ListBookmarkExportRuns(c *gin.Context) {
 	items, total, err := listBookmarkExportRuns(c.Request.Context(), page, pageSize)
 	if err != nil {
 		logger.ErrorF(c.Request.Context(), "[PixEz] list bookmark export runs failed: %v", err)
-		c.JSON(http.StatusOK, util.Err(errFetchExportRunsFailed))
+		c.JSON(http.StatusOK, response.Err(errFetchExportRunsFailed))
 		return
 	}
-	c.JSON(http.StatusOK, util.OK(gin.H{
+	c.JSON(http.StatusOK, response.OK(gin.H{
 		keyItems:    items,
 		keyTotal:    total,
 		keyPage:     page,
@@ -239,7 +239,7 @@ func ListBookmarkExportRuns(c *gin.Context) {
 // @Param work_status query string false "Work status: visible, muted, unavailable, removed, all"
 // @Param page query int false "Page number" default(1)
 // @Param page_size query int false "Page size" default(24)
-// @Success 200 {object} util.ResponseAny{data=object}
+// @Success 200 {object} response.Any{data=object}
 // @Router /api/pixez/bookmarks/illusts [get]
 func ListBookmarkIllusts(c *gin.Context) {
 	req := bindBookmarkListRequest(c)
@@ -247,10 +247,10 @@ func ListBookmarkIllusts(c *gin.Context) {
 	items, total, err := listBookmarkIllusts(c.Request.Context(), req, page, pageSize)
 	if err != nil {
 		logger.ErrorF(c.Request.Context(), "[PixEz] list bookmark illusts failed: %v", err)
-		c.JSON(http.StatusOK, util.Err(errFetchBookmarksFailed))
+		c.JSON(http.StatusOK, response.Err(errFetchBookmarksFailed))
 		return
 	}
-	c.JSON(http.StatusOK, util.OK(gin.H{
+	c.JSON(http.StatusOK, response.OK(gin.H{
 		keyItems:    items,
 		keyTotal:    total,
 		keyPage:     page,
@@ -270,7 +270,7 @@ func ListBookmarkIllusts(c *gin.Context) {
 // @Param work_status query string false "Work status: visible, muted, unavailable, removed, all"
 // @Param page query int false "Page number" default(1)
 // @Param page_size query int false "Page size" default(24)
-// @Success 200 {object} util.ResponseAny{data=object}
+// @Success 200 {object} response.Any{data=object}
 // @Router /api/pixez/bookmarks/novels [get]
 func ListBookmarkNovels(c *gin.Context) {
 	req := bindBookmarkListRequest(c)
@@ -278,10 +278,10 @@ func ListBookmarkNovels(c *gin.Context) {
 	items, total, err := listBookmarkNovels(c.Request.Context(), req, page, pageSize)
 	if err != nil {
 		logger.ErrorF(c.Request.Context(), "[PixEz] list bookmark novels failed: %v", err)
-		c.JSON(http.StatusOK, util.Err(errFetchBookmarksFailed))
+		c.JSON(http.StatusOK, response.Err(errFetchBookmarksFailed))
 		return
 	}
-	c.JSON(http.StatusOK, util.OK(gin.H{
+	c.JSON(http.StatusOK, response.OK(gin.H{
 		keyItems:    items,
 		keyTotal:    total,
 		keyPage:     page,
@@ -296,7 +296,7 @@ func ListBookmarkNovels(c *gin.Context) {
 // @Produce json
 // @Security SessionCookie
 // @Param illust_id path int true "Pixiv illustration ID"
-// @Success 200 {object} util.ResponseAny{data=object}
+// @Success 200 {object} response.Any{data=object}
 // @Router /api/pixez/bookmarks/illusts/{illust_id}/detail [get]
 func GetBookmarkIllustDetail(c *gin.Context) {
 	illustID, ok := parsePositiveIDParam(c, "illust_id")
@@ -306,10 +306,10 @@ func GetBookmarkIllustDetail(c *gin.Context) {
 	detail, err := getBookmarkIllustDetail(c.Request.Context(), illustID)
 	if err != nil {
 		logger.ErrorF(c.Request.Context(), "[PixEz] get bookmark illust detail failed illust_id=%d: %v", illustID, err)
-		c.JSON(http.StatusOK, util.Err(errFetchBookmarkDetailFailed))
+		c.JSON(http.StatusOK, response.Err(errFetchBookmarkDetailFailed))
 		return
 	}
-	c.JSON(http.StatusOK, util.OK(detail))
+	c.JSON(http.StatusOK, response.OK(detail))
 }
 
 // GetBookmarkNovelDetail returns one novel bookmark and mirror diagnostics.
@@ -319,7 +319,7 @@ func GetBookmarkIllustDetail(c *gin.Context) {
 // @Produce json
 // @Security SessionCookie
 // @Param novel_id path int true "Pixiv novel ID"
-// @Success 200 {object} util.ResponseAny{data=object}
+// @Success 200 {object} response.Any{data=object}
 // @Router /api/pixez/bookmarks/novels/{novel_id}/detail [get]
 func GetBookmarkNovelDetail(c *gin.Context) {
 	novelID, ok := parsePositiveIDParam(c, "novel_id")
@@ -329,10 +329,10 @@ func GetBookmarkNovelDetail(c *gin.Context) {
 	detail, err := getBookmarkNovelDetail(c.Request.Context(), novelID)
 	if err != nil {
 		logger.ErrorF(c.Request.Context(), "[PixEz] get bookmark novel detail failed novel_id=%d: %v", novelID, err)
-		c.JSON(http.StatusOK, util.Err(errFetchBookmarkDetailFailed))
+		c.JSON(http.StatusOK, response.Err(errFetchBookmarkDetailFailed))
 		return
 	}
-	c.JSON(http.StatusOK, util.OK(detail))
+	c.JSON(http.StatusOK, response.OK(detail))
 }
 
 func buildDashboard(ctx context.Context) (pixezDashboardResponse, error) {

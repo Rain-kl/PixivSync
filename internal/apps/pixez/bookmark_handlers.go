@@ -11,7 +11,7 @@ import (
 	"github.com/Rain-kl/Wavelet/internal/db"
 	"github.com/Rain-kl/Wavelet/internal/model"
 	pixezsvc "github.com/Rain-kl/Wavelet/internal/service/pixez"
-	"github.com/Rain-kl/Wavelet/internal/util"
+	"github.com/Rain-kl/Wavelet/internal/common/response"
 	"github.com/gin-gonic/gin"
 )
 
@@ -39,12 +39,12 @@ func ListRemovedBookmarkIllusts(c *gin.Context) {
 
 	var total int64
 	if err := query.Model(&model.PixezBookmarkIllust{}).Count(&total).Error; err != nil {
-		c.JSON(http.StatusOK, util.Err(errFetchRemovedBookmarksFailed))
+		c.JSON(http.StatusOK, response.Err(errFetchRemovedBookmarksFailed))
 		return
 	}
 	var records []model.PixezBookmarkIllust
 	if err := query.Limit(limit).Offset(offset).Find(&records).Error; err != nil {
-		c.JSON(http.StatusOK, util.Err(errFetchRemovedBookmarksFailed))
+		c.JSON(http.StatusOK, response.Err(errFetchRemovedBookmarksFailed))
 		return
 	}
 
@@ -53,7 +53,7 @@ func ListRemovedBookmarkIllusts(c *gin.Context) {
 	if int64(nextOffset) < total {
 		nextURL = removedBookmarkNextURL(userID, c.Query("restrict"), nextOffset, limit)
 	}
-	c.JSON(http.StatusOK, util.OK(gin.H{
+	c.JSON(http.StatusOK, response.OK(gin.H{
 		"illusts":  pixezsvc.RemovedBookmarkIllustPayload(records),
 		"next_url": nextURL,
 	}))

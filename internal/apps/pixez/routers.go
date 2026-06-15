@@ -21,10 +21,10 @@ import (
 	"strings"
 
 	"github.com/Rain-kl/Wavelet/internal/db"
-	"github.com/Rain-kl/Wavelet/internal/logger"
+	"github.com/Rain-kl/Wavelet/pkg/logger"
 	"github.com/Rain-kl/Wavelet/internal/model"
 	pixezsvc "github.com/Rain-kl/Wavelet/internal/service/pixez"
-	"github.com/Rain-kl/Wavelet/internal/util"
+	"github.com/Rain-kl/Wavelet/internal/common/response"
 	"github.com/gin-gonic/gin"
 	"gorm.io/gorm"
 )
@@ -35,11 +35,11 @@ import (
 // @Tags pixez
 // @Produce json
 // @Security SessionCookie
-// @Success 200 {object} util.ResponseAny
-// @Failure 401 {object} util.ResponseAny
+// @Success 200 {object} response.Any
+// @Failure 401 {object} response.Any
 // @Router /api/pixez/ping [get]
 func Ping(c *gin.Context) {
-	c.JSON(http.StatusOK, util.OK(gin.H{"status": "ok"}))
+	c.JSON(http.StatusOK, response.OK(gin.H{"status": "ok"}))
 }
 
 // ListUsers retrieves all saved Pixiv users as safe DTOs.
@@ -48,14 +48,14 @@ func Ping(c *gin.Context) {
 // @Tags pixez
 // @Produce json
 // @Security SessionCookie
-// @Success 200 {object} util.ResponseAny
+// @Success 200 {object} response.Any
 // @Router /api/pixez/users [get]
 func ListUsers(c *gin.Context) {
 	ctx := c.Request.Context()
 	var users []model.PixezPixivUser
 	if err := db.DB(ctx).Order("updated_at desc").Find(&users).Error; err != nil {
 		logger.ErrorF(ctx, "[PixEz] list users failed: %v", err)
-		c.JSON(http.StatusOK, util.Err(errFetchUsersFailed))
+		c.JSON(http.StatusOK, response.Err(errFetchUsersFailed))
 		return
 	}
 
@@ -63,7 +63,7 @@ func ListUsers(c *gin.Context) {
 	for i, u := range users {
 		dtos[i] = u.ToSafeDTO()
 	}
-	c.JSON(http.StatusOK, util.OK(dtos))
+	c.JSON(http.StatusOK, response.OK(dtos))
 }
 
 // GetUser retrieves a Pixiv user's full credentials.
@@ -73,8 +73,8 @@ func ListUsers(c *gin.Context) {
 // @Produce json
 // @Security SessionCookie
 // @Param pixiv_user_id path string true "Pixiv user ID"
-// @Success 200 {object} util.ResponseAny
-// @Failure 404 {object} util.ResponseAny
+// @Success 200 {object} response.Any
+// @Failure 404 {object} response.Any
 // @Router /api/pixez/users/{pixiv_user_id} [get]
 func GetUser(c *gin.Context) {
 	userID, ok := pixivUserIDParam(c)
@@ -85,14 +85,14 @@ func GetUser(c *gin.Context) {
 	var user model.PixezPixivUser
 	if err := db.DB(c.Request.Context()).Where("pixiv_user_id = ?", userID).First(&user).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
-			c.JSON(http.StatusNotFound, util.Err(errUserNotFound))
+			c.JSON(http.StatusNotFound, response.Err(errUserNotFound))
 			return
 		}
 		logger.ErrorF(c.Request.Context(), "[PixEz] get user failed pixiv_user_id=%s: %v", userID, err)
-		c.JSON(http.StatusOK, util.Err(errFetchUserFailed))
+		c.JSON(http.StatusOK, response.Err(errFetchUserFailed))
 		return
 	}
-	c.JSON(http.StatusOK, util.OK(user))
+	c.JSON(http.StatusOK, response.OK(user))
 }
 
 // UpsertUser inserts or updates a Pixiv user's credentials.
@@ -104,7 +104,7 @@ func GetUser(c *gin.Context) {
 // @Security SessionCookie
 // @Param pixiv_user_id path string true "Pixiv user ID"
 // @Param payload body model.PixezPixivUser true "Pixiv user credentials"
-// @Success 200 {object} util.ResponseAny
+// @Success 200 {object} response.Any
 // @Router /api/pixez/users/{pixiv_user_id} [put]
 func UpsertUser(c *gin.Context) {
 	userID, ok := pixivUserIDParam(c)
@@ -114,17 +114,17 @@ func UpsertUser(c *gin.Context) {
 
 	var input model.PixezPixivUser
 	if err := c.ShouldBindJSON(&input); err != nil {
-		c.JSON(http.StatusBadRequest, util.Err(errInvalidRequestBody))
+		c.JSON(http.StatusBadRequest, response.Err(errInvalidRequestBody))
 		return
 	}
 	input.PixivUserID = userID
 
 	if err := db.DB(c.Request.Context()).Save(&input).Error; err != nil {
 		logger.ErrorF(c.Request.Context(), "[PixEz] save user failed pixiv_user_id=%s: %v", userID, err)
-		c.JSON(http.StatusOK, util.Err(errSaveUserFailed))
+		c.JSON(http.StatusOK, response.Err(errSaveUserFailed))
 		return
 	}
-	c.JSON(http.StatusOK, util.OKNil())
+	c.JSON(http.StatusOK, response.OKNil())
 }
 
 type addUserRequest struct {
@@ -139,12 +139,12 @@ type addUserRequest struct {
 // @Produce json
 // @Security SessionCookie
 // @Param payload body addUserRequest true "Refresh token payload"
-// @Success 200 {object} util.ResponseAny{data=model.PixezPixivUserSafeDTO}
+// @Success 200 {object} response.Any{data=model.PixezPixivUserSafeDTO}
 // @Router /api/pixez/users [post]
 func AddUser(c *gin.Context) {
 	var req addUserRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, util.Err(errInvalidRequestBody))
+		c.JSON(http.StatusBadRequest, response.Err(errInvalidRequestBody))
 		return
 	}
 
@@ -152,11 +152,11 @@ func AddUser(c *gin.Context) {
 	user, err := pixezsvc.DefaultClient.AddPixivUserByRefreshToken(ctx, req.RefreshToken)
 	if err != nil {
 		logger.ErrorF(ctx, "[PixEz] add user by refresh token failed: %v", err)
-		c.JSON(http.StatusOK, util.Err(errAddUserFailed))
+		c.JSON(http.StatusOK, response.Err(errAddUserFailed))
 		return
 	}
 
-	c.JSON(http.StatusOK, util.OK(user.ToSafeDTO()))
+	c.JSON(http.StatusOK, response.OK(user.ToSafeDTO()))
 }
 
 func generateVerifier() (string, error) {
@@ -208,20 +208,20 @@ func extractCode(input string) string {
 // @Tags pixez
 // @Produce json
 // @Security SessionCookie
-// @Success 200 {object} util.ResponseAny
+// @Success 200 {object} response.Any
 // @Router /api/pixez/login-url [get]
 func GetLoginURL(c *gin.Context) {
 	verifier, err := generateVerifier()
 	if err != nil {
 		logger.ErrorF(c.Request.Context(), "[PixEz] failed to generate verifier: %v", err)
-		c.JSON(http.StatusOK, util.Err(errGenerateLoginURLFailed))
+		c.JSON(http.StatusOK, response.Err(errGenerateLoginURLFailed))
 		return
 	}
 
 	challenge := generateChallenge(verifier)
 	loginURL := fmt.Sprintf("https://app-api.pixiv.net/web/v1/login?code_challenge=%s&code_challenge_method=S256&client=pixiv-android", challenge)
 
-	c.JSON(http.StatusOK, util.OK(gin.H{
+	c.JSON(http.StatusOK, response.OK(gin.H{
 		"code_verifier": verifier,
 		"login_url":     loginURL,
 	}))
@@ -240,18 +240,18 @@ type loginCallbackRequest struct {
 // @Produce json
 // @Security SessionCookie
 // @Param payload body loginCallbackRequest true "Callback authorization code and code verifier"
-// @Success 200 {object} util.ResponseAny{data=model.PixezPixivUserSafeDTO}
+// @Success 200 {object} response.Any{data=model.PixezPixivUserSafeDTO}
 // @Router /api/pixez/login-callback [post]
 func LoginCallback(c *gin.Context) {
 	var req loginCallbackRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, util.Err(errInvalidRequestBody))
+		c.JSON(http.StatusBadRequest, response.Err(errInvalidRequestBody))
 		return
 	}
 
 	cleanCode := extractCode(req.Code)
 	if cleanCode == "" {
-		c.JSON(http.StatusBadRequest, util.Err("authorization code is required"))
+		c.JSON(http.StatusBadRequest, response.Err("authorization code is required"))
 		return
 	}
 
@@ -259,11 +259,11 @@ func LoginCallback(c *gin.Context) {
 	user, err := pixezsvc.DefaultClient.AddPixivUserByCode(ctx, cleanCode, req.CodeVerifier)
 	if err != nil {
 		logger.ErrorF(ctx, "[PixEz] login callback failed: %v", err)
-		c.JSON(http.StatusOK, util.Err(errAddUserByCodeFailed))
+		c.JSON(http.StatusOK, response.Err(errAddUserByCodeFailed))
 		return
 	}
 
-	c.JSON(http.StatusOK, util.OK(user.ToSafeDTO()))
+	c.JSON(http.StatusOK, response.OK(user.ToSafeDTO()))
 }
 
 // GetUserProfile fetches a Pixiv user's dynamic profile details from Pixiv API.
@@ -273,7 +273,7 @@ func LoginCallback(c *gin.Context) {
 // @Produce json
 // @Security SessionCookie
 // @Param pixiv_user_id path string true "Pixiv user ID"
-// @Success 200 {object} util.ResponseAny
+// @Success 200 {object} response.Any
 // @Router /api/pixez/users/{pixiv_user_id}/profile [get]
 func GetUserProfile(c *gin.Context) {
 	userID, ok := pixivUserIDParam(c)
@@ -285,28 +285,28 @@ func GetUserProfile(c *gin.Context) {
 	var user model.PixezPixivUser
 	if err := db.DB(ctx).Where("pixiv_user_id = ?", userID).First(&user).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
-			c.JSON(http.StatusNotFound, util.Err(errUserNotFound))
+			c.JSON(http.StatusNotFound, response.Err(errUserNotFound))
 			return
 		}
 		logger.ErrorF(ctx, "[PixEz] fetch user for profile failed pixiv_user_id=%s: %v", userID, err)
-		c.JSON(http.StatusOK, util.Err(errFetchUserFailed))
+		c.JSON(http.StatusOK, response.Err(errFetchUserFailed))
 		return
 	}
 
 	profileData, err := pixezsvc.DefaultClient.GetUserProfile(ctx, user, userID)
 	if err != nil {
 		logger.ErrorF(ctx, "[PixEz] fetch user profile from pixiv failed user_id=%s: %v", userID, err)
-		c.JSON(http.StatusOK, util.Err(errFetchProfileFailed))
+		c.JSON(http.StatusOK, response.Err(errFetchProfileFailed))
 		return
 	}
 
 	var raw map[string]any
 	if err := json.Unmarshal(profileData, &raw); err != nil {
-		c.JSON(http.StatusOK, util.Err("failed to parse profile data"))
+		c.JSON(http.StatusOK, response.Err("failed to parse profile data"))
 		return
 	}
 
-	c.JSON(http.StatusOK, util.OK(raw))
+	c.JSON(http.StatusOK, response.OK(raw))
 }
 
 
@@ -318,7 +318,7 @@ func GetUserProfile(c *gin.Context) {
 // @Produce json
 // @Security SessionCookie
 // @Param pixiv_user_id path string true "Pixiv user ID"
-// @Success 200 {object} util.ResponseAny
+// @Success 200 {object} response.Any
 // @Router /api/pixez/users/{pixiv_user_id} [delete]
 func DeleteUser(c *gin.Context) {
 	userID, ok := pixivUserIDParam(c)
@@ -343,10 +343,10 @@ func DeleteUser(c *gin.Context) {
 		return tx.Where("pixiv_user_id = ?", userID).Delete(&model.PixezPixivUser{}).Error
 	}); err != nil {
 		logger.ErrorF(ctx, "[PixEz] delete user failed pixiv_user_id=%s: %v", userID, err)
-		c.JSON(http.StatusOK, util.Err(errDeleteUserFailed))
+		c.JSON(http.StatusOK, response.Err(errDeleteUserFailed))
 		return
 	}
-	c.JSON(http.StatusOK, util.OKNil())
+	c.JSON(http.StatusOK, response.OKNil())
 }
 
 // GetUserData fetches all or selected synced user data tables.
@@ -357,7 +357,7 @@ func DeleteUser(c *gin.Context) {
 // @Security SessionCookie
 // @Param pixiv_user_id path string true "Pixiv user ID"
 // @Param tables query string false "Comma-separated table names"
-// @Success 200 {object} util.ResponseAny
+// @Success 200 {object} response.Any
 // @Router /api/pixez/users/{pixiv_user_id}/sync-data [get]
 func GetUserData(c *gin.Context) {
 	userID, ok := pixivUserIDParam(c)
@@ -369,10 +369,10 @@ func GetUserData(c *gin.Context) {
 	payload, err := fetchUserData(c.Request.Context(), userID, tables)
 	if err != nil {
 		logger.ErrorF(c.Request.Context(), "[PixEz] fetch sync data failed pixiv_user_id=%s: %v", userID, err)
-		c.JSON(http.StatusOK, util.Err(errFetchSyncDataFailed))
+		c.JSON(http.StatusOK, response.Err(errFetchSyncDataFailed))
 		return
 	}
-	c.JSON(http.StatusOK, util.OK(payload))
+	c.JSON(http.StatusOK, response.OK(payload))
 }
 
 // PostUserData replaces submitted synced user data tables.
@@ -384,7 +384,7 @@ func GetUserData(c *gin.Context) {
 // @Security SessionCookie
 // @Param pixiv_user_id path string true "Pixiv user ID"
 // @Param payload body model.PixezUserDataPayload true "Synced data payload"
-// @Success 200 {object} util.ResponseAny
+// @Success 200 {object} response.Any
 // @Router /api/pixez/users/{pixiv_user_id}/sync-data [post]
 func PostUserData(c *gin.Context) {
 	userID, ok := pixivUserIDParam(c)
@@ -394,7 +394,7 @@ func PostUserData(c *gin.Context) {
 
 	var payload model.PixezUserDataPayload
 	if err := c.ShouldBindJSON(&payload); err != nil {
-		c.JSON(http.StatusBadRequest, util.Err(errInvalidRequestBody))
+		c.JSON(http.StatusBadRequest, response.Err(errInvalidRequestBody))
 		return
 	}
 
@@ -406,11 +406,11 @@ func PostUserData(c *gin.Context) {
 		return createUserSyncData(tx, userID, payload)
 	}); err != nil {
 		logger.ErrorF(c.Request.Context(), "[PixEz] save sync data failed pixiv_user_id=%s: %v", userID, err)
-		c.JSON(http.StatusOK, util.Err(errSaveSyncDataFailed))
+		c.JSON(http.StatusOK, response.Err(errSaveSyncDataFailed))
 		return
 	}
 
-	c.JSON(http.StatusOK, util.OKNil())
+	c.JSON(http.StatusOK, response.OKNil())
 }
 
 // GetUserDataHashes returns MD5 checksums for each synced table.
@@ -420,7 +420,7 @@ func PostUserData(c *gin.Context) {
 // @Produce json
 // @Security SessionCookie
 // @Param pixiv_user_id path string true "Pixiv user ID"
-// @Success 200 {object} util.ResponseAny
+// @Success 200 {object} response.Any
 // @Router /api/pixez/users/{pixiv_user_id}/sync-data/hashes [get]
 func GetUserDataHashes(c *gin.Context) {
 	userID, ok := pixivUserIDParam(c)
@@ -431,16 +431,16 @@ func GetUserDataHashes(c *gin.Context) {
 	hashes, err := computeUserDataHashes(c.Request.Context(), userID)
 	if err != nil {
 		logger.ErrorF(c.Request.Context(), "[PixEz] fetch sync data hashes failed pixiv_user_id=%s: %v", userID, err)
-		c.JSON(http.StatusOK, util.Err(errFetchHashesFailed))
+		c.JSON(http.StatusOK, response.Err(errFetchHashesFailed))
 		return
 	}
-	c.JSON(http.StatusOK, util.OK(hashes))
+	c.JSON(http.StatusOK, response.OK(hashes))
 }
 
 func pixivUserIDParam(c *gin.Context) (string, bool) {
 	userID := strings.TrimSpace(c.Param("pixiv_user_id"))
 	if userID == "" {
-		c.JSON(http.StatusBadRequest, util.Err(errPixivUserIDRequired))
+		c.JSON(http.StatusBadRequest, response.Err(errPixivUserIDRequired))
 		return "", false
 	}
 	return userID, true
