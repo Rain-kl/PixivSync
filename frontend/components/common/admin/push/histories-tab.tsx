@@ -17,7 +17,17 @@ import {ErrorInline} from "@/components/layout/error"
 import {LoadingStateWithBorder} from "@/components/layout/loading"
 import {cn} from "@/lib/utils"
 
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog"
+
 import services from "@/lib/services"
+import type {PushHistory} from "@/lib/services/push"
 
 function getLevelBadgeVariant(level: string): "outline" | "secondary" | "destructive" | "default" {
   switch (level) {
@@ -34,6 +44,14 @@ export function HistoriesTab() {
   const [historyPage, setHistoryPage] = React.useState(1)
   const [historySearch, setHistorySearch] = React.useState("")
   const [historyStatus, setHistoryStatus] = React.useState("all")
+
+  const [detailOpen, setDetailOpen] = React.useState(false)
+  const [selectedHistory, setSelectedHistory] = React.useState<PushHistory | null>(null)
+
+  const handleRowClick = (hist: PushHistory) => {
+    setSelectedHistory(hist)
+    setDetailOpen(true)
+  }
 
   const historiesQuery = useQuery({
     queryKey: ["admin", "push-histories", historyPage, historySearch, historyStatus],
@@ -124,7 +142,11 @@ export function HistoriesTab() {
               </TableRow>
             ) : (
               (historiesQuery.data?.results ?? []).map(hist => (
-                <TableRow key={hist.id} className="hover:bg-muted/10">
+                <TableRow
+                  key={hist.id}
+                  className="hover:bg-muted/10 cursor-pointer transition-colors"
+                  onClick={() => handleRowClick(hist)}
+                >
                   <TableCell className="text-xs font-mono font-medium">{hist.event_key}</TableCell>
                   <TableCell className="text-xs uppercase font-semibold text-muted-foreground">
                     {hist.channel === "email" ? "邮件" : hist.channel}
@@ -187,6 +209,104 @@ export function HistoriesTab() {
           </div>
         </div>
       )}
+
+      {/* ==================== 对话框：推送详情 ==================== */}
+      <Dialog open={detailOpen} onOpenChange={setDetailOpen}>
+        <DialogContent className="sm:max-w-[550px] max-h-[85vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <History className="size-5 text-primary" />
+              推送通知详情
+            </DialogTitle>
+            <DialogDescription>
+              查看该条通知发送的详细审计信息与内容
+            </DialogDescription>
+          </DialogHeader>
+
+          {selectedHistory && (
+            <div className="space-y-4 py-4 text-xs">
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-1.5">
+                  <span className="font-semibold text-muted-foreground block">事件标识</span>
+                  <div className="font-mono bg-muted/40 p-2 rounded border">{selectedHistory.event_key}</div>
+                </div>
+                <div className="space-y-1.5">
+                  <span className="font-semibold text-muted-foreground block">发送渠道</span>
+                  <div className="bg-muted/40 p-2 rounded border uppercase font-medium">
+                    {selectedHistory.channel === "email" ? "邮件推送" : selectedHistory.channel}
+                  </div>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-1.5">
+                  <span className="font-semibold text-muted-foreground block">推送目标</span>
+                  <div className="font-mono bg-muted/40 p-2 rounded border truncate" title={selectedHistory.target}>
+                    {selectedHistory.target}
+                  </div>
+                </div>
+                <div className="space-y-1.5">
+                  <span className="font-semibold text-muted-foreground block">发送时间</span>
+                  <div className="bg-muted/40 p-2 rounded border">
+                    {new Date(selectedHistory.created_at).toLocaleString()}
+                  </div>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-1.5">
+                  <span className="font-semibold text-muted-foreground block">通知等级</span>
+                  <div>
+                    <Badge variant={getLevelBadgeVariant(selectedHistory.level)} className="text-[10px] font-semibold py-0.5 px-2">
+                      {selectedHistory.level}
+                    </Badge>
+                  </div>
+                </div>
+                <div className="space-y-1.5">
+                  <span className="font-semibold text-muted-foreground block">发送状态</span>
+                  <div>
+                    <Badge
+                      variant={selectedHistory.status === "success" ? "secondary" : "destructive"}
+                      className="text-[10px] font-semibold py-0.5 px-2"
+                    >
+                      {selectedHistory.status === "success" ? "成功" : "失败"}
+                    </Badge>
+                  </div>
+                </div>
+              </div>
+
+              {selectedHistory.status === "failed" && selectedHistory.error_msg && (
+                <div className="space-y-1.5">
+                  <span className="font-semibold text-destructive block">失败原因</span>
+                  <div className="font-mono text-destructive bg-destructive/10 p-2.5 rounded border border-destructive/20 whitespace-pre-wrap break-all">
+                    {selectedHistory.error_msg}
+                  </div>
+                </div>
+              )}
+
+              <div className="space-y-1.5">
+                <span className="font-semibold text-muted-foreground block">通知标题</span>
+                <div className="bg-muted/30 p-2.5 rounded border font-medium text-[13px]">
+                  {selectedHistory.title}
+                </div>
+              </div>
+
+              <div className="space-y-1.5">
+                <span className="font-semibold text-muted-foreground block">通知内容</span>
+                <div className="bg-muted/30 p-3 rounded border whitespace-pre-wrap break-all leading-relaxed font-sans text-xs">
+                  {selectedHistory.content}
+                </div>
+              </div>
+            </div>
+          )}
+
+          <DialogFooter>
+            <Button variant="outline" size="sm" onClick={() => setDetailOpen(false)} className="h-9 text-xs">
+              关闭
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

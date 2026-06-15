@@ -5,6 +5,7 @@ export interface PushEvent {
   id: number;
   event_key: string;
   name: string;
+  task_type?: string;
   channels: string[];
   targets: string[];
   template: string;
@@ -71,7 +72,8 @@ export interface EventMetadata {
 }
 
 export interface CreatePushEventRequest {
-  event_key: string;
+  event_key?: string;
+  task_type?: string;
   channels: string[];
   targets?: string[];
   template?: string;

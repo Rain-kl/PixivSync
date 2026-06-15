@@ -63,6 +63,12 @@ export function EventsTab() {
     queryFn: () => services.push.listBuiltInEvents(),
   })
 
+  // --- 获取所有系统可调度任务类型 ---
+  const taskTypesQuery = useQuery({
+    queryKey: ["admin", "task-types"],
+    queryFn: () => services.admin.getTaskTypes(),
+  })
+
   // --- 修改保存事件 Mutation ---
   const updateEventMutation = useMutation({
     mutationFn: ({ id, data }: { id: number; data: UpdatePushEventRequest }) => services.push.updateEvent(id, data),
@@ -93,6 +99,8 @@ export function EventsTab() {
       queryClient.invalidateQueries({ queryKey: ["admin", "push-events"] })
       setCreateEventOpen(false)
       setNewEventKey("")
+      setNewEventType("builtin")
+      setNewEventTaskType("")
       setNewEventChannels([])
       setNewEventEnabled(true)
     },
@@ -121,7 +129,9 @@ export function EventsTab() {
 
   // 事件创建对话框状态
   const [createEventOpen, setCreateEventOpen] = React.useState(false)
+  const [newEventType, setNewEventType] = React.useState<"builtin" | "task">("builtin")
   const [newEventKey, setNewEventKey] = React.useState("")
+  const [newEventTaskType, setNewEventTaskType] = React.useState("")
   const [newEventChannels, setNewEventChannels] = React.useState<string[]>([])
   const [newEventTargets, setNewEventTargets] = React.useState("")
   const [newEventTemplate, setNewEventTemplate] = React.useState("")
@@ -168,6 +178,8 @@ export function EventsTab() {
 
   const handleCreateEventClick = () => {
     setNewEventKey("")
+    setNewEventType("builtin")
+    setNewEventTaskType("")
     setNewEventChannels([])
     setNewEventTargets("")
     setNewEventTemplate("")
@@ -185,9 +197,28 @@ export function EventsTab() {
     }
   }
 
+  const handleNewEventTaskTypeChange = (taskType: string) => {
+    setNewEventTaskType(taskType)
+    const taskMeta = (taskTypesQuery.data ?? []).find(t => t.asynq_task === taskType)
+    if (taskMeta) {
+      const defaultTemplate = {
+        title: `任务完成: ${taskMeta.name}`,
+        content: `异步任务 {{task_name}} 已完成。状态: {{task_status}}，耗时: {{task_duration}} ms。`,
+        level: "INFO",
+      }
+      setNewEventTemplate(JSON.stringify(defaultTemplate, null, 2))
+    } else {
+      setNewEventTemplate("")
+    }
+  }
+
   const handleCreateEvent = () => {
-    if (!newEventKey) {
+    if (newEventType === "builtin" && !newEventKey) {
       toast.error("请选择系统事件")
+      return
+    }
+    if (newEventType === "task" && !newEventTaskType) {
+      toast.error("请选择异步任务")
       return
     }
 
@@ -206,7 +237,8 @@ export function EventsTab() {
       .filter(t => t !== "")
 
     createEventMutation.mutate({
-      event_key: newEventKey,
+      event_key: newEventType === "builtin" ? newEventKey : undefined,
+      task_type: newEventType === "task" ? newEventTaskType : undefined,
       channels: newEventChannels,
       targets: targets.length > 0 ? targets : undefined,
       template: newEventTemplate || undefined,
@@ -253,7 +285,14 @@ export function EventsTab() {
                   <TableCell className="font-mono text-[11px] text-muted-foreground py-1">{event.id}</TableCell>
                   <TableCell className="py-1">
                     <div className="flex flex-col gap-0.5">
-                      <span className="font-medium text-[11px] leading-tight" title={event.name}>{event.name}</span>
+                      <div className="flex items-center gap-1.5">
+                        <span className="font-medium text-[11px] leading-tight" title={event.name}>{event.name}</span>
+                        {event.task_type && (
+                          <Badge variant="outline" className="text-[8px] h-3.5 px-1 bg-blue-50/50 text-blue-600 border-blue-200">
+                            任务
+                          </Badge>
+                        )}
+                      </div>
                       <span className="text-[10px] text-muted-foreground font-mono leading-tight">{event.event_key}</span>
                     </div>
                   </TableCell>
@@ -353,37 +392,109 @@ export function EventsTab() {
 
           <div className="space-y-4 py-4">
             <div className="space-y-1.5">
-              <Label className="text-xs font-semibold">系统事件</Label>
-              {builtInEventsQuery.isLoading ? (
-                <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                  <Loader2 className="size-3.5 animate-spin" />
-                  <span>加载系统事件中...</span>
-                </div>
-              ) : availableBuiltInEvents.length === 0 ? (
-                <div className="text-xs text-muted-foreground italic border p-2.5 rounded bg-muted/20">
-                  所有内置事件都已配置，没有可新增的事件。
-                </div>
-              ) : (
-                <Select value={newEventKey} onValueChange={handleNewEventKeyChange}>
-                  <SelectTrigger className="text-xs h-9">
-                    <SelectValue placeholder="请选择系统事件" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {availableBuiltInEvents.map(ev => (
-                      <SelectItem key={ev.key} value={ev.key} className="text-xs">
-                        {ev.name} ({ev.key})
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              )}
+              <Label className="text-xs font-semibold">事件类型</Label>
+              <div className="flex gap-4 p-1.5 border rounded-md bg-muted/20">
+                <label className="flex items-center gap-1.5 text-xs cursor-pointer font-medium">
+                  <input
+                    type="radio"
+                    name="eventType"
+                    checked={newEventType === "builtin"}
+                    onChange={() => {
+                      setNewEventType("builtin")
+                      setNewEventTaskType("")
+                      setNewEventTemplate("")
+                    }}
+                    className="scale-90"
+                  />
+                  <span>系统内置事件</span>
+                </label>
+                <label className="flex items-center gap-1.5 text-xs cursor-pointer font-medium">
+                  <input
+                    type="radio"
+                    name="eventType"
+                    checked={newEventType === "task"}
+                    onChange={() => {
+                      setNewEventType("task")
+                      setNewEventKey("")
+                      setNewEventTemplate("")
+                    }}
+                    className="scale-90"
+                  />
+                  <span>任务完成事件</span>
+                </label>
+              </div>
             </div>
 
-            {newEventKey && (
+            {newEventType === "builtin" ? (
+              <div className="space-y-1.5">
+                <Label className="text-xs font-semibold">系统事件</Label>
+                {builtInEventsQuery.isLoading ? (
+                  <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                    <Loader2 className="size-3.5 animate-spin" />
+                    <span>加载系统事件中...</span>
+                  </div>
+                ) : availableBuiltInEvents.length === 0 ? (
+                  <div className="text-xs text-muted-foreground italic border p-2.5 rounded bg-muted/20">
+                    所有内置事件都已配置，没有可新增的事件。
+                  </div>
+                ) : (
+                  <Select value={newEventKey} onValueChange={handleNewEventKeyChange}>
+                    <SelectTrigger className="text-xs h-9">
+                      <SelectValue placeholder="请选择系统事件" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {availableBuiltInEvents.map(ev => (
+                        <SelectItem key={ev.key} value={ev.key} className="text-xs">
+                          {ev.name} ({ev.key})
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                )}
+              </div>
+            ) : (
+              <div className="space-y-1.5">
+                <Label className="text-xs font-semibold">系统异步任务</Label>
+                {taskTypesQuery.isLoading ? (
+                  <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                    <Loader2 className="size-3.5 animate-spin" />
+                    <span>加载异步任务中...</span>
+                  </div>
+                ) : (taskTypesQuery.data ?? []).length === 0 ? (
+                  <div className="text-xs text-muted-foreground italic border p-2.5 rounded bg-muted/20">
+                    暂无可用的系统任务。
+                  </div>
+                ) : (
+                  <Select value={newEventTaskType} onValueChange={handleNewEventTaskTypeChange}>
+                    <SelectTrigger className="text-xs h-9">
+                      <SelectValue placeholder="请选择异步任务" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {(taskTypesQuery.data ?? []).map(taskMeta => (
+                        <SelectItem key={taskMeta.asynq_task} value={taskMeta.asynq_task} className="text-xs">
+                          {taskMeta.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                )}
+              </div>
+            )}
+
+            {newEventType === "builtin" && newEventKey && (
               <div className="text-[11px] bg-muted/30 p-2.5 rounded border text-muted-foreground space-y-1">
                 <span className="font-semibold text-foreground">事件说明：</span>
                 <span>
                   {availableBuiltInEvents.find(e => e.key === newEventKey)?.description || "无描述信息"}
+                </span>
+              </div>
+            )}
+
+            {newEventType === "task" && newEventTaskType && (
+              <div className="text-[11px] bg-muted/30 p-2.5 rounded border text-muted-foreground space-y-1">
+                <span className="font-semibold text-foreground">任务说明：</span>
+                <span>
+                  {(taskTypesQuery.data ?? []).find(t => t.asynq_task === newEventTaskType)?.description || "无描述信息"}
                 </span>
               </div>
             )}
@@ -419,7 +530,7 @@ export function EventsTab() {
                           }}
                         />
                         <span>
-                          {ch === "email" ? "邮件推送 (内置)" : ch}
+                          {ch === "email" ? "邮件推送" : ch}
                         </span>
                       </label>
                     ))}
@@ -448,7 +559,9 @@ export function EventsTab() {
               <div className="flex justify-between items-center">
                 <Label className="text-xs font-semibold">内容渲染模板 (JSON 格式)</Label>
                 <span className="text-[10px] text-muted-foreground font-mono flex items-center">
-                  支持变量：{"{{user.username}}"}, {"{{ip}}"}, {"{{time}}"}
+                  {newEventType === "task"
+                    ? "支持变量：{{task_name}}, {{task_status}}, {{task_duration}}, {{user.username}}"
+                    : "支持变量：{{user.username}}, {{ip}}, {{time}}"}
                 </span>
               </div>
               <Textarea
@@ -479,7 +592,7 @@ export function EventsTab() {
             <Button
               variant="default"
               size="sm"
-              disabled={createEventMutation.isPending || availableBuiltInEvents.length === 0}
+              disabled={createEventMutation.isPending || (newEventType === "builtin" && availableBuiltInEvents.length === 0)}
               onClick={handleCreateEvent}
               className="h-9 px-5 text-xs"
             >
@@ -513,6 +626,17 @@ export function EventsTab() {
                 </div>
               </div>
 
+              {selectedEvent.task_type && (
+                <div className="space-y-1.5">
+                  <Label className="text-xs font-semibold text-muted-foreground">关联异步任务</Label>
+                  <Input
+                    value={`${(taskTypesQuery.data ?? []).find(t => t.asynq_task === selectedEvent.task_type)?.name || selectedEvent.task_type} (${selectedEvent.task_type})`}
+                    disabled
+                    className="text-xs h-9 bg-muted"
+                  />
+                </div>
+              )}
+
               <div className="space-y-1.5">
                 <Label className="text-xs font-semibold">推送渠道 (可多选)</Label>
                 <Popover>
@@ -544,7 +668,7 @@ export function EventsTab() {
                             }}
                           />
                           <span>
-                            {ch === "email" ? "邮件推送 (内置)" : ch}
+                            {ch === "email" ? "邮件推送" : ch}
                           </span>
                         </label>
                       ))}
@@ -573,7 +697,9 @@ export function EventsTab() {
                 <div className="flex justify-between items-center">
                   <Label className="text-xs font-semibold">内容渲染模板 (JSON 格式)</Label>
                   <span className="text-[10px] text-muted-foreground font-mono flex items-center">
-                    支持变量：{"{{user.username}}"}, {"{{ip}}"}, {"{{time}}"}
+                    {selectedEvent.task_type
+                      ? "支持变量：{{task_name}}, {{task_status}}, {{task_duration}}, {{user.username}}"
+                      : "支持变量：{{user.username}}, {{ip}}, {{time}}"}
                   </span>
                 </div>
                 <Textarea

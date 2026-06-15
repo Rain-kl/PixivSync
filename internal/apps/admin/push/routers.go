@@ -15,6 +15,7 @@ import (
 
 	"github.com/Rain-kl/Wavelet/internal/db"
 	"github.com/Rain-kl/Wavelet/internal/model"
+	"github.com/Rain-kl/Wavelet/internal/task"
 	"github.com/Rain-kl/Wavelet/internal/util"
 	"github.com/Rain-kl/Wavelet/pkg/push"
 	"github.com/gin-gonic/gin"
@@ -84,7 +85,8 @@ func ListEvents(c *gin.Context) {
 
 // CreateEventRequest 创建事件请求参数
 type CreateEventRequest struct {
-	EventKey string   `json:"event_key" binding:"required"`
+	EventKey string   `json:"event_key"`
+	TaskType string   `json:"task_type"` // 关联的异步任务类型
 	Channels []string `json:"channels"`
 	Targets  []string `json:"targets"`
 	Template string   `json:"template"`
@@ -112,9 +114,49 @@ func ListBuiltInEvents(c *gin.Context) {
 	c.JSON(http.StatusOK, util.OK(BuiltInEvents))
 }
 
+func getEventInfo(req CreateEventRequest) (string, string, []byte, error) {
+	if req.TaskType != "" {
+		// 1. 检查关联任务是否存在
+		meta := task.GetTaskMetaByAsynqTask(req.TaskType)
+		if meta == nil {
+			return "", "", nil, errors.New("unsupported task type")
+		}
+		eventKey := "task_completed:" + req.TaskType
+		eventName := "任务完成: " + meta.Name
+
+		defaultTemplate := NotificationMessage{
+			Title:   "任务完成: " + meta.Name,
+			Content: "异步任务 {{task_name}} (ID: {{task_id}}) 已完成。状态: {{task_status}}，耗时: {{task_duration}} ms。",
+			Level:   defaultLevelInfo,
+		}
+		defaultTemplateBytes, err := json.Marshal(defaultTemplate)
+		if err != nil {
+			return "", "", nil, err
+		}
+		return eventKey, eventName, defaultTemplateBytes, nil
+	}
+
+	if req.EventKey == "" {
+		return "", "", nil, errors.New("either event_key or task_type must be provided")
+	}
+
+	// 1. 检查内置事件是否存在
+	meta, found := findBuiltInEvent(req.EventKey)
+	if !found {
+		return "", "", nil, errors.New("unsupported built-in event key")
+	}
+
+	defaultTemplateBytes, err := json.Marshal(meta.DefaultTemplate)
+	if err != nil {
+		return "", "", nil, err
+	}
+
+	return req.EventKey, meta.Name, defaultTemplateBytes, nil
+}
+
 // CreateEvent 创建通知事件
 // @Summary 创建通知事件
-// @Description 绑定系统内置事件、推送渠道、接收目标并创建通知事件配置，需要管理员权限
+// @Description 绑定系统内置事件或异步任务、推送渠道、接收目标并创建通知事件配置，需要管理员权限
 // @Tags admin-push
 // @Accept json
 // @Produce json
@@ -131,16 +173,15 @@ func CreateEvent(c *gin.Context) {
 
 	ctx := c.Request.Context()
 
-	// 1. 检查内置事件是否存在
-	meta, found := findBuiltInEvent(req.EventKey)
-	if !found {
-		c.JSON(http.StatusBadRequest, util.Err("unsupported built-in event key"))
+	eventKey, eventName, defaultTemplateBytes, err := getEventInfo(req)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, util.Err(err.Error()))
 		return
 	}
 
 	// 2. 检查是否已经创建过该事件的配置
 	var count int64
-	if err := db.DB(ctx).Model(&model.PushEvent{}).Where("event_key = ?", req.EventKey).Count(&count).Error; err != nil {
+	if err := db.DB(ctx).Model(&model.PushEvent{}).Where("event_key = ?", eventKey).Count(&count).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, util.Err(err.Error()))
 		return
 	}
@@ -152,11 +193,6 @@ func CreateEvent(c *gin.Context) {
 	// 3. 模板处理
 	templateStr := strings.TrimSpace(req.Template)
 	if templateStr == "" {
-		defaultTemplateBytes, err := json.Marshal(meta.DefaultTemplate)
-		if err != nil {
-			c.JSON(http.StatusInternalServerError, util.Err(err.Error()))
-			return
-		}
 		templateStr = string(defaultTemplateBytes)
 	} else {
 		var tempMap map[string]any
@@ -177,8 +213,9 @@ func CreateEvent(c *gin.Context) {
 	}
 
 	event := model.PushEvent{
-		EventKey: meta.Key,
-		Name:     meta.Name,
+		EventKey: eventKey,
+		Name:     eventName,
+		TaskType: req.TaskType,
 		Channels: channels,
 		Targets:  targets,
 		Template: templateStr,
