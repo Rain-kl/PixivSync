@@ -8,7 +8,7 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/Rain-kl/Wavelet/internal/logger"
+	"github.com/Rain-kl/Wavelet/pkg/logger"
 	"go.uber.org/zap"
 )
 

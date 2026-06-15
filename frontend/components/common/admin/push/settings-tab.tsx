@@ -15,7 +15,6 @@ import {Label} from "@/components/ui/label"
 import {Textarea} from "@/components/ui/textarea"
 import {Switch} from "@/components/ui/switch"
 import {Badge} from "@/components/ui/badge"
-import {Card, CardContent, CardHeader, CardTitle} from "@/components/ui/card"
 import {Table, TableBody, TableCell, TableHead, TableHeader, TableRow,} from "@/components/ui/table"
 import {
   Dialog,
@@ -254,120 +253,122 @@ export function SettingsTab() {
 
 
   return (
-    <div className="pt-4 space-y-6">
-      <Card className="h-full flex flex-col">
-            <CardHeader className="pb-3 border-b bg-muted/10">
-              <div className="flex items-center justify-between">
-                <div>
-                  <CardTitle className="text-base font-semibold">自定义推送通道</CardTitle>
-                  <p className="text-xs text-muted-foreground mt-0.5">
-                    添加、配置及管理用于第三方 Webhook 对接的自定义数据推送通道
-                  </p>
-                </div>
-                <Button size="sm" onClick={handleCreateChannelClick} className="text-xs">
-                  <Plus className="size-3.5 mr-1" />
-                  新建消息通道
-                </Button>
-              </div>
-            </CardHeader>
-            <CardContent className="p-0 flex-1 overflow-x-auto">
-              {channelsQuery.isLoading ? (
-                <div className="p-8">
-                  <LoadingStateWithBorder icon={Settings} description="加载消息通道中..." className="border-0 shadow-none animate-pulse" />
-                </div>
-              ) : channelsQuery.isError ? (
-                <div className="p-8">
-                  <ErrorInline error={channelsQuery.error} onRetry={() => channelsQuery.refetch()} className="justify-center" />
-                </div>
-              ) : (channelsQuery.data ?? []).length === 0 ? (
-                <div className="py-12 flex flex-col items-center justify-center text-muted-foreground">
-                  <Settings className="size-8 mb-2 opacity-30 animate-spin" style={{ animationDuration: '3s' }} />
-                  <span className="text-xs font-medium">暂无自定义通道配置，请点击右上角新建</span>
-                </div>
-              ) : (
-                <Table>
-                  <TableHeader>
-                    <TableRow className="bg-muted/30">
-                      <TableHead className="text-xs font-semibold">名称</TableHead>
-                      <TableHead className="text-xs font-semibold">类型</TableHead>
-                      <TableHead className="text-xs font-semibold">备注</TableHead>
-                      <TableHead className="text-xs font-semibold w-[80px] text-center">状态</TableHead>
-                      <TableHead className="text-xs font-semibold w-[180px] text-right">操作</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {(channelsQuery.data ?? []).map(ch => (
-                      <TableRow key={ch.id} className="hover:bg-muted/5">
-                        <TableCell className="text-xs font-mono font-bold">
-                          {ch.name}
-                        </TableCell>
-                        <TableCell className="text-xs">
-                          <Badge variant="outline" className="text-[10px] whitespace-nowrap">
-                            {(definitionsQuery.data ?? []).find(d => d.type === ch.type)?.name ?? ch.type}
-                          </Badge>
-                        </TableCell>
-                        <TableCell className="text-xs text-muted-foreground max-w-[200px] truncate">
-                          {ch.description || <span className="italic">无备注</span>}
-                        </TableCell>
-                        <TableCell className="text-center">
-                          <Switch
-                            checked={ch.enabled}
-                            onCheckedChange={checked => {
-                              updateChannelMutation.mutate({
-                                id: ch.id,
-                                data: {
-                                  description: ch.description,
-                                  type: ch.type,
-                                  token: ch.token,
-                                  url: ch.url,
-                                  other: ch.other,
-                                  enabled: checked,
-                                }
-                              })
-                            }}
-                          />
-                        </TableCell>
-                        <TableCell className="text-right space-x-1 whitespace-nowrap">
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => handleTestChannelClick(ch.name)}
-                            className="h-7 text-[11px] text-primary hover:text-primary hover:bg-primary/10"
-                          >
-                            <Play className="size-2.5 mr-1" />
-                            测试
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => handleEditChannelClick(ch)}
-                            className="h-7 text-[11px]"
-                          >
-                            <Edit2 className="size-2.5 mr-1" />
-                            编辑
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            disabled={deleteChannelMutation.isPending}
-                            onClick={() => {
-                              if (confirm(`确定要删除通道 "${ch.name}" 吗？`)) {
-                                deleteChannelMutation.mutate(ch.id)
-                              }
-                            }}
-                            className="h-7 text-[11px] text-destructive hover:text-destructive hover:bg-destructive/10"
-                          >
-                            <Trash2 className="size-2.5 mr-1" />
-                            删除
-                          </Button>
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              )}
-            </CardContent>
-          </Card>
+    <div className="pt-4 space-y-4">
+      <div className="flex items-center justify-between">
+        <div>
+          <h2 className="text-sm font-semibold">自定义推送通道</h2>
+          <p className="text-[11px] text-muted-foreground mt-0.5">
+            添加、配置及管理用于第三方 Webhook 对接的自定义数据推送通道
+          </p>
+        </div>
+        <Button size="sm" onClick={handleCreateChannelClick} className="text-xs">
+          <Plus className="size-3.5 mr-1" />
+          新建消息通道
+        </Button>
+      </div>
+
+      {channelsQuery.isLoading ? (
+        <LoadingStateWithBorder icon={Settings} description="加载消息通道中..." />
+      ) : channelsQuery.isError ? (
+        <div className="p-8 border border-dashed rounded-xl bg-card">
+          <ErrorInline error={channelsQuery.error} onRetry={() => channelsQuery.refetch()} className="justify-center" />
+        </div>
+      ) : (channelsQuery.data ?? []).length === 0 ? (
+        <div className="py-12 border border-dashed rounded-lg flex flex-col items-center justify-center text-muted-foreground">
+          <Settings className="size-8 mb-2 opacity-30 animate-spin" style={{ animationDuration: '3s' }} />
+          <span className="text-xs font-medium">暂无自定义通道配置，请点击右上角新建</span>
+        </div>
+      ) : (
+        <div className="border border-dashed shadow-none rounded-lg overflow-hidden">
+          <Table className="w-full caption-bottom text-sm min-w-full">
+            <TableHeader className="sticky top-0 z-20 bg-background">
+              <TableRow className="border-b border-dashed hover:bg-transparent">
+                <TableHead className="w-[120px] whitespace-nowrap py-2 h-8">名称</TableHead>
+                <TableHead className="w-[100px] whitespace-nowrap py-2 h-8">类型</TableHead>
+                <TableHead className="whitespace-nowrap py-2 h-8">备注</TableHead>
+                <TableHead className="w-[80px] text-center whitespace-nowrap py-2 h-8">状态</TableHead>
+                <TableHead className="sticky right-0 text-center bg-background z-10 w-[180px] py-2 h-8">操作</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {(channelsQuery.data ?? []).map(ch => (
+                <TableRow
+                  key={ch.id}
+                  className="border-dashed hover:bg-muted/30 cursor-pointer group"
+                  onClick={() => handleEditChannelClick(ch)}
+                >
+                  <TableCell className="text-xs font-mono font-bold py-1">
+                    {ch.name}
+                  </TableCell>
+                  <TableCell className="py-1">
+                    <Badge variant="outline" className="text-[10px] py-0 px-1.5 h-4.5 whitespace-nowrap">
+                      {(definitionsQuery.data ?? []).find(d => d.type === ch.type)?.name ?? ch.type}
+                    </Badge>
+                  </TableCell>
+                  <TableCell className="text-xs text-muted-foreground max-w-[200px] truncate py-1">
+                    {ch.description || <span className="italic">无备注</span>}
+                  </TableCell>
+                  <TableCell className="text-center py-1" onClick={(e) => e.stopPropagation()}>
+                    <Switch
+                      checked={ch.enabled}
+                      onCheckedChange={checked => {
+                        updateChannelMutation.mutate({
+                          id: ch.id,
+                          data: {
+                            description: ch.description,
+                            type: ch.type,
+                            token: ch.token,
+                            url: ch.url,
+                            other: ch.other,
+                            enabled: checked,
+                          }
+                        })
+                      }}
+                      className="scale-75 data-[state=checked]:bg-green-600 h-4 w-7"
+                    />
+                  </TableCell>
+                  <TableCell className="sticky right-0 text-center bg-background z-10 py-1" onClick={(e) => e.stopPropagation()}>
+                    <div className="flex items-center justify-center gap-1">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => handleTestChannelClick(ch.name)}
+                        className="h-6 px-2 text-[10px] text-primary hover:text-primary hover:bg-primary/10"
+                      >
+                        <Play className="size-2.5 mr-1" />
+                        测试
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => handleEditChannelClick(ch)}
+                        className="h-6 px-2 text-[10px] text-muted-foreground hover:text-foreground"
+                      >
+                        <Edit2 className="size-2.5 mr-1" />
+                        编辑
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        disabled={deleteChannelMutation.isPending}
+                        onClick={() => {
+                          if (confirm(`确定要删除通道 "${ch.name}" 吗？`)) {
+                            deleteChannelMutation.mutate(ch.id)
+                          }
+                        }}
+                        className="h-6 px-2 text-[10px] text-destructive hover:text-destructive hover:bg-destructive/10"
+                      >
+                        <Trash2 className="size-2.5 mr-1" />
+                        删除
+                      </Button>
+                    </div>
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </div>
+      )}
 
       {/* ==================== 对话框：新增/编辑消息通道 ==================== */}
       <Dialog open={channelDialogOpen} onOpenChange={setChannelDialogOpen}>

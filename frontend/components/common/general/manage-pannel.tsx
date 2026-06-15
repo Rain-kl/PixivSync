@@ -22,6 +22,7 @@ import {ScrollArea, ScrollBar} from "@/components/ui/scroll-area"
 
 interface ManagePageProps<T> {
   title: string
+  icon?: LucideIcon
   data: T[]
   loading: boolean
   error: Error | null
@@ -61,6 +62,7 @@ interface ManagePageProps<T> {
 
 export function ManagePage<T>({
   title,
+  icon: Icon,
   data,
   loading,
   error,
@@ -201,8 +203,13 @@ export function ManagePage<T>({
 
   return (
     <div className="py-6">
-      <div className="flex border-b border-border pb-2 mb-6 items-center justify-between">
-        <div className="text-2xl font-semibold">{title}</div>
+      <div className="flex pb-2 mb-6 items-center justify-between">
+        <div className="flex items-center gap-2">
+          {Icon && <Icon className="size-5 text-primary" />}
+          <div>
+            <h1 className="text-2xl font-semibold tracking-tight">{title}</h1>
+          </div>
+        </div>
         {headerExtra}
       </div>
 

@@ -1,7 +1,7 @@
 "use client"
 
 import * as React from "react"
-import {motion} from "motion/react"
+import {AnimatePresence, motion} from "motion/react"
 import {useUser} from "@/contexts/user-context"
 import {Card, CardHeader, CardTitle} from "@/components/ui/card"
 import {Button} from "@/components/ui/button"
@@ -10,6 +10,7 @@ import Link from "next/link"
 
 export function HomeMain() {
   const { user } = useUser()
+  const [isBannerVisible, setIsBannerVisible] = React.useState(true)
 
   const quickLinks = [
     {
@@ -93,10 +94,49 @@ export function HomeMain() {
 
   return (
     <div className="py-6 space-y-8 max-w-6xl mx-auto">
+      {/* 积分收益提示 banner */}
+      <AnimatePresence>
+        {isBannerVisible && (
+          <motion.div
+            initial={{ opacity: 0, height: 0 }}
+            animate={{ opacity: 1, height: "auto" }}
+            exit={{ opacity: 0, height: 0 }}
+            transition={{ duration: 0.3 }}
+            className="overflow-hidden"
+          >
+            <div className="bg-gradient-to-r from-indigo-500/10 via-purple-500/10 to-pink-500/10 border border-dashed border-indigo-500/20 rounded-xl p-6 relative">
+              <div className="max-w-xl space-y-3">
+                <h3 className="text-lg font-bold text-indigo-600 dark:text-indigo-400">Modern Platform</h3>
+                <p className="text-xs text-muted-foreground leading-relaxed">
+                  通用的、现代化的后台管理系统脚手架, 开箱即用、完整基建、极易扩展，助您快速构建企业级应用。
+                </p>
+                <div className="flex gap-2.5">
+                  <Button
+                    size="sm"
+                    className="bg-indigo-600 hover:bg-indigo-700 text-xs font-semibold px-4 shadow-sm h-7"
+                    asChild
+                  >
+                    <Link href="/home">开始使用</Link>
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    className="text-xs font-medium hover:bg-black/5 dark:hover:bg-white/5 h-7"
+                    onClick={() => setIsBannerVisible(false)}
+                  >
+                    隐藏提示
+                  </Button>
+                </div>
+              </div>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
       {/* 快捷导航 */}
       <div className="space-y-4">
         <h2 className="text-lg font-semibold tracking-tight">常用功能导航</h2>
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {quickLinks.map((link, idx) => (
             <motion.div
               key={link.title}

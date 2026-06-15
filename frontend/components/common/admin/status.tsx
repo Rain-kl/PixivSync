@@ -157,12 +157,14 @@ export function SystemStatusManager() {
   }
 
   return (
-    <div className="space-y-6 p-1">
+    <div className="py-6 px-1 space-y-6">
       {/* 顶部控制栏 */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between border-b border-border/30 pb-4 gap-4">
-        <div>
-          <h2 className="text-xl font-bold tracking-tight">系统状态</h2>
-          <p className="text-xs text-muted-foreground">监控后端服务的核心运行时状态与内存指标</p>
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between pb-4 gap-4">
+        <div className="flex items-center gap-2">
+          <Activity className="size-5 text-primary" />
+          <div>
+            <h1 className="text-2xl font-semibold tracking-tight">系统状态</h1>
+          </div>
         </div>
 
         <div className="flex items-center flex-wrap gap-4 bg-muted/30 p-1.5 rounded-lg border border-border/40 backdrop-blur-sm">
