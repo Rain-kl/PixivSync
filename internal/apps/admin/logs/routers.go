@@ -5,8 +5,7 @@
 // Package logs 提供日志查询与分析功能
 package logs
 
-import (
-	"context"
+import ("context"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -18,11 +17,11 @@ import (
 	"github.com/Rain-kl/Wavelet/internal/apps/admin"
 	"github.com/Rain-kl/Wavelet/internal/config"
 	"github.com/Rain-kl/Wavelet/internal/db"
-	"github.com/Rain-kl/Wavelet/internal/logger"
 	"github.com/Rain-kl/Wavelet/internal/model"
-	"github.com/Rain-kl/Wavelet/internal/util"
+	"github.com/Rain-kl/Wavelet/pkg/logger"
 	"github.com/gin-gonic/gin"
-)
+
+	"github.com/Rain-kl/Wavelet/internal/common/response")
 
 const (
 	defaultLimit   = 200
@@ -48,9 +47,9 @@ type logsResponse struct {
 // @Security SessionCookie
 // @Param cursor query int false "日志游标，0=获取最新" default(0)
 // @Param limit query int false "每页条数" default(200)
-// @Success 200 {object} util.ResponseAny{data=logs.logsResponse} "日志列表"
-// @Failure 401 {object} util.ResponseAny "未登录"
-// @Failure 403 {object} util.ResponseAny "无管理员权限"
+// @Success 200 {object} response.Any{data=logs.logsResponse} "日志列表"
+// @Failure 401 {object} response.Any "未登录"
+// @Failure 403 {object} response.Any "无管理员权限"
 // @Router /api/v1/admin/logs [get]
 func GetLogs(c *gin.Context) {
 	cursorStr := c.DefaultQuery("cursor", "0")
@@ -58,7 +57,7 @@ func GetLogs(c *gin.Context) {
 
 	var cursor, limit int
 	if _, err := parsePositiveInt(cursorStr, &cursor); err != nil {
-		c.JSON(http.StatusBadRequest, util.Err(admin.InvalidCursorParam))
+		c.JSON(http.StatusBadRequest, response.Err(admin.InvalidCursorParam))
 		return
 	}
 	if _, err := parsePositiveInt(limitStr, &limit); err != nil || limit <= 0 {
@@ -78,7 +77,7 @@ func GetLogs(c *gin.Context) {
 		resp.NextCursor = entries[0].Index
 	}
 
-	c.JSON(http.StatusOK, util.OK(resp))
+	c.JSON(http.StatusOK, response.OK(resp))
 }
 
 // wsMessage WebSocket 消息格式
@@ -281,15 +280,15 @@ func fetchAccessLogDetails(ctx context.Context, whereClause string, args []inter
 // @Param path query string false "接口路径模糊搜索"
 // @Param start_time query string false "起始时间（RFC3339 或 YYYY-MM-DD HH:MM:SS）"
 // @Param end_time query string false "结束时间（RFC3339 或 YYYY-MM-DD HH:MM:SS）"
-// @Success 200 {object} util.ResponseAny{data=logs.accessLogsResponse} "访问日志列表"
-// @Failure 400 {object} util.ResponseAny "ClickHouse 未启用或参数错误"
-// @Failure 401 {object} util.ResponseAny "未登录"
-// @Failure 403 {object} util.ResponseAny "无管理员权限"
+// @Success 200 {object} response.Any{data=logs.accessLogsResponse} "访问日志列表"
+// @Failure 400 {object} response.Any "ClickHouse 未启用或参数错误"
+// @Failure 401 {object} response.Any "未登录"
+// @Failure 403 {object} response.Any "无管理员权限"
 // @Router /api/v1/admin/logs/access [get]
 func GetAccessLogs(c *gin.Context) {
 	// 1. 检查 ClickHouse 是否启用
 	if !config.Config.ClickHouse.Enabled || db.ChConn == nil {
-		c.JSON(http.StatusBadRequest, util.Err("ClickHouse 存储服务未启用，无法检索访问日志"))
+		c.JSON(http.StatusBadRequest, response.Err("ClickHouse 存储服务未启用，无法检索访问日志"))
 		return
 	}
 
@@ -310,11 +309,11 @@ func GetAccessLogs(c *gin.Context) {
 	// 3. 构建过滤条件
 	conditions, args, userIDs, err := buildAccessLogFilters(c.Request.Context(), c)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, util.Err(err.Error()))
+		c.JSON(http.StatusInternalServerError, response.Err(err.Error()))
 		return
 	}
 	if userIDs != nil && len(userIDs) == 0 {
-		c.JSON(http.StatusOK, util.OK(accessLogsResponse{Total: 0, List: []accessLogItem{}}))
+		c.JSON(http.StatusOK, response.OK(accessLogsResponse{Total: 0, List: []accessLogItem{}}))
 		return
 	}
 
@@ -327,22 +326,22 @@ func GetAccessLogs(c *gin.Context) {
 	var total uint64
 	countQuery := fmt.Sprintf("SELECT count() FROM w_user_access_logs %s", whereClause)
 	if err := db.ChConn.QueryRow(c.Request.Context(), countQuery, args...).Scan(&total); err != nil {
-		c.JSON(http.StatusInternalServerError, util.Err("查询 ClickHouse 日志统计失败: "+err.Error()))
+		c.JSON(http.StatusInternalServerError, response.Err("查询 ClickHouse 日志统计失败: "+err.Error()))
 		return
 	}
 	if total == 0 {
-		c.JSON(http.StatusOK, util.OK(accessLogsResponse{Total: 0, List: []accessLogItem{}}))
+		c.JSON(http.StatusOK, response.OK(accessLogsResponse{Total: 0, List: []accessLogItem{}}))
 		return
 	}
 
 	// 5. 分页查询明细数据
 	list, err := fetchAccessLogDetails(c.Request.Context(), whereClause, args, pageSize, offset)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, util.Err(err.Error()))
+		c.JSON(http.StatusInternalServerError, response.Err(err.Error()))
 		return
 	}
 
-	c.JSON(http.StatusOK, util.OK(accessLogsResponse{
+	c.JSON(http.StatusOK, response.OK(accessLogsResponse{
 		Total: total,
 		List:  list,
 	}))
@@ -381,15 +380,15 @@ type logsAnalyticsResponse struct {
 // @Tags admin
 // @Produce json
 // @Security SessionCookie
-// @Success 200 {object} util.ResponseAny{data=logs.logsAnalyticsResponse} "分析统计数据"
-// @Failure 400 {object} util.ResponseAny "ClickHouse 未启用"
-// @Failure 401 {object} util.ResponseAny "未登录"
-// @Failure 403 {object} util.ResponseAny "无管理员权限"
+// @Success 200 {object} response.Any{data=logs.logsAnalyticsResponse} "分析统计数据"
+// @Failure 400 {object} response.Any "ClickHouse 未启用"
+// @Failure 401 {object} response.Any "未登录"
+// @Failure 403 {object} response.Any "无管理员权限"
 // @Router /api/v1/admin/logs/analytics [get]
 func GetLogsAnalytics(c *gin.Context) {
 	// 1. 检查 ClickHouse 是否启用
 	if !config.Config.ClickHouse.Enabled || db.ChConn == nil {
-		c.JSON(http.StatusBadRequest, util.Err("ClickHouse 存储服务未启用，无法获取分析数据"))
+		c.JSON(http.StatusBadRequest, response.Err("ClickHouse 存储服务未启用，无法获取分析数据"))
 		return
 	}
 
@@ -401,7 +400,7 @@ func GetLogsAnalytics(c *gin.Context) {
 	browserList := queryBrowserDistribution(ctx, startTime)
 	topUsers := queryTopActiveUsers(ctx, startTime)
 
-	c.JSON(http.StatusOK, util.OK(logsAnalyticsResponse{
+	c.JSON(http.StatusOK, response.OK(logsAnalyticsResponse{
 		Trend:    trendList,
 		Browsers: browserList,
 		TopUsers: topUsers,

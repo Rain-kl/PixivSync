@@ -33,8 +33,6 @@ import (
 	"github.com/Rain-kl/Wavelet/internal/apps/upload"
 	"github.com/Rain-kl/Wavelet/internal/apps/user"
 	"github.com/Rain-kl/Wavelet/internal/model"
-	"github.com/Rain-kl/Wavelet/internal/util"
-	capUtil "github.com/Rain-kl/Wavelet/internal/util/cap"
 
 	// Swagger 文档生成
 	_ "github.com/Rain-kl/Wavelet/docs"
@@ -42,7 +40,7 @@ import (
 	"github.com/Rain-kl/Wavelet/internal/apps/admin/system_config"
 	"github.com/Rain-kl/Wavelet/internal/apps/oauth"
 	"github.com/Rain-kl/Wavelet/internal/config"
-	"github.com/Rain-kl/Wavelet/internal/otel_trace"
+	otel_trace "github.com/Rain-kl/Wavelet/pkg/trace"
 	"github.com/gin-contrib/sessions"
 	"github.com/gin-contrib/sessions/redis"
 	"github.com/gin-gonic/gin"
@@ -98,7 +96,7 @@ func Serve() {
 		}
 	}
 
-	sessionStore.Options(util.GetSessionOptions(config.Config.App.SessionAge))
+	sessionStore.Options(oauth.GetSessionOptions(config.Config.App.SessionAge))
 
 	r.Use(sessions.Sessions(config.Config.App.SessionCookieName, sessionStore))
 
@@ -209,21 +207,21 @@ func registerOAuthRoutes(apiV1Router *gin.RouterGroup) {
 func registerUserRoutes(apiV1Router *gin.RouterGroup) {
 	userRouter := apiV1Router.Group("/user")
 	{
-		userRouter.POST("/login", capApp.VerifyMiddleware(capUtil.GetDefaultManager(), "login", func() bool {
+		userRouter.POST("/login", capApp.VerifyMiddleware(capApp.GetDefaultManager(), "login", func() bool {
 			enabled, err := model.GetBoolByKey(context.Background(), model.ConfigKeyCapLoginEnabled)
 			if err != nil {
 				return false
 			}
 			return enabled
 		}), user.Login)
-		userRouter.POST("/register", capApp.VerifyMiddleware(capUtil.GetDefaultManager(), "register", func() bool {
+		userRouter.POST("/register", capApp.VerifyMiddleware(capApp.GetDefaultManager(), "register", func() bool {
 			enabled, err := model.GetBoolByKey(context.Background(), model.ConfigKeyCapLoginEnabled)
 			if err != nil {
 				return false
 			}
 			return enabled
 		}), user.Register)
-		userRouter.POST("/send-email-code", capApp.VerifyMiddleware(capUtil.GetDefaultManager(), "send_email_code", func() bool {
+		userRouter.POST("/send-email-code", capApp.VerifyMiddleware(capApp.GetDefaultManager(), "send_email_code", func() bool {
 			enabled, err := model.GetBoolByKey(context.Background(), model.ConfigKeyCapLoginEnabled)
 			if err != nil {
 				return false

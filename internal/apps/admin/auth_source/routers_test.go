@@ -4,8 +4,7 @@
 
 package auth_source
 
-import (
-	"bytes"
+import ("bytes"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
@@ -16,7 +15,8 @@ import (
 	"github.com/Rain-kl/Wavelet/internal/testhelper"
 	"github.com/Rain-kl/Wavelet/internal/util"
 	"github.com/gin-gonic/gin"
-)
+
+	"github.com/Rain-kl/Wavelet/internal/common/response")
 
 func setupTestRouter(authUser *model.User) *gin.Engine {
 	gin.SetMode(gin.TestMode)
@@ -67,7 +67,7 @@ func TestListAuthSources(t *testing.T) {
 		t.Errorf("expected 200 OK, got %d", w.Code)
 	}
 
-	var resp util.ResponseAny
+	var resp response.Any
 	_ = json.Unmarshal(w.Body.Bytes(), &resp)
 
 	dataBytes, _ := json.Marshal(resp.Data)

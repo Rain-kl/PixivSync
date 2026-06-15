@@ -4,17 +4,16 @@
 
 package config
 
-import (
-	"encoding/json"
+import ("encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"testing"
 
 	"github.com/Rain-kl/Wavelet/internal/model"
 	"github.com/Rain-kl/Wavelet/internal/testhelper"
-	"github.com/Rain-kl/Wavelet/internal/util"
 	"github.com/gin-gonic/gin"
-)
+
+	"github.com/Rain-kl/Wavelet/internal/common/response")
 
 func TestGetPublicConfigUsesVisibility(t *testing.T) {
 	dbConn, _, cleanup := testhelper.SetupTestEnvironment(t)
@@ -47,7 +46,7 @@ func TestGetPublicConfigUsesVisibility(t *testing.T) {
 		t.Fatalf("GetPublicConfig() status = %d, want %d; body = %s", w.Code, http.StatusOK, w.Body.String())
 	}
 
-	var resp util.ResponseAny
+	var resp response.Any
 	if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
 		t.Fatalf("json.Unmarshal(GetPublicConfig()) error = %v", err)
 	}

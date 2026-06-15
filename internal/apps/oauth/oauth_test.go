@@ -340,7 +340,7 @@ func setupTestRouter(dbConn *gorm.DB, mockRedis *mockRedisClient, mockClient *ht
 	r.Use(mockContextMiddleware(mockClient))
 
 	store := cookie.NewStore([]byte(config.Config.App.SessionSecret))
-	store.Options(util.GetSessionOptions(3600))
+	store.Options(GetSessionOptions(3600))
 	r.Use(sessions.Sessions(config.Config.App.SessionCookieName, store))
 
 	db.SetDB(dbConn)

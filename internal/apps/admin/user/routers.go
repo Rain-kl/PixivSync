@@ -4,8 +4,7 @@
 
 package user
 
-import (
-	"net/http"
+import ("net/http"
 	"strconv"
 	"strings"
 	"time"
@@ -17,7 +16,8 @@ import (
 	"github.com/Rain-kl/Wavelet/internal/util"
 	"github.com/gin-gonic/gin"
 	"gorm.io/gorm"
-)
+
+	"github.com/Rain-kl/Wavelet/internal/common/response")
 
 // minPasswordLength 密码最小长度
 const minPasswordLength = 8
@@ -57,7 +57,7 @@ type listUsersResponse struct {
 func parseUserID(c *gin.Context) (uint64, bool) {
 	id, err := strconv.ParseUint(c.Param("id"), 10, 64)
 	if err != nil || id == 0 {
-		c.JSON(http.StatusBadRequest, util.Err(userNotFound))
+		c.JSON(http.StatusBadRequest, response.Err(userNotFound))
 		return 0, false
 	}
 	return id, true
@@ -90,17 +90,17 @@ func toUser(u model.User) user {
 // @Produce json
 // @Security SessionCookie
 // @Param request query listUsersRequest true "查询参数"
-// @Success 200 {object} util.ResponseAny{data=user.listUsersResponse} "用户列表"
-// @Failure 400 {object} util.ResponseAny "参数错误"
-// @Failure 401 {object} util.ResponseAny "未登录"
-// @Failure 403 {object} util.ResponseAny "无管理员权限"
-// @Failure 500 {object} util.ResponseAny "内部错误"
+// @Success 200 {object} response.Any{data=user.listUsersResponse} "用户列表"
+// @Failure 400 {object} response.Any "参数错误"
+// @Failure 401 {object} response.Any "未登录"
+// @Failure 403 {object} response.Any "无管理员权限"
+// @Failure 500 {object} response.Any "内部错误"
 // @Router /api/v1/admin/users [get]
 // ListUsers 获取用户列表
 func ListUsers(c *gin.Context) {
 	var req listUsersRequest
 	if err := c.ShouldBindQuery(&req); err != nil {
-		c.JSON(http.StatusBadRequest, util.Err(err.Error()))
+		c.JSON(http.StatusBadRequest, response.Err(err.Error()))
 		return
 	}
 
@@ -120,7 +120,7 @@ func ListUsers(c *gin.Context) {
 	}
 
 	if err := query.Count(&total).Error; err != nil {
-		c.JSON(http.StatusInternalServerError, util.Err(err.Error()))
+		c.JSON(http.StatusInternalServerError, response.Err(err.Error()))
 		return
 	}
 
@@ -132,11 +132,11 @@ func ListUsers(c *gin.Context) {
 		Offset(offset).
 		Limit(req.PageSize).
 		Find(&users).Error; err != nil {
-		c.JSON(http.StatusInternalServerError, util.Err(err.Error()))
+		c.JSON(http.StatusInternalServerError, response.Err(err.Error()))
 		return
 	}
 
-	c.JSON(http.StatusOK, util.OK(listUsersResponse{
+	c.JSON(http.StatusOK, response.OK(listUsersResponse{
 		Users: users,
 		Total: total,
 	}))
@@ -149,12 +149,12 @@ func ListUsers(c *gin.Context) {
 // @Produce json
 // @Security SessionCookie
 // @Param id path int true "用户 ID"
-// @Success 200 {object} util.ResponseAny{data=user.user} "用户详情"
-// @Failure 400 {object} util.ResponseAny "参数错误"
-// @Failure 401 {object} util.ResponseAny "未登录"
-// @Failure 403 {object} util.ResponseAny "无管理员权限"
-// @Failure 404 {object} util.ResponseAny "用户不存在"
-// @Failure 500 {object} util.ResponseAny "内部错误"
+// @Success 200 {object} response.Any{data=user.user} "用户详情"
+// @Failure 400 {object} response.Any "参数错误"
+// @Failure 401 {object} response.Any "未登录"
+// @Failure 403 {object} response.Any "无管理员权限"
+// @Failure 404 {object} response.Any "用户不存在"
+// @Failure 500 {object} response.Any "内部错误"
 // @Router /api/v1/admin/users/{id} [get]
 func GetUser(c *gin.Context) {
 	id, ok := parseUserID(c)
@@ -169,14 +169,14 @@ func GetUser(c *gin.Context) {
 		Where("id = ?", id).
 		First(&targetUser).Error; err != nil {
 		if err == gorm.ErrRecordNotFound {
-			c.JSON(http.StatusNotFound, util.Err(userNotFound))
+			c.JSON(http.StatusNotFound, response.Err(userNotFound))
 			return
 		}
-		c.JSON(http.StatusInternalServerError, util.Err(err.Error()))
+		c.JSON(http.StatusInternalServerError, response.Err(err.Error()))
 		return
 	}
 
-	c.JSON(http.StatusOK, util.OK(toUser(targetUser)))
+	c.JSON(http.StatusOK, response.OK(toUser(targetUser)))
 }
 
 // updateUserStatusRequest 更新用户状态请求
@@ -193,17 +193,17 @@ type updateUserStatusRequest struct {
 // @Security SessionCookie
 // @Param id path int true "用户 ID"
 // @Param request body updateUserStatusRequest true "状态参数"
-// @Success 200 {object} util.ResponseAny{data=string} "更新成功"
-// @Failure 400 {object} util.ResponseAny "参数错误"
-// @Failure 401 {object} util.ResponseAny "未登录"
-// @Failure 403 {object} util.ResponseAny "无管理员权限或尝试禁用管理员"
-// @Failure 404 {object} util.ResponseAny "用户不存在"
-// @Failure 500 {object} util.ResponseAny "内部错误"
+// @Success 200 {object} response.Any{data=string} "更新成功"
+// @Failure 400 {object} response.Any "参数错误"
+// @Failure 401 {object} response.Any "未登录"
+// @Failure 403 {object} response.Any "无管理员权限或尝试禁用管理员"
+// @Failure 404 {object} response.Any "用户不存在"
+// @Failure 500 {object} response.Any "内部错误"
 // @Router /api/v1/admin/users/{id}/status [put]
 func UpdateUserStatus(c *gin.Context) {
 	var req updateUserStatusRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, util.Err(err.Error()))
+		c.JSON(http.StatusBadRequest, response.Err(err.Error()))
 		return
 	}
 
@@ -222,15 +222,15 @@ func UpdateUserStatus(c *gin.Context) {
 		Where("id = ?", id).
 		First(&targetUser).Error; err != nil {
 		if err == gorm.ErrRecordNotFound {
-			c.JSON(http.StatusNotFound, util.Err(userNotFound))
+			c.JSON(http.StatusNotFound, response.Err(userNotFound))
 			return
 		}
-		c.JSON(http.StatusInternalServerError, util.Err(err.Error()))
+		c.JSON(http.StatusInternalServerError, response.Err(err.Error()))
 		return
 	}
 
 	if !req.IsActive && targetUser.IsAdmin {
-		c.JSON(http.StatusForbidden, util.Err(cannotDisable))
+		c.JSON(http.StatusForbidden, response.Err(cannotDisable))
 		return
 	}
 
@@ -238,11 +238,11 @@ func UpdateUserStatus(c *gin.Context) {
 		Model(&model.User{}).
 		Where("id = ?", id).
 		Update("is_active", req.IsActive).Error; err != nil {
-		c.JSON(http.StatusInternalServerError, util.Err(updateUserFailed))
+		c.JSON(http.StatusInternalServerError, response.Err(updateUserFailed))
 		return
 	}
 
-	c.JSON(http.StatusOK, util.OKNil())
+	c.JSON(http.StatusOK, response.OKNil())
 }
 
 // DeleteUser 删除用户
@@ -252,12 +252,12 @@ func UpdateUserStatus(c *gin.Context) {
 // @Produce json
 // @Security SessionCookie
 // @Param id path int true "用户 ID"
-// @Success 200 {object} util.ResponseAny{data=string} "删除成功"
-// @Failure 400 {object} util.ResponseAny "参数错误"
-// @Failure 401 {object} util.ResponseAny "未登录"
-// @Failure 403 {object} util.ResponseAny "无管理员权限、尝试删除管理员或当前用户"
-// @Failure 404 {object} util.ResponseAny "用户不存在"
-// @Failure 500 {object} util.ResponseAny "内部错误"
+// @Success 200 {object} response.Any{data=string} "删除成功"
+// @Failure 400 {object} response.Any "参数错误"
+// @Failure 401 {object} response.Any "未登录"
+// @Failure 403 {object} response.Any "无管理员权限、尝试删除管理员或当前用户"
+// @Failure 404 {object} response.Any "用户不存在"
+// @Failure 500 {object} response.Any "内部错误"
 // @Router /api/v1/admin/users/{id} [delete]
 func DeleteUser(c *gin.Context) {
 	id, ok := parseUserID(c)
@@ -267,7 +267,7 @@ func DeleteUser(c *gin.Context) {
 
 	currUser, _ := util.GetFromContext[*model.User](c, oauth.UserObjKey)
 	if currUser != nil && currUser.ID == id {
-		c.JSON(http.StatusForbidden, util.Err(cannotDeleteSelf))
+		c.JSON(http.StatusForbidden, response.Err(cannotDeleteSelf))
 		return
 	}
 
@@ -281,15 +281,15 @@ func DeleteUser(c *gin.Context) {
 		Where("id = ?", id).
 		First(&targetUser).Error; err != nil {
 		if err == gorm.ErrRecordNotFound {
-			c.JSON(http.StatusNotFound, util.Err(userNotFound))
+			c.JSON(http.StatusNotFound, response.Err(userNotFound))
 			return
 		}
-		c.JSON(http.StatusInternalServerError, util.Err(err.Error()))
+		c.JSON(http.StatusInternalServerError, response.Err(err.Error()))
 		return
 	}
 
 	if targetUser.IsAdmin {
-		c.JSON(http.StatusForbidden, util.Err(cannotDelete))
+		c.JSON(http.StatusForbidden, response.Err(cannotDelete))
 		return
 	}
 
@@ -302,11 +302,11 @@ func DeleteUser(c *gin.Context) {
 		}
 		return tx.Where("id = ?", id).Delete(&model.User{}).Error
 	}); err != nil {
-		c.JSON(http.StatusInternalServerError, util.Err(deleteUserFailed))
+		c.JSON(http.StatusInternalServerError, response.Err(deleteUserFailed))
 		return
 	}
 
-	c.JSON(http.StatusOK, util.OKNil())
+	c.JSON(http.StatusOK, response.OKNil())
 }
 
 // createUserRequest 创建用户请求
@@ -327,16 +327,16 @@ type createUserRequest struct {
 // @Produce json
 // @Security SessionCookie
 // @Param request body user.createUserRequest true "创建用户参数"
-// @Success 200 {object} util.ResponseAny{data=user.user} "创建成功"
-// @Failure 400 {object} util.ResponseAny "参数错误或用户名已存在"
-// @Failure 401 {object} util.ResponseAny "未登录"
-// @Failure 403 {object} util.ResponseAny "无管理员权限"
-// @Failure 500 {object} util.ResponseAny "内部错误"
+// @Success 200 {object} response.Any{data=user.user} "创建成功"
+// @Failure 400 {object} response.Any "参数错误或用户名已存在"
+// @Failure 401 {object} response.Any "未登录"
+// @Failure 403 {object} response.Any "无管理员权限"
+// @Failure 500 {object} response.Any "内部错误"
 // @Router /api/v1/admin/users [post]
 func CreateUser(c *gin.Context) {
 	var req createUserRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, util.Err(err.Error()))
+		c.JSON(http.StatusBadRequest, response.Err(err.Error()))
 		return
 	}
 
@@ -346,36 +346,36 @@ func CreateUser(c *gin.Context) {
 	req.Email = strings.TrimSpace(req.Email)
 
 	if req.Username == "" {
-		c.JSON(http.StatusBadRequest, util.Err(usernameRequired))
+		c.JSON(http.StatusBadRequest, response.Err(usernameRequired))
 		return
 	}
 	if req.Email == "" {
-		c.JSON(http.StatusBadRequest, util.Err(emailRequired))
+		c.JSON(http.StatusBadRequest, response.Err(emailRequired))
 		return
 	}
 	if len(req.Password) < minPasswordLength {
-		c.JSON(http.StatusBadRequest, util.Err(passwordTooShort))
+		c.JSON(http.StatusBadRequest, response.Err(passwordTooShort))
 		return
 	}
 
 	ctx := c.Request.Context()
 	var count int64
 	if err := db.DB(ctx).Model(&model.User{}).Where("username = ?", req.Username).Count(&count).Error; err != nil {
-		c.JSON(http.StatusInternalServerError, util.Err(err.Error()))
+		c.JSON(http.StatusInternalServerError, response.Err(err.Error()))
 		return
 	}
 	if count > 0 {
-		c.JSON(http.StatusBadRequest, util.Err(usernameExists))
+		c.JSON(http.StatusBadRequest, response.Err(usernameExists))
 		return
 	}
 
 	var emailCount int64
 	if err := db.DB(ctx).Model(&model.User{}).Where("email = ?", req.Email).Count(&emailCount).Error; err != nil {
-		c.JSON(http.StatusInternalServerError, util.Err(err.Error()))
+		c.JSON(http.StatusInternalServerError, response.Err(err.Error()))
 		return
 	}
 	if emailCount > 0 {
-		c.JSON(http.StatusBadRequest, util.Err(emailExists))
+		c.JSON(http.StatusBadRequest, response.Err(emailExists))
 		return
 	}
 
@@ -393,14 +393,14 @@ func CreateUser(c *gin.Context) {
 	}
 
 	if err := newUser.SetEncryptedPassword(req.Password); err != nil {
-		c.JSON(http.StatusInternalServerError, util.Err(err.Error()))
+		c.JSON(http.StatusInternalServerError, response.Err(err.Error()))
 		return
 	}
 
 	if err := db.DB(ctx).Create(&newUser).Error; err != nil {
-		c.JSON(http.StatusInternalServerError, util.Err(err.Error()))
+		c.JSON(http.StatusInternalServerError, response.Err(err.Error()))
 		return
 	}
 
-	c.JSON(http.StatusOK, util.OK(toUser(newUser)))
+	c.JSON(http.StatusOK, response.OK(toUser(newUser)))
 }

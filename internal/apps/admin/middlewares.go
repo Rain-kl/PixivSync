@@ -7,10 +7,10 @@ package admin
 import (
 	"net/http"
 
-	"github.com/Rain-kl/Wavelet/internal/logger"
 	"github.com/Rain-kl/Wavelet/internal/model"
-	"github.com/Rain-kl/Wavelet/internal/otel_trace"
 	"github.com/Rain-kl/Wavelet/internal/util"
+	"github.com/Rain-kl/Wavelet/pkg/logger"
+	otel_trace "github.com/Rain-kl/Wavelet/pkg/trace"
 
 	"github.com/Rain-kl/Wavelet/internal/apps/oauth"
 	"github.com/gin-gonic/gin"

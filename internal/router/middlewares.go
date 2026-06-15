@@ -12,9 +12,9 @@ import (
 	"time"
 
 	"github.com/Rain-kl/Wavelet/internal/config"
-	"github.com/Rain-kl/Wavelet/internal/logger"
 	"github.com/Rain-kl/Wavelet/internal/model"
-	"github.com/Rain-kl/Wavelet/internal/otel_trace"
+	"github.com/Rain-kl/Wavelet/pkg/logger"
+	otel_trace "github.com/Rain-kl/Wavelet/pkg/trace"
 	"github.com/gin-gonic/gin"
 	"go.opentelemetry.io/otel/codes"
 	"go.opentelemetry.io/otel/trace"

@@ -18,8 +18,7 @@ description: "Wavelet 项目专用：当新增或修改自定义业务 API、新
 | 目录/包名 | 职责定位 | 框架依赖限制 | 常见包含内容 |
 | :--- | :--- | :--- | :--- |
 | **`internal/router/`** | 路由分发层 | 依赖 Gin 框架 | `router.go` 核心路由、`custom.go` (自定义路由注册入口) |
-| **`internal/apps/custom/`** | 应用入口层与本地逻辑层 | 依赖 Gin 框架 (路由/Handler 部分) | 接收 HTTP 请求、解析请求体（JSON/Query）、校验基础参数、提取 Session。对于**模块内闭环的简单业务逻辑**，直接在其下的 `logics.go` 或 `*_logic.go` 中实现。 |
-| **`internal/service/`** | 核心跨模块业务服务层 | **禁止**依赖 Gin/HTTP 框架 | 仅存放**复杂、跨模块/跨领域交互，或被多端复用**（如同时被 Handler、后台 Asynq 任务、Cobra CLI 命令行调用）的业务核心逻辑。只接受 standard `context.Context`。 |
+| **`internal/apps/custom/`** | 功能模块层 (Feature Module) | 依赖 Gin 框架 (仅限路由/Handler 部分) | 高度内聚的业务功能块。接收 HTTP 请求、解析请求体、校验基础参数、提取 Session。业务服务逻辑直接实现在当前目录下的 `service.go` 或 `logics.go` 中，不依赖 Gin/HTTP 框架。 |
 | **`internal/model/`** | 数据模型层 | 依赖 GORM / SQL 基础 | GORM 实体定义、表结构、主键生成、单表极简 SQL 查询方法。 |
 | **`internal/db/`** | 数据存储层 | 依赖 SQL 驱动 / GORM 连接 | PostgreSQL, SQLite 等数据库连接管理与 Goose 数据库迁移文件。 |
 
@@ -33,13 +32,11 @@ description: "Wavelet 项目专用：当新增或修改自定义业务 API、新
 internal/
 ├── router/
 │   └── custom.go               # [修改/创建] 仅用于注册定制路由，将路由委托给 apps/custom
-├── apps/
-│   └── custom/
-│       ├── routers.go          # [新建] HTTP Handlers (Gin)，负责参数绑定、校验与响应
-│       ├── logics.go           # [新建] 承载模块内闭环的简单业务逻辑（保持该逻辑仅局限在当前模块）
-│       └── errs.go             # [新建] 仅存放业务特有的错误常量定义（可选）
-└── service/
-    └── custom.go               # [新建/可选] 仅当出现跨模块交互、复杂多表事务或需要被 Task/CLI 复用时才创建
+└── apps/
+    └── custom/
+        ├── routers.go          # [新建] HTTP Handlers (Gin)，负责参数绑定、校验与响应
+        ├── logics.go           # [新建] 承载功能模块内闭环的业务逻辑（可以使用 logics.go 或 service.go）
+        └── errs.go             # [新建] 仅存放业务特有的错误常量定义（可选）
 ```
 
 ---
@@ -49,11 +46,11 @@ internal/
 ### 步骤 1：如果有数据库变更，编写数据库迁移
 如果需要新表或字段，请参考 [database-migration](../database-migration/SKILL.md) 技能，在 `internal/db/migrator/goose/` 目录下编写迁移文件。在 `internal/model/` 中定义 GORM 数据模型。
 
-### 步骤 2：判断业务逻辑的归属与放置
-在编写具体逻辑前，必须明确逻辑是属于**本地简单业务**还是**跨模块复杂业务**：
-- **方案 A（推荐，轻量化优先）**：直接在 `internal/apps/custom/logics.go` 下定义函数。该函数虽然在 `apps` 目录下，但同样应该**保持纯 Go 参数**（不直接操作 `*gin.Context`），仅供 Handler 层直接调用。
-- **方案 B（当满足“跨模块”、“复杂事务”、“多入口调用”时）**：在 `internal/service/` 下创建独立的业务 Service 方法，以实现逻辑复用和领域解耦。
-参考示例：[service_example.go](file:///Users/ryan/DEV/Go/Wavelet/.agent/skills/new-api/references/service_example.go)
+### 步骤 2：在模块内实现业务服务与逻辑 (Service / Logics)
+在编写具体逻辑前，建议选择以下结构实现业务逻辑（均置于 `internal/apps/custom/` 下）：
+- **方案 A（轻量化函数形式，推荐）**：在 `logics.go` 中定义独立的纯 Go 函数，这些函数不强依赖 `*gin.Context`。
+- **方案 B（面向对象/结构体形式）**：在 `service.go` 中定义 Service 结构体和构造函数，如 `type CustomService struct`，并将逻辑作为其方法。这适用于需要注入依赖（如 DB 连接、外部 client 等）或有状态管理的对象。
+参考示例：[logics_example.go](file:///Users/ryan/DEV/Go/Wavelet/.agent/skills/new-api/references/logics_example.go) 和 [service_example.go](file:///Users/ryan/DEV/Go/Wavelet/.agent/skills/new-api/references/service_example.go)
 
 ### 步骤 3：在 `internal/apps/custom/` 下编写 HTTP Handler
 创建应用路由文件 `routers.go`，定义接口的请求和响应 DTO，编写 Handler 绑定参数并调用 Service，编写 Swagger 注释。

@@ -5,8 +5,7 @@
 // Package status 提供系统状态查询接口
 package status
 
-import (
-	"context"
+import ("context"
 	"fmt"
 	"log"
 	"math"
@@ -18,9 +17,9 @@ import (
 
 	"github.com/Rain-kl/Wavelet/internal/config"
 	"github.com/Rain-kl/Wavelet/internal/db"
-	"github.com/Rain-kl/Wavelet/internal/util"
 	"github.com/gin-gonic/gin"
-)
+
+	"github.com/Rain-kl/Wavelet/internal/common/response")
 
 // startTime 记录服务启动时间
 var startTime = time.Now()
@@ -135,9 +134,9 @@ func formatDuration(d time.Duration) string {
 // @Tags admin
 // @Produce json
 // @Security SessionCookie
-// @Success 200 {object} util.ResponseAny{data=status.SystemStatusResponse} "获取成功"
-// @Failure 401 {object} util.ResponseAny "未登录"
-// @Failure 403 {object} util.ResponseAny "无管理员权限"
+// @Success 200 {object} response.Any{data=status.SystemStatusResponse} "获取成功"
+// @Failure 401 {object} response.Any "未登录"
+// @Failure 403 {object} response.Any "无管理员权限"
 // @Router /api/v1/admin/status [get]
 func GetSystemStatus(c *gin.Context) {
 	var m runtime.MemStats
@@ -194,7 +193,7 @@ func GetSystemStatus(c *gin.Context) {
 		NumGC:        m.NumGC,
 	}
 
-	c.JSON(http.StatusOK, util.OK(res))
+	c.JSON(http.StatusOK, response.OK(res))
 }
 
 // DatabaseInfoResponse 数据库信息响应结构体
@@ -249,9 +248,9 @@ func getPostgresInfo(ctx context.Context) DatabaseInfoResponse {
 // @Tags admin
 // @Produce json
 // @Security SessionCookie
-// @Success 200 {object} util.ResponseAny{data=status.DatabaseInfoResponse} "获取成功"
-// @Failure 401 {object} util.ResponseAny "未登录"
-// @Failure 403 {object} util.ResponseAny "无管理员权限"
+// @Success 200 {object} response.Any{data=status.DatabaseInfoResponse} "获取成功"
+// @Failure 401 {object} response.Any "未登录"
+// @Failure 403 {object} response.Any "无管理员权限"
 // @Router /api/v1/admin/db-info [get]
 func GetDatabaseInfo(c *gin.Context) {
 	var info DatabaseInfoResponse
@@ -260,7 +259,7 @@ func GetDatabaseInfo(c *gin.Context) {
 	} else {
 		info = getPostgresInfo(c.Request.Context())
 	}
-	c.JSON(http.StatusOK, util.OK(info))
+	c.JSON(http.StatusOK, response.OK(info))
 }
 
 // ExportDatabase 导出数据库
@@ -270,9 +269,9 @@ func GetDatabaseInfo(c *gin.Context) {
 // @Produce application/octet-stream
 // @Security SessionCookie
 // @Success 200 {file} binary "数据库文件"
-// @Failure 401 {object} util.ResponseAny "未登录"
-// @Failure 403 {object} util.ResponseAny "无管理员权限"
-// @Failure 500 {object} util.ResponseAny "导出失败"
+// @Failure 401 {object} response.Any "未登录"
+// @Failure 403 {object} response.Any "无管理员权限"
+// @Failure 500 {object} response.Any "导出失败"
 // @Router /api/v1/admin/db-export [get]
 func ExportDatabase(c *gin.Context) {
 	if !config.Config.Database.Enabled {
@@ -291,7 +290,7 @@ func exportSQLite(c *gin.Context) {
 
 	f, err := os.Open(path) //nolint:gosec // path is loaded from server startup configuration, not user input
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, util.Err("无法打开数据库文件: "+err.Error()))
+		c.JSON(http.StatusInternalServerError, response.Err("无法打开数据库文件: "+err.Error()))
 		return
 	}
 	defer func() {
@@ -302,7 +301,7 @@ func exportSQLite(c *gin.Context) {
 
 	fi, err := f.Stat()
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, util.Err("无法读取数据库文件信息: "+err.Error()))
+		c.JSON(http.StatusInternalServerError, response.Err("无法读取数据库文件信息: "+err.Error()))
 		return
 	}
 
@@ -320,7 +319,7 @@ func exportPostgres(c *gin.Context) {
 	// 检查 pg_dump 是否可用
 	pgDumpPath, err := exec.LookPath("pg_dump")
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, util.Err("pg_dump 不可用，请确保服务器已安装 PostgreSQL 客户端工具"))
+		c.JSON(http.StatusInternalServerError, response.Err("pg_dump 不可用，请确保服务器已安装 PostgreSQL 客户端工具"))
 		return
 	}
 

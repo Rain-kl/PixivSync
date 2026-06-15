@@ -3,8 +3,7 @@
 
 package oauth
 
-import (
-	"context"
+import ("context"
 	"crypto/sha256"
 	"encoding/hex"
 	"errors"
@@ -18,15 +17,15 @@ import (
 	"github.com/Rain-kl/Wavelet/internal/common"
 	"github.com/Rain-kl/Wavelet/internal/config"
 	"github.com/Rain-kl/Wavelet/internal/db"
-	"github.com/Rain-kl/Wavelet/internal/logger"
 	"github.com/Rain-kl/Wavelet/internal/model"
-	"github.com/Rain-kl/Wavelet/internal/util"
+	"github.com/Rain-kl/Wavelet/pkg/logger"
 	"github.com/coreos/go-oidc/v3/oidc"
 	"github.com/gin-contrib/sessions"
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 	"golang.org/x/oauth2"
 	"gorm.io/gorm"
+	"github.com/Rain-kl/Wavelet/internal/common/response"
 )
 
 // AuthSourceView 登录源展示信息
@@ -215,14 +214,14 @@ func setLoginSession(ctx context.Context, c *gin.Context, user *model.User) erro
 			isSessionCookie = true
 		}
 	}
-	session.Options(util.GetSessionOptions(maxAge))
+	session.Options(GetSessionOptions(maxAge))
 
 	if err := session.Save(); err != nil {
 		return err
 	}
 
 	if isSessionCookie {
-		util.StripCookieMaxAgeAndExpires(c.Writer.Header(), config.Config.App.SessionCookieName)
+		StripCookieMaxAgeAndExpires(c.Writer.Header(), config.Config.App.SessionCookieName)
 	}
 
 	return nil
@@ -358,10 +357,10 @@ func buildCallbackResult(user *model.User, status string) OAuthCallbackResult {
 // @Description 返回当前系统已启用的所有 OAuth 登录源，前端展示登录按钮列表时调用
 // @Tags oauth
 // @Produce json
-// @Success 200 {object} util.ResponseAny{data=[]oauth.AuthSourceView} "登录源列表"
+// @Success 200 {object} response.Any{data=[]oauth.AuthSourceView} "登录源列表"
 // @Router /api/v1/oauth/sources [get]
 func GetLoginSources(c *gin.Context) {
-	c.JSON(http.StatusOK, util.OK(activeLoginSources(c.Request.Context())))
+	c.JSON(http.StatusOK, response.OK(activeLoginSources(c.Request.Context())))
 }
 
 // GetLoginURL 获取登录授权地址
@@ -370,25 +369,25 @@ func GetLoginSources(c *gin.Context) {
 // @Tags oauth
 // @Produce json
 // @Param source query string false "认证源名称，为空使用第一个启用的认证源"
-// @Success 200 {object} util.ResponseAny{data=oauth.OAuthAuthorizeResponse} "授权 URL"
-// @Failure 400 {object} util.ResponseAny "认证源不存在或未配置"
-// @Failure 500 {object} util.ResponseAny "Redis 异常 or 构造 URL 失败"
+// @Success 200 {object} response.Any{data=oauth.OAuthAuthorizeResponse} "授权 URL"
+// @Failure 400 {object} response.Any "认证源不存在或未配置"
+// @Failure 500 {object} response.Any "Redis 异常 or 构造 URL 失败"
 // @Router /api/v1/oauth/login [get]
 func GetLoginURL(c *gin.Context) {
 	ctx := c.Request.Context()
 	if !isOIDCLoginEnabled(ctx) {
-		c.JSON(http.StatusBadRequest, util.Err(errAuthSourceDisabled))
+		c.JSON(http.StatusBadRequest, response.Err(errAuthSourceDisabled))
 		return
 	}
 
 	source, err := resolveAuthSource(ctx, c.Query("source"))
 	if err != nil {
-		c.JSON(http.StatusBadRequest, util.Err(err.Error()))
+		c.JSON(http.StatusBadRequest, response.Err(err.Error()))
 		return
 	}
 
 	if !source.IsActive {
-		c.JSON(http.StatusBadRequest, util.Err(errAuthSourceDisabled))
+		c.JSON(http.StatusBadRequest, response.Err(errAuthSourceDisabled))
 		return
 	}
 
@@ -396,7 +395,7 @@ func GetLoginURL(c *gin.Context) {
 	token, isNew := ensureSessionToken(session)
 	if isNew {
 		if err := session.Save(); err != nil {
-			c.JSON(http.StatusInternalServerError, util.Err(err.Error()))
+			c.JSON(http.StatusInternalServerError, response.Err(err.Error()))
 			return
 		}
 	}
@@ -412,20 +411,20 @@ func GetLoginURL(c *gin.Context) {
 		SessionHash: sessionHash,
 	})
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, util.Err(err.Error()))
+		c.JSON(http.StatusInternalServerError, response.Err(err.Error()))
 		return
 	}
 	if err := db.Redis.Set(c.Request.Context(), db.PrefixedKey(fmt.Sprintf(OAuthStateCacheKeyFormat, state)), payloadValue, OAuthStateCacheKeyExpiration).Err(); err != nil {
-		c.JSON(http.StatusInternalServerError, util.Err(err.Error()))
+		c.JSON(http.StatusInternalServerError, response.Err(err.Error()))
 		return
 	}
 
 	authorizeURL, err := buildAuthorizeURL(c.Request.Context(), source, state)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, util.Err(err.Error()))
+		c.JSON(http.StatusBadRequest, response.Err(err.Error()))
 		return
 	}
-	c.JSON(http.StatusOK, util.OK(OAuthAuthorizeResponse{AuthorizeURL: authorizeURL}))
+	c.JSON(http.StatusOK, response.OK(OAuthAuthorizeResponse{AuthorizeURL: authorizeURL}))
 }
 
 func buildAuthorizeURL(ctx context.Context, source *model.AuthSource, state string) (string, error) {
@@ -450,25 +449,25 @@ func buildAuthorizeURL(ctx context.Context, source *model.AuthSource, state stri
 // @Produce json
 // @Param source path string true "认证源名称"
 // @Param purpose query string false "授权目的：login（登录）或 bind（绑定账号），默认 login"
-// @Success 200 {object} util.ResponseAny{data=oauth.OAuthAuthorizeResponse} "授权 URL"
-// @Failure 400 {object} util.ResponseAny "认证源不存在或未启用"
-// @Failure 500 {object} util.ResponseAny "Redis 异常或构造 URL 失败"
+// @Success 200 {object} response.Any{data=oauth.OAuthAuthorizeResponse} "授权 URL"
+// @Failure 400 {object} response.Any "认证源不存在或未启用"
+// @Failure 500 {object} response.Any "Redis 异常或构造 URL 失败"
 // @Router /api/v1/oauth/{source}/authorize [get]
 func Authorize(c *gin.Context) {
 	ctx := c.Request.Context()
 	if !isOIDCLoginEnabled(ctx) {
-		c.JSON(http.StatusBadRequest, util.Err(errAuthSourceDisabled))
+		c.JSON(http.StatusBadRequest, response.Err(errAuthSourceDisabled))
 		return
 	}
 
 	source, err := resolveAuthSource(ctx, c.Param("source"))
 	if err != nil {
-		c.JSON(http.StatusBadRequest, util.Err(err.Error()))
+		c.JSON(http.StatusBadRequest, response.Err(err.Error()))
 		return
 	}
 
 	if !source.IsActive {
-		c.JSON(http.StatusBadRequest, util.Err(errAuthSourceDisabled))
+		c.JSON(http.StatusBadRequest, response.Err(errAuthSourceDisabled))
 		return
 	}
 	purpose := strings.ToLower(strings.TrimSpace(c.Query("purpose")))
@@ -479,14 +478,14 @@ func Authorize(c *gin.Context) {
 	session := sessions.Default(c)
 	userID := GetUserIDFromSession(session)
 	if purpose == OAuthPurposeBind && userID == 0 {
-		c.JSON(http.StatusUnauthorized, util.Err(common.UnAuthorized))
+		c.JSON(http.StatusUnauthorized, response.Err(common.UnAuthorized))
 		return
 	}
 
 	token, isNew := ensureSessionToken(session)
 	if isNew {
 		if err := session.Save(); err != nil {
-			c.JSON(http.StatusInternalServerError, util.Err(err.Error()))
+			c.JSON(http.StatusInternalServerError, response.Err(err.Error()))
 			return
 		}
 	}
@@ -501,20 +500,20 @@ func Authorize(c *gin.Context) {
 		SessionHash: sessionHash,
 	})
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, util.Err(err.Error()))
+		c.JSON(http.StatusInternalServerError, response.Err(err.Error()))
 		return
 	}
 	if err := db.Redis.Set(c.Request.Context(), db.PrefixedKey(fmt.Sprintf(OAuthStateCacheKeyFormat, state)), payloadValue, OAuthStateCacheKeyExpiration).Err(); err != nil {
-		c.JSON(http.StatusInternalServerError, util.Err(err.Error()))
+		c.JSON(http.StatusInternalServerError, response.Err(err.Error()))
 		return
 	}
 
 	authorizeURL, err := buildAuthorizeURL(c.Request.Context(), source, state)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, util.Err(err.Error()))
+		c.JSON(http.StatusBadRequest, response.Err(err.Error()))
 		return
 	}
-	c.JSON(http.StatusOK, util.OK(OAuthAuthorizeResponse{AuthorizeURL: authorizeURL}))
+	c.JSON(http.StatusOK, response.OK(OAuthAuthorizeResponse{AuthorizeURL: authorizeURL}))
 }
 
 // Callback OAuth 回调处理
@@ -524,15 +523,15 @@ func Authorize(c *gin.Context) {
 // @Accept json
 // @Produce json
 // @Param request body oauth.CallbackRequest true "回调请求参数"
-// @Success 200 {object} util.ResponseAny{data=oauth.OAuthCallbackResult} "登录或绑定成功"
-// @Failure 400 {object} util.ResponseAny "state 无效、参数错误或认证源错误"
-// @Failure 401 {object} util.ResponseAny "绑定场景未登录"
-// @Failure 500 {object} util.ResponseAny "OAuth 认证失败或内部错误"
+// @Success 200 {object} response.Any{data=oauth.OAuthCallbackResult} "登录或绑定成功"
+// @Failure 400 {object} response.Any "state 无效、参数错误或认证源错误"
+// @Failure 401 {object} response.Any "绑定场景未登录"
+// @Failure 500 {object} response.Any "OAuth 认证失败或内部错误"
 // @Router /api/v1/oauth/callback [post]
 func Callback(c *gin.Context) {
 	var req CallbackRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, util.Err(err.Error()))
+		c.JSON(http.StatusBadRequest, response.Err(err.Error()))
 		return
 	}
 
@@ -540,14 +539,14 @@ func Callback(c *gin.Context) {
 	stateKey := db.PrefixedKey(fmt.Sprintf(OAuthStateCacheKeyFormat, req.State))
 	payloadRaw, err := db.Redis.Get(ctx, stateKey).Result()
 	if err != nil {
-		c.JSON(http.StatusBadRequest, util.Err(errInvalidState))
+		c.JSON(http.StatusBadRequest, response.Err(errInvalidState))
 		return
 	}
 	_ = db.Redis.Del(ctx, stateKey)
 
 	payload, err := decodeOAuthStatePayload(payloadRaw)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, util.Err(err.Error()))
+		c.JSON(http.StatusBadRequest, response.Err(err.Error()))
 		return
 	}
 
@@ -555,55 +554,55 @@ func Callback(c *gin.Context) {
 	currentUserID := GetUserIDFromSession(session)
 
 	if payload.Purpose == OAuthPurposeBind && currentUserID == 0 {
-		c.JSON(http.StatusUnauthorized, util.Err(common.UnAuthorized))
+		c.JSON(http.StatusUnauthorized, response.Err(common.UnAuthorized))
 		return
 	}
 
 	token, ok := session.Get(SessionTokenKey).(string)
 	if !ok || token == "" {
-		c.JSON(http.StatusBadRequest, util.Err("invalid session context"))
+		c.JSON(http.StatusBadRequest, response.Err("invalid session context"))
 		return
 	}
 
 	if hashSessionToken(token) != payload.SessionHash {
-		c.JSON(http.StatusBadRequest, util.Err("session mismatch for oauth state"))
+		c.JSON(http.StatusBadRequest, response.Err("session mismatch for oauth state"))
 		return
 	}
 
 	if payload.Purpose == OAuthPurposeBind && currentUserID != payload.UserID {
-		c.JSON(http.StatusBadRequest, util.Err("user context mismatch for oauth binding"))
+		c.JSON(http.StatusBadRequest, response.Err("user context mismatch for oauth binding"))
 		return
 	}
 
 	if !isOIDCLoginEnabled(ctx) {
-		c.JSON(http.StatusBadRequest, util.Err(errAuthSourceDisabled))
+		c.JSON(http.StatusBadRequest, response.Err(errAuthSourceDisabled))
 		return
 	}
 
 	source, err := resolveAuthSource(ctx, payload.SourceName)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, util.Err(err.Error()))
+		c.JSON(http.StatusBadRequest, response.Err(err.Error()))
 		return
 	}
 
 	if !source.IsActive {
-		c.JSON(http.StatusBadRequest, util.Err(errAuthSourceDisabled))
+		c.JSON(http.StatusBadRequest, response.Err(errAuthSourceDisabled))
 		return
 	}
 
 	redirectURL, err := getFrontendLoginRedirectURL(ctx)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, util.Err(err.Error()))
+		c.JSON(http.StatusBadRequest, response.Err(err.Error()))
 		return
 	}
 
 	userInfo, err := buildOAuthUserInfo(ctx, source, req.Code, req.State, redirectURL)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, util.Err(err.Error()))
+		c.JSON(http.StatusInternalServerError, response.Err(err.Error()))
 		return
 	}
 	if err := normalizeOAuthUserInfo(userInfo); err != nil {
-		c.JSON(http.StatusBadRequest, util.Err(err.Error()))
+		c.JSON(http.StatusBadRequest, response.Err(err.Error()))
 		return
 	}
 	if userInfo.Sub == "" {
@@ -622,12 +621,12 @@ func Callback(c *gin.Context) {
 func handleCallbackBind(ctx context.Context, c *gin.Context, source *model.AuthSource, userInfo *model.OAuthUserInfo) {
 	userID := GetUserIDFromContext(c)
 	if userID == 0 {
-		c.JSON(http.StatusUnauthorized, util.Err(common.UnAuthorized))
+		c.JSON(http.StatusUnauthorized, response.Err(common.UnAuthorized))
 		return
 	}
 	var user model.User
 	if err := db.DB(ctx).First(&user, "id = ?", userID).Error; err != nil {
-		c.JSON(http.StatusInternalServerError, util.Err(err.Error()))
+		c.JSON(http.StatusInternalServerError, response.Err(err.Error()))
 		return
 	}
 	if err := model.BindExternalAccount(ctx, &model.ExternalAccount{
@@ -637,12 +636,12 @@ func handleCallbackBind(ctx context.Context, c *gin.Context, source *model.AuthS
 		ExternalUsername: userInfo.Username,
 		Email:            userInfo.Email,
 	}); err != nil {
-		c.JSON(http.StatusBadRequest, util.Err(err.Error()))
+		c.JSON(http.StatusBadRequest, response.Err(err.Error()))
 		return
 	}
 	user.LastLoginAt = time.Now()
 	_ = db.DB(ctx).Model(&user).Update("last_login_at", user.LastLoginAt).Error
-	c.JSON(http.StatusOK, util.OK(buildCallbackResult(&user, "bound")))
+	c.JSON(http.StatusOK, response.OK(buildCallbackResult(&user, "bound")))
 }
 
 // handleCallbackLogin 处理 OAuth 回调中的登录流程（查找已有帐号或自动注册）
@@ -653,7 +652,7 @@ func handleCallbackLogin(ctx context.Context, c *gin.Context, source *model.Auth
 	switch {
 	case err == nil:
 		if err := db.DB(ctx).First(&user, "id = ?", account.UserID).Error; err != nil {
-			c.JSON(http.StatusInternalServerError, util.Err(err.Error()))
+			c.JSON(http.StatusInternalServerError, response.Err(err.Error()))
 			return
 		}
 	case errors.Is(err, gorm.ErrRecordNotFound):
@@ -663,14 +662,14 @@ func handleCallbackLogin(ctx context.Context, c *gin.Context, source *model.Auth
 		}
 		user = newUser
 	default:
-		c.JSON(http.StatusInternalServerError, util.Err(err.Error()))
+		c.JSON(http.StatusInternalServerError, response.Err(err.Error()))
 		return
 	}
 
 	user.LastLoginAt = time.Now()
 	_ = db.DB(ctx).Model(&user).Update("last_login_at", user.LastLoginAt).Error
 	if err := setLoginSession(ctx, c, &user); err != nil {
-		c.JSON(http.StatusInternalServerError, util.Err(err.Error()))
+		c.JSON(http.StatusInternalServerError, response.Err(err.Error()))
 		return
 	}
 
@@ -678,7 +677,7 @@ func handleCallbackLogin(ctx context.Context, c *gin.Context, source *model.Auth
 
 	custom_events.TriggerAdminLoginEvent(ctx, &user, c.ClientIP())
 
-	c.JSON(http.StatusOK, util.OK(buildCallbackResult(&user, "logged_in")))
+	c.JSON(http.StatusOK, response.OK(buildCallbackResult(&user, "logged_in")))
 }
 
 // handleCallbackRegister 处理 OAuth 回调中的自动注册流程
@@ -690,20 +689,20 @@ func handleCallbackRegister(ctx context.Context, c *gin.Context, source *model.A
 	}
 
 	if !registrationEnabled {
-		c.JSON(http.StatusOK, util.OK(buildCallbackResult(nil, "need_bind")))
+		c.JSON(http.StatusOK, response.OK(buildCallbackResult(nil, "need_bind")))
 		return model.User{}, false
 	}
 
 	username, uniqueErr := uniqueUsername(ctx, userInfo.Username)
 	if uniqueErr != nil {
-		c.JSON(http.StatusInternalServerError, util.Err(uniqueErr.Error()))
+		c.JSON(http.StatusInternalServerError, response.Err(uniqueErr.Error()))
 		return model.User{}, false
 	}
 	userInfo.Username = username
 
 	var user model.User
 	if err := user.CreateUser(ctx, db.DB(ctx), userInfo); err != nil {
-		c.JSON(http.StatusInternalServerError, util.Err(err.Error()))
+		c.JSON(http.StatusInternalServerError, response.Err(err.Error()))
 		return model.User{}, false
 	}
 	if err := model.BindExternalAccount(ctx, &model.ExternalAccount{
@@ -713,7 +712,7 @@ func handleCallbackRegister(ctx context.Context, c *gin.Context, source *model.A
 		ExternalUsername: userInfo.Username,
 		Email:            userInfo.Email,
 	}); err != nil {
-		c.JSON(http.StatusBadRequest, util.Err(err.Error()))
+		c.JSON(http.StatusBadRequest, response.Err(err.Error()))
 		return model.User{}, false
 	}
 	logger.InfoF(ctx, "[LoginAudit] successful OAuth registration via source: %s, external ID: %s, user: %s, ID: %d, IP: %s", source.Name, userInfo.Sub, user.Username, user.ID, c.ClientIP())
@@ -727,18 +726,18 @@ func handleCallbackRegister(ctx context.Context, c *gin.Context, source *model.A
 // @Tags oauth
 // @Produce json
 // @Security SessionCookie
-// @Success 200 {object} util.ResponseAny{data=[]model.ExternalAccountView} "外部帐号列表"
-// @Failure 401 {object} util.ResponseAny "未登录"
-// @Failure 500 {object} util.ResponseAny "内部错误"
+// @Success 200 {object} response.Any{data=[]model.ExternalAccountView} "外部帐号列表"
+// @Failure 401 {object} response.Any "未登录"
+// @Failure 500 {object} response.Any "内部错误"
 // @Router /api/v1/oauth/external-accounts [get]
 func ListExternalAccounts(c *gin.Context) {
 	userID := GetUserIDFromContext(c)
 	accounts, err := model.ListExternalAccountsByUserID(c.Request.Context(), userID)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, util.Err(err.Error()))
+		c.JSON(http.StatusInternalServerError, response.Err(err.Error()))
 		return
 	}
-	c.JSON(http.StatusOK, util.OK(accounts))
+	c.JSON(http.StatusOK, response.OK(accounts))
 }
 
 // DeleteExternalAccount 解除外部帐号绑定
@@ -748,25 +747,25 @@ func ListExternalAccounts(c *gin.Context) {
 // @Produce json
 // @Security SessionCookie
 // @Param id path uint64 true "外部帐号绑定记录 ID"
-// @Success 200 {object} util.ResponseAny{data=string} "解除绑定成功"
-// @Failure 400 {object} util.ResponseAny "ID 无效或解除失败"
-// @Failure 401 {object} util.ResponseAny "未登录"
+// @Success 200 {object} response.Any{data=string} "解除绑定成功"
+// @Failure 400 {object} response.Any "ID 无效或解除失败"
+// @Failure 401 {object} response.Any "未登录"
 // @Router /api/v1/oauth/external-accounts/{id}/delete [post]
 func DeleteExternalAccount(c *gin.Context) {
 	userID := GetUserIDFromContext(c)
 	if userID == 0 {
-		c.JSON(http.StatusUnauthorized, util.Err(common.UnAuthorized))
+		c.JSON(http.StatusUnauthorized, response.Err(common.UnAuthorized))
 		return
 	}
 	rawID := strings.TrimSpace(c.Param("id"))
 	id, err := strconv.ParseUint(rawID, 10, 64)
 	if err != nil || id == 0 {
-		c.JSON(http.StatusBadRequest, util.Err(errInvalidExternalAccountBindingID))
+		c.JSON(http.StatusBadRequest, response.Err(errInvalidExternalAccountBindingID))
 		return
 	}
 	if err := model.DeleteExternalAccountForUser(c.Request.Context(), id, userID); err != nil {
-		c.JSON(http.StatusBadRequest, util.Err(err.Error()))
+		c.JSON(http.StatusBadRequest, response.Err(err.Error()))
 		return
 	}
-	c.JSON(http.StatusOK, util.OKNil())
+	c.JSON(http.StatusOK, response.OKNil())
 }

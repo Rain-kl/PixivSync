@@ -5,8 +5,7 @@
 // Package user 提供用户认证与帐户管理功能
 package user
 
-import (
-	"net/http"
+import ("net/http"
 	"strconv"
 	"strings"
 
@@ -15,7 +14,8 @@ import (
 	"github.com/Rain-kl/Wavelet/internal/model"
 	"github.com/Rain-kl/Wavelet/internal/util"
 	"github.com/gin-gonic/gin"
-)
+
+	"github.com/Rain-kl/Wavelet/internal/common/response")
 
 type createTokenRequest struct {
 	Name    string `json:"name"`
@@ -33,8 +33,8 @@ type tokenResponse struct {
 // @Tags user
 // @Produce json
 // @Security SessionCookie
-// @Success 200 {object} util.ResponseAny{data=[]model.AccessToken} "令牌列表"
-// @Failure 401 {object} util.ResponseAny "未登录"
+// @Success 200 {object} response.Any{data=[]model.AccessToken} "令牌列表"
+// @Failure 401 {object} response.Any "未登录"
 // @Router /api/v1/user/access-tokens [get]
 // ListAccessTokens 获取当前用户的 AccessToken 列表
 func ListAccessTokens(c *gin.Context) {
@@ -43,11 +43,11 @@ func ListAccessTokens(c *gin.Context) {
 
 	var tokens []model.AccessToken
 	if err := db.DB(ctx).Where("user_id = ?", currUser.ID).Order("created_at desc").Find(&tokens).Error; err != nil {
-		c.JSON(http.StatusOK, util.Err(err.Error()))
+		c.JSON(http.StatusOK, response.Err(err.Error()))
 		return
 	}
 
-	c.JSON(http.StatusOK, util.OK(tokens))
+	c.JSON(http.StatusOK, response.OK(tokens))
 }
 
 // CreateAccessToken 创建一个新的 AccessToken
@@ -58,8 +58,8 @@ func ListAccessTokens(c *gin.Context) {
 // @Produce json
 // @Param request body user.createTokenRequest true "令牌名称"
 // @Security SessionCookie
-// @Success 200 {object} util.ResponseAny{data=user.tokenResponse} "新建令牌成功"
-// @Failure 400 {object} util.ResponseAny "参数错误或超限"
+// @Success 200 {object} response.Any{data=user.tokenResponse} "新建令牌成功"
+// @Failure 400 {object} response.Any "参数错误或超限"
 // @Router /api/v1/user/access-tokens [post]
 func CreateAccessToken(c *gin.Context) {
 	currUser, _ := util.GetFromContext[*model.User](c, oauth.UserObjKey)
@@ -67,19 +67,19 @@ func CreateAccessToken(c *gin.Context) {
 
 	var req createTokenRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusOK, util.Err(errBindParamsFailed))
+		c.JSON(http.StatusOK, response.Err(errBindParamsFailed))
 		return
 	}
 
 	req.Name = strings.TrimSpace(req.Name)
 	if req.Name == "" {
-		c.JSON(http.StatusOK, util.Err(errTokenNameRequired))
+		c.JSON(http.StatusOK, response.Err(errTokenNameRequired))
 		return
 	}
 
 	// 只有管理员才能创建具有管理员权限的令牌
 	if req.IsAdmin && !currUser.IsAdmin {
-		c.JSON(http.StatusOK, util.Err(errAdminTokenRequiresAdmin))
+		c.JSON(http.StatusOK, response.Err(errAdminTokenRequiresAdmin))
 		return
 	}
 
@@ -91,19 +91,19 @@ func CreateAccessToken(c *gin.Context) {
 
 	var count int64
 	if err := db.DB(ctx).Model(&model.AccessToken{}).Where("user_id = ?", currUser.ID).Count(&count).Error; err != nil {
-		c.JSON(http.StatusOK, util.Err(err.Error()))
+		c.JSON(http.StatusOK, response.Err(err.Error()))
 		return
 	}
 
 	if int(count) >= maxLimit {
-		c.JSON(http.StatusOK, util.Err(errAccessTokenLimitReached))
+		c.JSON(http.StatusOK, response.Err(errAccessTokenLimitReached))
 		return
 	}
 
 	// 生成 Token
 	tokenStr, err := model.GenerateTokenString()
 	if err != nil {
-		c.JSON(http.StatusOK, util.Err(errGenerateTokenFailed))
+		c.JSON(http.StatusOK, response.Err(errGenerateTokenFailed))
 		return
 	}
 
@@ -119,11 +119,11 @@ func CreateAccessToken(c *gin.Context) {
 	}
 
 	if err := db.DB(ctx).Create(&tokenRecord).Error; err != nil {
-		c.JSON(http.StatusOK, util.Err(err.Error()))
+		c.JSON(http.StatusOK, response.Err(err.Error()))
 		return
 	}
 
-	c.JSON(http.StatusOK, util.OK(tokenResponse{
+	c.JSON(http.StatusOK, response.OK(tokenResponse{
 		Token:  tokenStr,
 		Record: tokenRecord,
 	}))
@@ -136,8 +136,8 @@ func CreateAccessToken(c *gin.Context) {
 // @Produce json
 // @Param id path string true "令牌ID"
 // @Security SessionCookie
-// @Success 200 {object} util.ResponseAny{data=string} "删除成功"
-// @Failure 400 {object} util.ResponseAny "参数错误"
+// @Success 200 {object} response.Any{data=string} "删除成功"
+// @Failure 400 {object} response.Any "参数错误"
 // @Router /api/v1/user/access-tokens/{id} [delete]
 func DeleteAccessToken(c *gin.Context) {
 	currUser, _ := util.GetFromContext[*model.User](c, oauth.UserObjKey)
@@ -146,22 +146,22 @@ func DeleteAccessToken(c *gin.Context) {
 	idStr := c.Param("id")
 	id, err := strconv.ParseUint(idStr, 10, 64)
 	if err != nil {
-		c.JSON(http.StatusOK, util.Err(errInvalidTokenID))
+		c.JSON(http.StatusOK, response.Err(errInvalidTokenID))
 		return
 	}
 
 	tx := db.DB(ctx).Where("id = ? AND user_id = ?", id, currUser.ID).Delete(&model.AccessToken{})
 	if tx.Error != nil {
-		c.JSON(http.StatusOK, util.Err(tx.Error.Error()))
+		c.JSON(http.StatusOK, response.Err(tx.Error.Error()))
 		return
 	}
 
 	if tx.RowsAffected == 0 {
-		c.JSON(http.StatusOK, util.Err(errTokenNotFoundOrForbidden))
+		c.JSON(http.StatusOK, response.Err(errTokenNotFoundOrForbidden))
 		return
 	}
 
-	c.JSON(http.StatusOK, util.OK("删除成功"))
+	c.JSON(http.StatusOK, response.OK("删除成功"))
 }
 
 // RotateAccessToken 轮换一个 AccessToken
@@ -171,8 +171,8 @@ func DeleteAccessToken(c *gin.Context) {
 // @Produce json
 // @Param id path string true "令牌ID"
 // @Security SessionCookie
-// @Success 200 {object} util.ResponseAny{data=user.tokenResponse} "令牌轮换成功"
-// @Failure 400 {object} util.ResponseAny "参数错误"
+// @Success 200 {object} response.Any{data=user.tokenResponse} "令牌轮换成功"
+// @Failure 400 {object} response.Any "参数错误"
 // @Router /api/v1/user/access-tokens/{id}/rotate [post]
 func RotateAccessToken(c *gin.Context) {
 	currUser, _ := util.GetFromContext[*model.User](c, oauth.UserObjKey)
@@ -181,20 +181,20 @@ func RotateAccessToken(c *gin.Context) {
 	idStr := c.Param("id")
 	id, err := strconv.ParseUint(idStr, 10, 64)
 	if err != nil {
-		c.JSON(http.StatusOK, util.Err(errInvalidTokenID))
+		c.JSON(http.StatusOK, response.Err(errInvalidTokenID))
 		return
 	}
 
 	var tokenRecord model.AccessToken
 	if err := db.DB(ctx).Where("id = ? AND user_id = ?", id, currUser.ID).First(&tokenRecord).Error; err != nil {
-		c.JSON(http.StatusOK, util.Err(errTokenNotFoundOrForbidden))
+		c.JSON(http.StatusOK, response.Err(errTokenNotFoundOrForbidden))
 		return
 	}
 
 	// 生成新的 Token
 	newTokenStr, err := model.GenerateTokenString()
 	if err != nil {
-		c.JSON(http.StatusOK, util.Err(errGenerateTokenFailed))
+		c.JSON(http.StatusOK, response.Err(errGenerateTokenFailed))
 		return
 	}
 
@@ -205,11 +205,11 @@ func RotateAccessToken(c *gin.Context) {
 	tokenRecord.MaskedToken = newMaskedToken
 
 	if err := db.DB(ctx).Save(&tokenRecord).Error; err != nil {
-		c.JSON(http.StatusOK, util.Err(err.Error()))
+		c.JSON(http.StatusOK, response.Err(err.Error()))
 		return
 	}
 
-	c.JSON(http.StatusOK, util.OK(tokenResponse{
+	c.JSON(http.StatusOK, response.OK(tokenResponse{
 		Token:  newTokenStr,
 		Record: tokenRecord,
 	}))

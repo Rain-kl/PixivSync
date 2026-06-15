@@ -4,8 +4,7 @@
 
 package user
 
-import (
-	"bytes"
+import ("bytes"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
@@ -17,7 +16,8 @@ import (
 	"github.com/Rain-kl/Wavelet/internal/testhelper"
 	"github.com/Rain-kl/Wavelet/internal/util"
 	"github.com/gin-gonic/gin"
-)
+
+	"github.com/Rain-kl/Wavelet/internal/common/response")
 
 func setupTestRouter(authUser *model.User) *gin.Engine {
 	gin.SetMode(gin.TestMode)
@@ -90,7 +90,7 @@ func TestListUsers(t *testing.T) {
 			t.Errorf("expected 200 OK, got %d. Body: %s", w.Code, w.Body.String())
 		}
 
-		var resp util.ResponseAny
+		var resp response.Any
 		if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
 			t.Fatalf("failed to parse response: %v", err)
 		}
@@ -119,7 +119,7 @@ func TestListUsers(t *testing.T) {
 		w := httptest.NewRecorder()
 		router.ServeHTTP(w, req)
 
-		var resp util.ResponseAny
+		var resp response.Any
 		_ = json.Unmarshal(w.Body.Bytes(), &resp)
 
 		dataBytes, _ := json.Marshal(resp.Data)
@@ -136,7 +136,7 @@ func TestListUsers(t *testing.T) {
 		w := httptest.NewRecorder()
 		router.ServeHTTP(w, req)
 
-		var resp util.ResponseAny
+		var resp response.Any
 		_ = json.Unmarshal(w.Body.Bytes(), &resp)
 
 		dataBytes, _ := json.Marshal(resp.Data)
@@ -194,7 +194,7 @@ func TestGetUser(t *testing.T) {
 			t.Fatalf("expected 200 OK, got %d. Body: %s", w.Code, w.Body.String())
 		}
 
-		var resp util.ResponseAny
+		var resp response.Any
 		if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
 			t.Fatalf("failed to parse response: %v", err)
 		}
@@ -280,7 +280,7 @@ func TestUpdateUserStatus(t *testing.T) {
 			t.Errorf("expected 403 Forbidden, got %d. Body: %s", w.Code, w.Body.String())
 		}
 
-		var resp util.ResponseAny
+		var resp response.Any
 		_ = json.Unmarshal(w.Body.Bytes(), &resp)
 		if resp.ErrorMsg != cannotDisable {
 			t.Errorf("expected error message '%s', got '%s'", cannotDisable, resp.ErrorMsg)
@@ -327,7 +327,7 @@ func TestCreateUser(t *testing.T) {
 			t.Errorf("expected 200 OK, got %d. Body: %s", w.Code, w.Body.String())
 		}
 
-		var resp util.ResponseAny
+		var resp response.Any
 		if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
 			t.Fatalf("failed to parse response: %v", err)
 		}
@@ -386,7 +386,7 @@ func TestCreateUser(t *testing.T) {
 			t.Errorf("expected 400 Bad Request, got %d. Body: %s", w.Code, w.Body.String())
 		}
 
-		var resp util.ResponseAny
+		var resp response.Any
 		_ = json.Unmarshal(w.Body.Bytes(), &resp)
 		if resp.ErrorMsg != usernameExists {
 			t.Errorf("expected error '%s', got '%s'", usernameExists, resp.ErrorMsg)
@@ -419,7 +419,7 @@ func TestCreateUser(t *testing.T) {
 			t.Errorf("expected 400 Bad Request, got %d. Body: %s", w.Code, w.Body.String())
 		}
 
-		var resp util.ResponseAny
+		var resp response.Any
 		_ = json.Unmarshal(w.Body.Bytes(), &resp)
 		if resp.ErrorMsg != emailExists {
 			t.Errorf("expected error '%s', got '%s'", emailExists, resp.ErrorMsg)

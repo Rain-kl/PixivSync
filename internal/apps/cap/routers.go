@@ -6,8 +6,7 @@ package cap
 import (
 	"net/http"
 
-	"github.com/Rain-kl/Wavelet/internal/util/cap"
-	"github.com/gin-gonic/gin"
+		"github.com/gin-gonic/gin"
 )
 
 type challengeRequest struct {
@@ -28,7 +27,7 @@ type redeemRequest struct {
 // @Produce json
 // @Param request body challengeRequest false "可选范围限制参数"
 // @Success 200 {object} cap.ChallengeResponse "成功返回 PoW 难题"
-// @Failure 500 {object} cap.RedeemResponse "内部服务错误"
+// @Failure 500 {object} RedeemResponse "内部服务错误"
 // @Router /api/cap/challenge [post]
 func Challenge(c *gin.Context) {
 	var req challengeRequest
@@ -38,10 +37,10 @@ func Challenge(c *gin.Context) {
 		req.Scope = "login"
 	}
 
-	mgr := cap.GetDefaultManager()
+	mgr := GetDefaultManager()
 	resp, err := mgr.Generate(c.Request.Context(), req.Scope)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, cap.RedeemResponse{
+		c.JSON(http.StatusInternalServerError, RedeemResponse{
 			Success: false,
 			Error:   err.Error(),
 		})
@@ -58,14 +57,14 @@ func Challenge(c *gin.Context) {
 // @Accept json
 // @Produce json
 // @Param request body redeemRequest true "难题 Token 与解答 solutions 数组"
-// @Success 200 {object} cap.RedeemResponse "核销成功，返回 X-Cap-Token"
-// @Failure 400 {object} cap.RedeemResponse "参数错误或核销失败"
-// @Failure 500 {object} cap.RedeemResponse "内部服务错误"
+// @Success 200 {object} RedeemResponse "核销成功，返回 X-Cap-Token"
+// @Failure 400 {object} RedeemResponse "参数错误或核销失败"
+// @Failure 500 {object} RedeemResponse "内部服务错误"
 // @Router /api/cap/redeem [post]
 func Redeem(c *gin.Context) {
 	var req redeemRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, cap.RedeemResponse{
+		c.JSON(http.StatusBadRequest, RedeemResponse{
 			Success: false,
 			Error:   "无效的参数",
 		})
@@ -76,10 +75,10 @@ func Redeem(c *gin.Context) {
 		req.Scope = "login"
 	}
 
-	mgr := cap.GetDefaultManager()
+	mgr := GetDefaultManager()
 	resp, err := mgr.Redeem(c.Request.Context(), req.Token, req.Solutions, req.Scope)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, cap.RedeemResponse{
+		c.JSON(http.StatusInternalServerError, RedeemResponse{
 			Success: false,
 			Error:   err.Error(),
 		})

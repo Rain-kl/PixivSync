@@ -5,13 +5,12 @@
 // Package config 提供公开配置查询接口
 package config
 
-import (
-	"net/http"
+import ("net/http"
 
 	"github.com/Rain-kl/Wavelet/internal/model"
-	"github.com/Rain-kl/Wavelet/internal/util"
 	"github.com/gin-gonic/gin"
-)
+
+	"github.com/Rain-kl/Wavelet/internal/common/response")
 
 // GetPublicConfig 获取公共配置
 // @Summary 获取公共配置
@@ -19,22 +18,22 @@ import (
 // @Tags config
 // @Accept json
 // @Produce json
-// @Success 200 {object} util.ResponseAny
+// @Success 200 {object} response.Any
 // @Router /api/v1/config/public [get]
 func GetPublicConfig(c *gin.Context) {
 	ctx := c.Request.Context()
 	configs, err := model.ListVisibleSystemConfigs(ctx)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, util.Err(err.Error()))
+		c.JSON(http.StatusInternalServerError, response.Err(err.Error()))
 		return
 	}
 
-	response := make(map[string]string, len(configs))
+	resp := make(map[string]string, len(configs))
 	for _, config := range configs {
-		response[config.Key] = config.Value
+		resp[config.Key] = config.Value
 	}
 
-	c.JSON(http.StatusOK, util.OK(response))
+	c.JSON(http.StatusOK, response.OK(resp))
 }
 
 // GetRobotsTXT 动态生成 robots.txt

@@ -13,8 +13,8 @@ import (
 )
 
 // ProcessLocalBusiness 示例的模块内部闭环业务逻辑
-// 1. 虽然存放在 apps/custom/logics.go 下，但依然遵循纯 Go 规范，不强依赖 gin.Context，以便逻辑清晰和便于单元测试。
-// 2. 仅用于当前应用模块私有的简单业务，避免滥用全局的 internal/service 从而导致 Service 臃肿。
+// 1. 存放在 apps/custom/logics.go 下，遵循纯 Go 规范，不强依赖 gin.Context，以便逻辑清晰和便于单元测试。
+// 2. 用于当前应用模块内的简单业务或通用过程。
 func ProcessLocalBusiness(ctx context.Context, userID int64, param string) (string, error) {
 	if param == "" {
 		return "", errors.New("param cannot be empty")

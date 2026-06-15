@@ -20,7 +20,6 @@ import (
 	"github.com/Rain-kl/Wavelet/internal/db"
 	"github.com/Rain-kl/Wavelet/internal/diskcache"
 	"github.com/Rain-kl/Wavelet/internal/model"
-	"github.com/Rain-kl/Wavelet/internal/service"
 	"github.com/Rain-kl/Wavelet/internal/storage"
 	"github.com/Rain-kl/Wavelet/internal/task"
 	"github.com/Rain-kl/Wavelet/internal/testhelper"
@@ -111,7 +110,7 @@ func TestSystemCleanupHandler_Execute(t *testing.T) {
 	require.NoError(t, err)
 
 	// 执行 handler
-	handler := &service.SystemCleanupHandler{}
+	handler := &SystemCleanupHandler{}
 	result, err := handler.Execute(ctx, nil)
 
 	// 验证结果
@@ -162,7 +161,7 @@ func TestSystemCleanupHandler_ExecuteNoFiles(t *testing.T) {
 	require.NoError(t, err)
 
 	// 没有任何上传记录
-	handler := &service.SystemCleanupHandler{}
+	handler := &SystemCleanupHandler{}
 	result, err := handler.Execute(ctx, nil)
 
 	require.NoError(t, err)
@@ -172,7 +171,7 @@ func TestSystemCleanupHandler_ExecuteNoFiles(t *testing.T) {
 
 func TestSystemCleanupHandler_ImplementsTaskHandler(t *testing.T) {
 	// 编译期验证 SystemCleanupHandler 实现了 TaskHandler 接口
-	var _ task.TaskHandler = (*service.SystemCleanupHandler)(nil)
+	var _ task.TaskHandler = (*SystemCleanupHandler)(nil)
 }
 
 func TestWarmImageCacheHandlerValidatePayload(t *testing.T) {

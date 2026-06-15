@@ -4,8 +4,7 @@
 
 package system_config
 
-import (
-	"bufio"
+import ("bufio"
 	"bytes"
 	"context"
 	"encoding/json"
@@ -22,7 +21,8 @@ import (
 	"github.com/Rain-kl/Wavelet/internal/testhelper"
 	"github.com/Rain-kl/Wavelet/internal/util"
 	"github.com/gin-gonic/gin"
-)
+
+	"github.com/Rain-kl/Wavelet/internal/common/response")
 
 func setupTestRouter(authUser *model.User) *gin.Engine {
 	gin.SetMode(gin.TestMode)
@@ -131,7 +131,7 @@ func TestListSystemConfigs(t *testing.T) {
 			t.Fatalf("expected 200 OK, got %d", w.Code)
 		}
 
-		var resp util.ResponseAny
+		var resp response.Any
 		_ = json.Unmarshal(w.Body.Bytes(), &resp)
 
 		dataBytes, _ := json.Marshal(resp.Data)
@@ -149,7 +149,7 @@ func TestListSystemConfigs(t *testing.T) {
 		w := httptest.NewRecorder()
 		router.ServeHTTP(w, req)
 
-		var resp util.ResponseAny
+		var resp response.Any
 		_ = json.Unmarshal(w.Body.Bytes(), &resp)
 
 		dataBytes, _ := json.Marshal(resp.Data)
@@ -191,7 +191,7 @@ func TestGetSystemConfig(t *testing.T) {
 			t.Errorf("expected 200 OK, got %d", w.Code)
 		}
 
-		var resp util.ResponseAny
+		var resp response.Any
 		_ = json.Unmarshal(w.Body.Bytes(), &resp)
 
 		dataBytes, _ := json.Marshal(resp.Data)
@@ -363,7 +363,7 @@ func TestTestSMTP(t *testing.T) {
 		t.Fatalf("expected 200 OK, got %d. Body: %s", w.Code, w.Body.String())
 	}
 
-	var resp util.ResponseAny
+	var resp response.Any
 	json.Unmarshal(w.Body.Bytes(), &resp)
 
 	dataBytes, _ := json.Marshal(resp.Data)

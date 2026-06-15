@@ -11,7 +11,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/Rain-kl/Wavelet/internal/logger"
+	"github.com/Rain-kl/Wavelet/pkg/logger"
 	"gorm.io/gorm"
 	gormLogger "gorm.io/gorm/logger"
 )

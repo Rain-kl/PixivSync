@@ -6,8 +6,7 @@
 // overview information, and executing custom SQL queries.
 package db_manage
 
-import (
-	"database/sql"
+import ("database/sql"
 	"fmt"
 	"math"
 	"net/http"
@@ -17,10 +16,10 @@ import (
 
 	"github.com/Rain-kl/Wavelet/internal/config"
 	"github.com/Rain-kl/Wavelet/internal/db"
-	"github.com/Rain-kl/Wavelet/internal/util"
 	"github.com/gin-gonic/gin"
 	"gorm.io/gorm"
-)
+
+	"github.com/Rain-kl/Wavelet/internal/common/response")
 
 const (
 	binaryKB        = 0
@@ -206,15 +205,15 @@ func getPostgresOverview(gormDB *gorm.DB) (DBOverviewResponse, error) {
 // @Tags admin
 // @Produce json
 // @Security SessionCookie
-// @Success 200 {object} util.ResponseAny{data=db_manage.DBOverviewResponse} "获取成功"
-// @Failure 401 {object} util.ResponseAny "未登录"
-// @Failure 403 {object} util.ResponseAny "无管理员权限"
-// @Failure 500 {object} util.ResponseAny "内部错误"
+// @Success 200 {object} response.Any{data=db_manage.DBOverviewResponse} "获取成功"
+// @Failure 401 {object} response.Any "未登录"
+// @Failure 403 {object} response.Any "无管理员权限"
+// @Failure 500 {object} response.Any "内部错误"
 // @Router /api/v1/admin/db-manage/overview [get]
 func GetDBOverview(c *gin.Context) {
 	gormDB := db.DB(c.Request.Context())
 	if gormDB == nil {
-		c.JSON(http.StatusInternalServerError, util.Err("数据库未初始化"))
+		c.JSON(http.StatusInternalServerError, response.Err("数据库未初始化"))
 		return
 	}
 
@@ -228,11 +227,11 @@ func GetDBOverview(c *gin.Context) {
 	}
 
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, util.Err(err.Error()))
+		c.JSON(http.StatusInternalServerError, response.Err(err.Error()))
 		return
 	}
 
-	c.JSON(http.StatusOK, util.OK(overview))
+	c.JSON(http.StatusOK, response.OK(overview))
 }
 
 // ListDBTables 获取数据库所有表名
@@ -241,15 +240,15 @@ func GetDBOverview(c *gin.Context) {
 // @Tags admin
 // @Produce json
 // @Security SessionCookie
-// @Success 200 {object} util.ResponseAny{data=[]string} "获取成功"
-// @Failure 401 {object} util.ResponseAny "未登录"
-// @Failure 403 {object} util.ResponseAny "无管理员权限"
-// @Failure 500 {object} util.ResponseAny "内部错误"
+// @Success 200 {object} response.Any{data=[]string} "获取成功"
+// @Failure 401 {object} response.Any "未登录"
+// @Failure 403 {object} response.Any "无管理员权限"
+// @Failure 500 {object} response.Any "内部错误"
 // @Router /api/v1/admin/db-manage/tables [get]
 func ListDBTables(c *gin.Context) {
 	gormDB := db.DB(c.Request.Context())
 	if gormDB == nil {
-		c.JSON(http.StatusInternalServerError, util.Err("数据库未初始化"))
+		c.JSON(http.StatusInternalServerError, response.Err("数据库未初始化"))
 		return
 	}
 
@@ -263,24 +262,24 @@ func ListDBTables(c *gin.Context) {
 	}
 
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, util.Err(err.Error()))
+		c.JSON(http.StatusInternalServerError, response.Err(err.Error()))
 		return
 	}
 
-	c.JSON(http.StatusOK, util.OK(tables))
+	c.JSON(http.StatusOK, response.OK(tables))
 }
 
 // GetDBTableData 获取数据表 data
 func GetDBTableData(c *gin.Context) {
 	var req GetTableDataRequest
 	if err := c.ShouldBindQuery(&req); err != nil {
-		c.JSON(http.StatusBadRequest, util.Err(err.Error()))
+		c.JSON(http.StatusBadRequest, response.Err(err.Error()))
 		return
 	}
 
 	gormDB := db.DB(c.Request.Context())
 	if gormDB == nil {
-		c.JSON(http.StatusInternalServerError, util.Err("数据库未初始化"))
+		c.JSON(http.StatusInternalServerError, response.Err("数据库未初始化"))
 		return
 	}
 
@@ -289,7 +288,7 @@ func GetDBTableData(c *gin.Context) {
 
 	var total int64
 	if err := gormDB.Raw("SELECT count(*) FROM " + quotedTable).Scan(&total).Error; err != nil {
-		c.JSON(http.StatusBadRequest, util.Err(err.Error()))
+		c.JSON(http.StatusBadRequest, response.Err(err.Error()))
 		return
 	}
 
@@ -304,7 +303,7 @@ func GetDBTableData(c *gin.Context) {
 
 	rows, err := gormDB.Raw("SELECT * FROM "+quotedTable+" LIMIT ? OFFSET ?", limit, offset).Rows()
 	if err != nil {
-		c.JSON(http.StatusBadRequest, util.Err(err.Error()))
+		c.JSON(http.StatusBadRequest, response.Err(err.Error()))
 		return
 	}
 	defer func() {
@@ -313,17 +312,17 @@ func GetDBTableData(c *gin.Context) {
 
 	cols, err := rows.Columns()
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, util.Err(err.Error()))
+		c.JSON(http.StatusInternalServerError, response.Err(err.Error()))
 		return
 	}
 
 	results, err := scanTableRows(rows, cols)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, util.Err(err.Error()))
+		c.JSON(http.StatusInternalServerError, response.Err(err.Error()))
 		return
 	}
 
-	c.JSON(http.StatusOK, util.OK(TableDataResponse{
+	c.JSON(http.StatusOK, response.OK(TableDataResponse{
 		Columns: cols,
 		Total:   total,
 		Results: results,
@@ -441,28 +440,28 @@ func executeSQLMutation(gormDB *gorm.DB, sqlStr string, startTime time.Time) (Ex
 // @Produce json
 // @Security SessionCookie
 // @Param request body db_manage.ExecuteSQLRequest true "SQL 请求参数"
-// @Success 200 {object} util.ResponseAny{data=db_manage.ExecuteSQLResponse} "执行完毕"
-// @Failure 400 {object} util.ResponseAny "SQL 语句错误"
-// @Failure 401 {object} util.ResponseAny "未登录"
-// @Failure 403 {object} util.ResponseAny "无管理员权限"
-// @Failure 500 {object} util.ResponseAny "内部错误"
+// @Success 200 {object} response.Any{data=db_manage.ExecuteSQLResponse} "执行完毕"
+// @Failure 400 {object} response.Any "SQL 语句错误"
+// @Failure 401 {object} response.Any "未登录"
+// @Failure 403 {object} response.Any "无管理员权限"
+// @Failure 500 {object} response.Any "内部错误"
 // @Router /api/v1/admin/db-manage/query [post]
 func ExecuteSQL(c *gin.Context) {
 	var req ExecuteSQLRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, util.Err(err.Error()))
+		c.JSON(http.StatusBadRequest, response.Err(err.Error()))
 		return
 	}
 
 	gormDB := db.DB(c.Request.Context())
 	if gormDB == nil {
-		c.JSON(http.StatusInternalServerError, util.Err("数据库未初始化"))
+		c.JSON(http.StatusInternalServerError, response.Err("数据库未初始化"))
 		return
 	}
 
 	trimmedSQL := strings.TrimSpace(req.SQL)
 	if trimmedSQL == "" {
-		c.JSON(http.StatusBadRequest, util.Err("SQL 语句不能为空"))
+		c.JSON(http.StatusBadRequest, response.Err("SQL 语句不能为空"))
 		return
 	}
 
@@ -489,9 +488,9 @@ func ExecuteSQL(c *gin.Context) {
 	}
 
 	if err != nil {
-		c.JSON(http.StatusBadRequest, util.Err(err.Error()))
+		c.JSON(http.StatusBadRequest, response.Err(err.Error()))
 		return
 	}
 
-	c.JSON(http.StatusOK, util.OK(resp))
+	c.JSON(http.StatusOK, response.OK(resp))
 }

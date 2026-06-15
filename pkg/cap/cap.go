@@ -79,7 +79,8 @@ func b64urlDecode(str string) ([]byte, error) {
 	return base64.RawURLEncoding.DecodeString(str)
 }
 
-func randomHex(byteLen int) string {
+// RandomHex generates a cryptographically secure random hexadecimal string of the specified byte length.
+func RandomHex(byteLen int) string {
 	bytes := make([]byte, byteLen)
 	if _, err := rand.Read(bytes); err != nil {
 		panic(err)
@@ -129,7 +130,8 @@ func jwtVerify(token string, secret []byte) ([]byte, error) {
 	return payload, nil
 }
 
-func jwtSigHex(token string) string {
+// JwtSigHex extracts the signature part of a JWT token and returns it as a hexadecimal string.
+func JwtSigHex(token string) string {
 	parts := strings.Split(token, ".")
 	if len(parts) != jwtPartsCount {
 		return ""
@@ -160,7 +162,7 @@ func GenerateChallenge(secret []byte, conf ChallengeConfig, scope string) (*Chal
 	expires := now + int64(conf.Expires/time.Millisecond)
 
 	payload := ChallengePayload{
-		Nonce:      randomHex(defaultNonceLength),
+		Nonce:      RandomHex(defaultNonceLength),
 		Count:      conf.Count,
 		Size:       conf.Size,
 		Difficulty: conf.Difficulty,

@@ -14,9 +14,9 @@ import (
 	"sync"
 
 	"github.com/Rain-kl/Wavelet/internal/db"
-	"github.com/Rain-kl/Wavelet/internal/logger"
 	"github.com/Rain-kl/Wavelet/internal/model"
 	"github.com/Rain-kl/Wavelet/internal/task"
+	"github.com/Rain-kl/Wavelet/pkg/logger"
 	pkgpush "github.com/Rain-kl/Wavelet/pkg/push"
 	"gorm.io/gorm"
 )

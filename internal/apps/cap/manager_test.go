@@ -9,11 +9,13 @@ import (
 	"sync/atomic"
 	"testing"
 	"time"
+
+	pkgcap "github.com/Rain-kl/Wavelet/pkg/cap"
 )
 
 func TestCapFullFlow(t *testing.T) {
 	secret := []byte("a-very-long-secret-key-at-least-16-bytes")
-	store := NewMemoryStore(1 * time.Minute)
+	store := pkgcap.NewMemoryStore(1 * time.Minute)
 
 	manager := NewManager(Config{
 		Secret:              secret,
@@ -36,7 +38,7 @@ func TestCapFullFlow(t *testing.T) {
 	}
 
 	// Solve the challenge (acting as client)
-	solutions := Solve(resp.Token, resp.Challenge.C, resp.Challenge.S, resp.Challenge.D)
+	solutions := pkgcap.Solve(resp.Token, resp.Challenge.C, resp.Challenge.S, resp.Challenge.D)
 
 	// Redeem
 	redeemResp, err := manager.Redeem(ctx, resp.Token, solutions, scope)
@@ -76,7 +78,7 @@ func TestRedeemConcurrentRace(t *testing.T) {
 	const goroutines = 50
 
 	secret := []byte("race-test-secret-key-at-least-16-bytes")
-	store := NewMemoryStore(1 * time.Minute)
+	store := pkgcap.NewMemoryStore(1 * time.Minute)
 	manager := NewManager(Config{
 		Secret:              secret,
 		ChallengeCount:      1,
@@ -91,7 +93,7 @@ func TestRedeemConcurrentRace(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Generate failed: %v", err)
 	}
-	solutions := Solve(resp.Token, resp.Challenge.C, resp.Challenge.S, resp.Challenge.D)
+	solutions := pkgcap.Solve(resp.Token, resp.Challenge.C, resp.Challenge.S, resp.Challenge.D)
 
 	var (
 		wg      sync.WaitGroup
@@ -125,7 +127,7 @@ func TestVerifyTokenConcurrentRace(t *testing.T) {
 	const goroutines = 50
 
 	secret := []byte("race-test-secret-key-at-least-16-bytes")
-	store := NewMemoryStore(1 * time.Minute)
+	store := pkgcap.NewMemoryStore(1 * time.Minute)
 	manager := NewManager(Config{
 		Secret:              secret,
 		ChallengeCount:      1,
@@ -137,7 +139,7 @@ func TestVerifyTokenConcurrentRace(t *testing.T) {
 
 	ctx := context.Background()
 	resp, _ := manager.Generate(ctx, "login")
-	solutions := Solve(resp.Token, resp.Challenge.C, resp.Challenge.S, resp.Challenge.D)
+	solutions := pkgcap.Solve(resp.Token, resp.Challenge.C, resp.Challenge.S, resp.Challenge.D)
 	redeemResp, err := manager.Redeem(ctx, resp.Token, solutions, "login")
 	if err != nil || !redeemResp.Success {
 		t.Fatalf("Redeem failed: %v %+v", err, redeemResp)

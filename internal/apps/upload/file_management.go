@@ -11,6 +11,7 @@ import (
 	"strings"
 
 	"github.com/Rain-kl/Wavelet/internal/apps/oauth"
+	"github.com/Rain-kl/Wavelet/internal/common/response"
 	"github.com/Rain-kl/Wavelet/internal/db"
 	"github.com/Rain-kl/Wavelet/internal/model"
 	"github.com/Rain-kl/Wavelet/internal/util"
@@ -46,16 +47,16 @@ type listFilesResponse struct {
 // @Param extension query string false "扩展名过滤"
 // @Param user_id query uint64 false "上传用户 ID"
 // @Security SessionCookie
-// @Success 200 {object} util.ResponseAny{data=listFilesResponse} "查询成功"
-// @Failure 401 {object} util.ResponseAny "未登录"
-// @Failure 403 {object} util.ResponseAny "无管理员权限"
+// @Success 200 {object} response.Any{data=listFilesResponse} "查询成功"
+// @Failure 401 {object} response.Any "未登录"
+// @Failure 403 {object} response.Any "无管理员权限"
 // @Router /api/v1/admin/uploads [get]
 func ListFiles(c *gin.Context) {
 	ctx := c.Request.Context()
 
 	var req listFilesRequest
 	if err := c.ShouldBindQuery(&req); err != nil {
-		c.JSON(http.StatusOK, util.Err(ErrInvalidParams))
+		c.JSON(http.StatusOK, response.Err(ErrInvalidParams))
 		return
 	}
 	if req.Page <= 0 {
@@ -83,18 +84,18 @@ func ListFiles(c *gin.Context) {
 
 	var total int64
 	if err := query.Count(&total).Error; err != nil {
-		c.JSON(http.StatusOK, util.Err(ErrQueryFileCountFailed))
+		c.JSON(http.StatusOK, response.Err(ErrQueryFileCountFailed))
 		return
 	}
 
 	var items []model.Upload
 	offset := (req.Page - 1) * req.PageSize
 	if err := query.Order("created_at DESC").Offset(offset).Limit(req.PageSize).Find(&items).Error; err != nil {
-		c.JSON(http.StatusOK, util.Err(ErrQueryFileListFailed))
+		c.JSON(http.StatusOK, response.Err(ErrQueryFileListFailed))
 		return
 	}
 
-	c.JSON(http.StatusOK, util.OK(listFilesResponse{
+	c.JSON(http.StatusOK, response.OK(listFilesResponse{
 		Total:    total,
 		Page:     req.Page,
 		PageSize: req.PageSize,
@@ -109,20 +110,20 @@ func ListFiles(c *gin.Context) {
 // @Produce json
 // @Param id path string true "文件 ID"
 // @Security SessionCookie
-// @Success 200 {object} util.ResponseAny "删除成功"
-// @Failure 403 {object} util.ResponseAny "无权操作"
-// @Failure 404 {object} util.ResponseAny "文件不存在"
+// @Success 200 {object} response.Any "删除成功"
+// @Failure 403 {object} response.Any "无权操作"
+// @Failure 404 {object} response.Any "文件不存在"
 // @Router /api/v1/admin/uploads/{id} [delete]
 func DeleteFile(c *gin.Context) {
 	ctx := c.Request.Context()
 	if StorageReadOnly(ctx) {
-		c.JSON(http.StatusConflict, util.Err(ErrStorageReadOnly))
+		c.JSON(http.StatusConflict, response.Err(ErrStorageReadOnly))
 		return
 	}
 
 	uploadID, err := strconv.ParseUint(c.Param("id"), 10, 64)
 	if err != nil {
-		c.JSON(http.StatusOK, util.Err(ErrInvalidFileID))
+		c.JSON(http.StatusOK, response.Err(ErrInvalidFileID))
 		return
 	}
 
@@ -132,14 +133,14 @@ func DeleteFile(c *gin.Context) {
 			c.AbortWithStatus(http.StatusNotFound)
 			return
 		}
-		c.JSON(http.StatusOK, util.Err(ErrQueryUploadRecordFailed))
+		c.JSON(http.StatusOK, response.Err(ErrQueryUploadRecordFailed))
 		return
 	}
 	if err := db.DB(ctx).Model(&upload).Update("status", model.UploadStatusDeleted).Error; err != nil {
-		c.JSON(http.StatusOK, util.Err(ErrDeleteFileFailed))
+		c.JSON(http.StatusOK, response.Err(ErrDeleteFileFailed))
 		return
 	}
-	c.JSON(http.StatusOK, util.OKNil())
+	c.JSON(http.StatusOK, response.OKNil())
 }
 
 // GetDistinctUploadTypes 获取数据库中所有已存在的文件业务类型
@@ -148,10 +149,10 @@ func DeleteFile(c *gin.Context) {
 // @Tags admin
 // @Produce json
 // @Security SessionCookie
-// @Success 200 {object} util.ResponseAny{data=[]string} "业务类型列表"
-// @Failure 401 {object} util.ResponseAny "未登录"
-// @Failure 403 {object} util.ResponseAny "无管理员权限"
-// @Failure 500 {object} util.ResponseAny "内部错误"
+// @Success 200 {object} response.Any{data=[]string} "业务类型列表"
+// @Failure 401 {object} response.Any "未登录"
+// @Failure 403 {object} response.Any "无管理员权限"
+// @Failure 500 {object} response.Any "内部错误"
 // @Router /api/v1/admin/uploads/types [get]
 func GetDistinctUploadTypes(c *gin.Context) {
 	var dbTypes []string
@@ -159,11 +160,11 @@ func GetDistinctUploadTypes(c *gin.Context) {
 		Where("type IS NOT NULL AND type != ''").
 		Distinct().
 		Pluck("type", &dbTypes).Error; err != nil {
-		c.JSON(http.StatusInternalServerError, util.Err(err.Error()))
+		c.JSON(http.StatusInternalServerError, response.Err(err.Error()))
 		return
 	}
 	sort.Strings(dbTypes)
-	c.JSON(http.StatusOK, util.OK(dbTypes))
+	c.JSON(http.StatusOK, response.OK(dbTypes))
 }
 
 type listMyFilesRequest struct {
@@ -192,8 +193,8 @@ type listMyFilesResponse struct {
 // @Param type query string false "业务分类过滤"
 // @Param extension query string false "扩展名过滤"
 // @Security SessionCookie
-// @Success 200 {object} util.ResponseAny{data=listMyFilesResponse} "查询成功"
-// @Failure 401 {object} util.ResponseAny "未登录"
+// @Success 200 {object} response.Any{data=listMyFilesResponse} "查询成功"
+// @Failure 401 {object} response.Any "未登录"
 // @Router /api/v1/upload/my [get]
 func ListMyFiles(c *gin.Context) {
 	currUser, _ := util.GetFromContext[*model.User](c, oauth.UserObjKey)
@@ -201,7 +202,7 @@ func ListMyFiles(c *gin.Context) {
 
 	var req listMyFilesRequest
 	if err := c.ShouldBindQuery(&req); err != nil {
-		c.JSON(http.StatusOK, util.Err(ErrInvalidParams))
+		c.JSON(http.StatusOK, response.Err(ErrInvalidParams))
 		return
 	}
 	if req.Page <= 0 {
@@ -226,18 +227,18 @@ func ListMyFiles(c *gin.Context) {
 
 	var total int64
 	if err := query.Count(&total).Error; err != nil {
-		c.JSON(http.StatusOK, util.Err(ErrQueryFileCountFailed))
+		c.JSON(http.StatusOK, response.Err(ErrQueryFileCountFailed))
 		return
 	}
 
 	var items []model.Upload
 	offset := (req.Page - 1) * req.PageSize
 	if err := query.Order("created_at DESC").Offset(offset).Limit(req.PageSize).Find(&items).Error; err != nil {
-		c.JSON(http.StatusOK, util.Err(ErrQueryFileListFailed))
+		c.JSON(http.StatusOK, response.Err(ErrQueryFileListFailed))
 		return
 	}
 
-	c.JSON(http.StatusOK, util.OK(listMyFilesResponse{
+	c.JSON(http.StatusOK, response.OK(listMyFilesResponse{
 		Total:    total,
 		Page:     req.Page,
 		PageSize: req.PageSize,
@@ -252,21 +253,21 @@ func ListMyFiles(c *gin.Context) {
 // @Produce json
 // @Param id path string true "文件 ID"
 // @Security SessionCookie
-// @Success 200 {object} util.ResponseAny "删除成功"
-// @Failure 403 {object} util.ResponseAny "无权操作"
-// @Failure 404 {object} util.ResponseAny "文件不存在"
+// @Success 200 {object} response.Any "删除成功"
+// @Failure 403 {object} response.Any "无权操作"
+// @Failure 404 {object} response.Any "文件不存在"
 // @Router /api/v1/upload/{id} [delete]
 func DeleteMyFile(c *gin.Context) {
 	currUser, _ := util.GetFromContext[*model.User](c, oauth.UserObjKey)
 	ctx := c.Request.Context()
 	if StorageReadOnly(ctx) {
-		c.JSON(http.StatusConflict, util.Err(ErrStorageReadOnly))
+		c.JSON(http.StatusConflict, response.Err(ErrStorageReadOnly))
 		return
 	}
 
 	uploadID, err := strconv.ParseUint(c.Param("id"), 10, 64)
 	if err != nil {
-		c.JSON(http.StatusOK, util.Err(ErrInvalidFileID))
+		c.JSON(http.StatusOK, response.Err(ErrInvalidFileID))
 		return
 	}
 
@@ -276,7 +277,7 @@ func DeleteMyFile(c *gin.Context) {
 			c.AbortWithStatus(http.StatusNotFound)
 			return
 		}
-		c.JSON(http.StatusOK, util.Err(ErrQueryUploadRecordFailed))
+		c.JSON(http.StatusOK, response.Err(ErrQueryUploadRecordFailed))
 		return
 	}
 
@@ -286,10 +287,10 @@ func DeleteMyFile(c *gin.Context) {
 	}
 
 	if err := db.DB(ctx).Model(&upload).Update("status", model.UploadStatusDeleted).Error; err != nil {
-		c.JSON(http.StatusOK, util.Err(ErrDeleteFileFailed))
+		c.JSON(http.StatusOK, response.Err(ErrDeleteFileFailed))
 		return
 	}
-	c.JSON(http.StatusOK, util.OKNil())
+	c.JSON(http.StatusOK, response.OKNil())
 }
 
 type updateMyFileRequest struct {
@@ -306,27 +307,27 @@ type updateMyFileRequest struct {
 // @Param id path string true "文件 ID"
 // @Param request body updateMyFileRequest true "更新字段"
 // @Security SessionCookie
-// @Success 200 {object} util.ResponseAny{data=model.Upload} "更新成功"
-// @Failure 403 {object} util.ResponseAny "无权操作"
-// @Failure 404 {object} util.ResponseAny "文件不存在"
+// @Success 200 {object} response.Any{data=model.Upload} "更新成功"
+// @Failure 403 {object} response.Any "无权操作"
+// @Failure 404 {object} response.Any "文件不存在"
 // @Router /api/v1/upload/{id} [put]
 func UpdateMyFile(c *gin.Context) {
 	currUser, _ := util.GetFromContext[*model.User](c, oauth.UserObjKey)
 	ctx := c.Request.Context()
 	if StorageReadOnly(ctx) {
-		c.JSON(http.StatusConflict, util.Err(ErrStorageReadOnly))
+		c.JSON(http.StatusConflict, response.Err(ErrStorageReadOnly))
 		return
 	}
 
 	uploadID, err := strconv.ParseUint(c.Param("id"), 10, 64)
 	if err != nil {
-		c.JSON(http.StatusOK, util.Err(ErrInvalidFileID))
+		c.JSON(http.StatusOK, response.Err(ErrInvalidFileID))
 		return
 	}
 
 	var req updateMyFileRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusOK, util.Err(ErrInvalidParams))
+		c.JSON(http.StatusOK, response.Err(ErrInvalidParams))
 		return
 	}
 
@@ -336,7 +337,7 @@ func UpdateMyFile(c *gin.Context) {
 			c.AbortWithStatus(http.StatusNotFound)
 			return
 		}
-		c.JSON(http.StatusOK, util.Err(ErrQueryUploadRecordFailed))
+		c.JSON(http.StatusOK, response.Err(ErrQueryUploadRecordFailed))
 		return
 	}
 
@@ -355,10 +356,10 @@ func UpdateMyFile(c *gin.Context) {
 
 	if len(updates) > 0 {
 		if err := db.DB(ctx).Model(&upload).Updates(updates).Error; err != nil {
-			c.JSON(http.StatusOK, util.Err("更新文件记录失败"))
+			c.JSON(http.StatusOK, response.Err("更新文件记录失败"))
 			return
 		}
 	}
 
-	c.JSON(http.StatusOK, util.OK(upload))
+	c.JSON(http.StatusOK, response.OK(upload))
 }

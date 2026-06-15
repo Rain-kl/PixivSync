@@ -4,8 +4,7 @@
 // Package cache provides HTTP handlers for managing disk cache.
 package cache
 
-import (
-	"context"
+import ("context"
 	"errors"
 	"net/http"
 	"strconv"
@@ -13,10 +12,10 @@ import (
 	"github.com/Rain-kl/Wavelet/internal/db"
 	"github.com/Rain-kl/Wavelet/internal/diskcache"
 	"github.com/Rain-kl/Wavelet/internal/model"
-	"github.com/Rain-kl/Wavelet/internal/util"
 	"github.com/gin-gonic/gin"
 	"gorm.io/gorm"
-)
+
+	"github.com/Rain-kl/Wavelet/internal/common/response")
 
 type updateCacheConfigRequest struct {
 	MaxSizeMB  int64 `json:"max_size_mb" binding:"required,min=1"`
@@ -30,14 +29,14 @@ type updateCacheConfigRequest struct {
 // @Tags admin
 // @Produce json
 // @Security SessionCookie
-// @Success 200 {object} util.ResponseAny{data=diskcache.Status} "获取成功"
-// @Failure 401 {object} util.ResponseAny "未登录"
-// @Failure 403 {object} util.ResponseAny "无管理员权限"
-// @Failure 500 {object} util.ResponseAny "内部错误"
+// @Success 200 {object} response.Any{data=diskcache.Status} "获取成功"
+// @Failure 401 {object} response.Any "未登录"
+// @Failure 403 {object} response.Any "无管理员权限"
+// @Failure 500 {object} response.Any "内部错误"
 // @Router /api/v1/admin/cache/status [get]
 func GetCacheStatus(c *gin.Context) {
 	status := diskcache.GetGlobalCache().Status()
-	c.JSON(http.StatusOK, util.OK(status))
+	c.JSON(http.StatusOK, response.OK(status))
 }
 
 // UpdateCacheConfig 更新磁盘缓存策略配置
@@ -48,16 +47,16 @@ func GetCacheStatus(c *gin.Context) {
 // @Produce json
 // @Param request body cache.updateCacheConfigRequest true "缓存配置请求体"
 // @Security SessionCookie
-// @Success 200 {object} util.ResponseAny "更新成功"
-// @Failure 400 {object} util.ResponseAny "参数错误"
-// @Failure 401 {object} util.ResponseAny "未登录"
-// @Failure 403 {object} util.ResponseAny "无管理员权限"
-// @Failure 500 {object} util.ResponseAny "服务内部错误"
+// @Success 200 {object} response.Any "更新成功"
+// @Failure 400 {object} response.Any "参数错误"
+// @Failure 401 {object} response.Any "未登录"
+// @Failure 403 {object} response.Any "无管理员权限"
+// @Failure 500 {object} response.Any "服务内部错误"
 // @Router /api/v1/admin/cache/config [post]
 func UpdateCacheConfig(c *gin.Context) {
 	var req updateCacheConfigRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, util.Err(err.Error()))
+		c.JSON(http.StatusBadRequest, response.Err(err.Error()))
 		return
 	}
 
@@ -65,26 +64,26 @@ func UpdateCacheConfig(c *gin.Context) {
 
 	// Update Max Size
 	if err := saveOrUpdateConfig(ctx, model.ConfigKeyDiskCacheMaxSizeMB, strconv.FormatInt(req.MaxSizeMB, 10)); err != nil {
-		c.JSON(http.StatusInternalServerError, util.Err(err.Error()))
+		c.JSON(http.StatusInternalServerError, response.Err(err.Error()))
 		return
 	}
 
 	// Update Default TTL
 	if err := saveOrUpdateConfig(ctx, model.ConfigKeyDiskCacheTTLMinutes, strconv.FormatInt(req.TTLMinutes, 10)); err != nil {
-		c.JSON(http.StatusInternalServerError, util.Err(err.Error()))
+		c.JSON(http.StatusInternalServerError, response.Err(err.Error()))
 		return
 	}
 
 	// Update LRU Enabled
 	if err := saveOrUpdateConfig(ctx, model.ConfigKeyDiskCacheLRUEnabled, strconv.FormatBool(req.LRUEnabled)); err != nil {
-		c.JSON(http.StatusInternalServerError, util.Err(err.Error()))
+		c.JSON(http.StatusInternalServerError, response.Err(err.Error()))
 		return
 	}
 
 	// Trigger hot reloading in global cache
 	diskcache.GetGlobalCache().ReloadConfig(ctx)
 
-	c.JSON(http.StatusOK, util.OKNil())
+	c.JSON(http.StatusOK, response.OKNil())
 }
 
 // ClearCache 一键清空所有磁盘缓存数据
@@ -93,17 +92,17 @@ func UpdateCacheConfig(c *gin.Context) {
 // @Tags admin
 // @Produce json
 // @Security SessionCookie
-// @Success 200 {object} util.ResponseAny "清理成功"
-// @Failure 401 {object} util.ResponseAny "未登录"
-// @Failure 403 {object} util.ResponseAny "无管理员权限"
-// @Failure 500 {object} util.ResponseAny "服务内部错误"
+// @Success 200 {object} response.Any "清理成功"
+// @Failure 401 {object} response.Any "未登录"
+// @Failure 403 {object} response.Any "无管理员权限"
+// @Failure 500 {object} response.Any "服务内部错误"
 // @Router /api/v1/admin/cache/clear [post]
 func ClearCache(c *gin.Context) {
 	if err := diskcache.GetGlobalCache().Clear(); err != nil {
-		c.JSON(http.StatusInternalServerError, util.Err(err.Error()))
+		c.JSON(http.StatusInternalServerError, response.Err(err.Error()))
 		return
 	}
-	c.JSON(http.StatusOK, util.OKNil())
+	c.JSON(http.StatusOK, response.OKNil())
 }
 
 func saveOrUpdateConfig(ctx context.Context, key string, value string) error {

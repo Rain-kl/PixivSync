@@ -10,7 +10,7 @@ import (
 	"path"
 	"strings"
 
-	"github.com/Rain-kl/Wavelet/internal/httppool"
+	"github.com/Rain-kl/Wavelet/pkg/httppool"
 	"github.com/studio-b12/gowebdav"
 )
 

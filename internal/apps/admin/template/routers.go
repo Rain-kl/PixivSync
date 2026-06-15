@@ -3,16 +3,15 @@
 
 package template
 
-import (
-	"errors"
+import ("errors"
 	"net/http"
 
 	"github.com/Rain-kl/Wavelet/internal/db"
 	"github.com/Rain-kl/Wavelet/internal/model"
-	"github.com/Rain-kl/Wavelet/internal/util"
 	"github.com/gin-gonic/gin"
 	"gorm.io/gorm"
-)
+
+	"github.com/Rain-kl/Wavelet/internal/common/response")
 
 // CreateTemplateRequest 创建模板请求
 type CreateTemplateRequest struct {
@@ -41,26 +40,26 @@ type UpdateTemplateRequest struct {
 // @Produce json
 // @Security SessionCookie
 // @Param request body template.CreateTemplateRequest true "创建请求参数"
-// @Success 200 {object} util.ResponseAny{data=string} "创建成功"
-// @Failure 400 {object} util.ResponseAny "参数错误或模板标识符已存在"
-// @Failure 401 {object} util.ResponseAny "未登录"
-// @Failure 403 {object} util.ResponseAny "无管理员权限"
-// @Failure 500 {object} util.ResponseAny "内部错误"
+// @Success 200 {object} response.Any{data=string} "创建成功"
+// @Failure 400 {object} response.Any "参数错误或模板标识符已存在"
+// @Failure 401 {object} response.Any "未登录"
+// @Failure 403 {object} response.Any "无管理员权限"
+// @Failure 500 {object} response.Any "内部错误"
 // @Router /api/v1/admin/templates [post]
 func CreateTemplate(c *gin.Context) {
 	var req CreateTemplateRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, util.Err(err.Error()))
+		c.JSON(http.StatusBadRequest, response.Err(err.Error()))
 		return
 	}
 
 	// 检查模板 Key 是否已存在
 	var existing model.Template
 	if err := db.DB(c.Request.Context()).Where("key = ?", req.Key).First(&existing).Error; err == nil {
-		c.JSON(http.StatusBadRequest, util.Err(TemplateKeyExists))
+		c.JSON(http.StatusBadRequest, response.Err(TemplateKeyExists))
 		return
 	} else if !errors.Is(err, gorm.ErrRecordNotFound) {
-		c.JSON(http.StatusInternalServerError, util.Err(err.Error()))
+		c.JSON(http.StatusInternalServerError, response.Err(err.Error()))
 		return
 	}
 
@@ -75,16 +74,16 @@ func CreateTemplate(c *gin.Context) {
 	}
 
 	if err := tmpl.Validate(); err != nil {
-		c.JSON(http.StatusBadRequest, util.Err(err.Error()))
+		c.JSON(http.StatusBadRequest, response.Err(err.Error()))
 		return
 	}
 
 	if err := db.DB(c.Request.Context()).Create(&tmpl).Error; err != nil {
-		c.JSON(http.StatusInternalServerError, util.Err(err.Error()))
+		c.JSON(http.StatusInternalServerError, response.Err(err.Error()))
 		return
 	}
 
-	c.JSON(http.StatusOK, util.OK(tmpl))
+	c.JSON(http.StatusOK, response.OK(tmpl))
 }
 
 // ListTemplates 获取模板列表
@@ -93,19 +92,19 @@ func CreateTemplate(c *gin.Context) {
 // @Tags admin
 // @Produce json
 // @Security SessionCookie
-// @Success 200 {object} util.ResponseAny{data=[]model.Template} "模板列表"
-// @Failure 401 {object} util.ResponseAny "未登录"
-// @Failure 403 {object} util.ResponseAny "无管理员权限"
-// @Failure 500 {object} util.ResponseAny "内部错误"
+// @Success 200 {object} response.Any{data=[]model.Template} "模板列表"
+// @Failure 401 {object} response.Any "未登录"
+// @Failure 403 {object} response.Any "无管理员权限"
+// @Failure 500 {object} response.Any "内部错误"
 // @Router /api/v1/admin/templates [get]
 func ListTemplates(c *gin.Context) {
 	var templates []model.Template
 	if err := db.DB(c.Request.Context()).Order("is_system DESC, created_at DESC").Find(&templates).Error; err != nil {
-		c.JSON(http.StatusInternalServerError, util.Err(err.Error()))
+		c.JSON(http.StatusInternalServerError, response.Err(err.Error()))
 		return
 	}
 
-	c.JSON(http.StatusOK, util.OK(templates))
+	c.JSON(http.StatusOK, response.OK(templates))
 }
 
 // GetTemplate 获取单个模板
@@ -115,24 +114,24 @@ func ListTemplates(c *gin.Context) {
 // @Produce json
 // @Security SessionCookie
 // @Param key path string true "模板标识符"
-// @Success 200 {object} util.ResponseAny{data=model.Template} "模板详情"
-// @Failure 401 {object} util.ResponseAny "未登录"
-// @Failure 403 {object} util.ResponseAny "无管理员权限"
-// @Failure 404 {object} util.ResponseAny "模板不存在"
-// @Failure 500 {object} util.ResponseAny "内部错误"
+// @Success 200 {object} response.Any{data=model.Template} "模板详情"
+// @Failure 401 {object} response.Any "未登录"
+// @Failure 403 {object} response.Any "无管理员权限"
+// @Failure 404 {object} response.Any "模板不存在"
+// @Failure 500 {object} response.Any "内部错误"
 // @Router /api/v1/admin/templates/{key} [get]
 func GetTemplate(c *gin.Context) {
 	var tmpl model.Template
 	if err := db.DB(c.Request.Context()).Where("key = ?", c.Param("key")).First(&tmpl).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
-			c.JSON(http.StatusNotFound, util.Err(TemplateNotFound))
+			c.JSON(http.StatusNotFound, response.Err(TemplateNotFound))
 		} else {
-			c.JSON(http.StatusInternalServerError, util.Err(err.Error()))
+			c.JSON(http.StatusInternalServerError, response.Err(err.Error()))
 		}
 		return
 	}
 
-	c.JSON(http.StatusOK, util.OK(tmpl))
+	c.JSON(http.StatusOK, response.OK(tmpl))
 }
 
 // UpdateTemplate 更新模板
@@ -144,17 +143,17 @@ func GetTemplate(c *gin.Context) {
 // @Security SessionCookie
 // @Param key path string true "模板标识符"
 // @Param request body template.UpdateTemplateRequest true "更新请求参数"
-// @Success 200 {object} util.ResponseAny{data=model.Template} "更新成功"
-// @Failure 400 {object} util.ResponseAny "参数错误"
-// @Failure 401 {object} util.ResponseAny "未登录"
-// @Failure 403 {object} util.ResponseAny "无管理员权限"
-// @Failure 404 {object} util.ResponseAny "模板不存在"
-// @Failure 500 {object} util.ResponseAny "内部错误"
+// @Success 200 {object} response.Any{data=model.Template} "更新成功"
+// @Failure 400 {object} response.Any "参数错误"
+// @Failure 401 {object} response.Any "未登录"
+// @Failure 403 {object} response.Any "无管理员权限"
+// @Failure 404 {object} response.Any "模板不存在"
+// @Failure 500 {object} response.Any "内部错误"
 // @Router /api/v1/admin/templates/{key} [put]
 func UpdateTemplate(c *gin.Context) {
 	var req UpdateTemplateRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, util.Err(err.Error()))
+		c.JSON(http.StatusBadRequest, response.Err(err.Error()))
 		return
 	}
 
@@ -164,9 +163,9 @@ func UpdateTemplate(c *gin.Context) {
 	var tmpl model.Template
 	if err := db.DB(c.Request.Context()).Where("key = ?", key).First(&tmpl).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
-			c.JSON(http.StatusNotFound, util.Err(TemplateNotFound))
+			c.JSON(http.StatusNotFound, response.Err(TemplateNotFound))
 		} else {
-			c.JSON(http.StatusInternalServerError, util.Err(err.Error()))
+			c.JSON(http.StatusInternalServerError, response.Err(err.Error()))
 		}
 		return
 	}
@@ -178,16 +177,16 @@ func UpdateTemplate(c *gin.Context) {
 	tmpl.Description = req.Description
 
 	if err := tmpl.Validate(); err != nil {
-		c.JSON(http.StatusBadRequest, util.Err(err.Error()))
+		c.JSON(http.StatusBadRequest, response.Err(err.Error()))
 		return
 	}
 
 	if err := db.DB(c.Request.Context()).Save(&tmpl).Error; err != nil {
-		c.JSON(http.StatusInternalServerError, util.Err(err.Error()))
+		c.JSON(http.StatusInternalServerError, response.Err(err.Error()))
 		return
 	}
 
-	c.JSON(http.StatusOK, util.OK(tmpl))
+	c.JSON(http.StatusOK, response.OK(tmpl))
 }
 
 // DeleteTemplate 删除模板
@@ -197,12 +196,12 @@ func UpdateTemplate(c *gin.Context) {
 // @Produce json
 // @Security SessionCookie
 // @Param key path string true "模板标识符"
-// @Success 200 {object} util.ResponseAny{data=string} "删除成功"
-// @Failure 400 {object} util.ResponseAny "不可删除系统模板"
-// @Failure 401 {object} util.ResponseAny "未登录"
-// @Failure 403 {object} util.ResponseAny "无管理员权限"
-// @Failure 404 {object} util.ResponseAny "模板不存在"
-// @Failure 500 {object} util.ResponseAny "内部错误"
+// @Success 200 {object} response.Any{data=string} "删除成功"
+// @Failure 400 {object} response.Any "不可删除系统模板"
+// @Failure 401 {object} response.Any "未登录"
+// @Failure 403 {object} response.Any "无管理员权限"
+// @Failure 404 {object} response.Any "模板不存在"
+// @Failure 500 {object} response.Any "内部错误"
 // @Router /api/v1/admin/templates/{key} [delete]
 func DeleteTemplate(c *gin.Context) {
 	key := c.Param("key")
@@ -211,23 +210,23 @@ func DeleteTemplate(c *gin.Context) {
 	var tmpl model.Template
 	if err := db.DB(c.Request.Context()).Where("key = ?", key).First(&tmpl).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
-			c.JSON(http.StatusNotFound, util.Err(TemplateNotFound))
+			c.JSON(http.StatusNotFound, response.Err(TemplateNotFound))
 		} else {
-			c.JSON(http.StatusInternalServerError, util.Err(err.Error()))
+			c.JSON(http.StatusInternalServerError, response.Err(err.Error()))
 		}
 		return
 	}
 
 	// 限制系统模板删除
 	if tmpl.IsSystem {
-		c.JSON(http.StatusBadRequest, util.Err(SystemTemplateCannotDelete))
+		c.JSON(http.StatusBadRequest, response.Err(SystemTemplateCannotDelete))
 		return
 	}
 
 	if err := db.DB(c.Request.Context()).Delete(&tmpl).Error; err != nil {
-		c.JSON(http.StatusInternalServerError, util.Err(err.Error()))
+		c.JSON(http.StatusInternalServerError, response.Err(err.Error()))
 		return
 	}
 
-	c.JSON(http.StatusOK, util.OKNil())
+	c.JSON(http.StatusOK, response.OKNil())
 }

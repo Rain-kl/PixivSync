@@ -22,8 +22,8 @@ import (
 	"time"
 
 	"github.com/Rain-kl/Wavelet/internal/buildinfo"
-	"github.com/Rain-kl/Wavelet/internal/logger"
 	"github.com/Rain-kl/Wavelet/internal/model"
+	"github.com/Rain-kl/Wavelet/pkg/logger"
 	"golang.org/x/mod/semver"
 )
 

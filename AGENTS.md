@@ -33,7 +33,8 @@
 ## 严格遵循事项 (Guardrails)
 
 - 切勿删除 `frontend/node_modules`；如果需要刷新依赖，请使用 `pnpm install` 重新安装。
-- 保持 `internal/util/` 不引入任何框架。不要从 `internal/util/` 及其子包中导入 Gin、GORM、sessions 或其他 HTTP/框架包。
+- 保持 `internal/util/` 绝对纯净且不引入任何框架。禁止从 `internal/util/` 及其子包中导入 Gin、GORM、sessions 等 HTTP/Web/数据库相关框架包（例如，Web 会话选项已收敛至 `internal/apps/oauth/session.go`）。
+- 编写测试用例时，禁止使用硬编码的相对路径（如 `"uploads/test_cache"`）在源码目录下创建临时测试目录，必须统一使用 Go 内置的 `t.TempDir()` 以避免污染源码目录。
 - 所有 HTTP 路由仅在 `internal/router/router.go` 中注册。
 - 当 API Handler 发生变化时，更新 Swagger 文档（运行 `make swagger`）。
 - 在提交更改前运行 `make code-check`。
@@ -69,22 +70,29 @@
 - `internal/cmd/`：用于 API、worker、scheduler、root init 的 Cobra 命令。
 - `internal/config/`：Viper 加载和配置结构体。运行时代码应使用 `config.Config.<Section>.<Field>`。
 - `internal/router/`：唯一的 HTTP 路由注册点。
-- `internal/apps/`：按领域组织的 HTTP Handler 和模块逻辑；管理端模块位于 `internal/apps/admin/`。
+- `internal/apps/`：按功能（Feature-based）组织的 HTTP Handler、中间件、内部服务与模块逻辑。移除全局 service 层，模块内部业务逻辑（如验证码业务逻辑管理器 `internal/apps/cap/manager.go`）均收敛于各自模块中；管理端模块位于 `internal/apps/admin/`。
 - `internal/apps/upload/`：上传记录、文件访问控制、本地/S3 文件响应、下载及图片 WebP 压缩。业务应复用这些入口，不直接操作底层文件。
 - `internal/model/`：GORM 实体和模型级业务方法。
 - `internal/db/`：PostgreSQL、Redis、ClickHouse、GORM 日志、ID 生成和 goose SQL 迁移的布线。
 - `internal/diskcache/`：平台级磁盘字节缓存，通过 `diskcache.GetGlobalCache()` 提供 TTL、最大空间限制、LRU 淘汰、清空、状态统计和配置热更新。写入时使用 `DefaultExpiration`（全局默认 TTL）、正数 `time.Duration`（业务 TTL）或 `NoExpiration`（无 TTL，仍受空间限制和 LRU 淘汰）。
 - `internal/storage/`：S3 兼容对象存储适配，提供对象上传、读取、删除、CDN/代理读取及远端对象本地缓存。
 - `internal/task/`：Asynq 任务框架；参见 `new-async-task` 了解变更。
-- `internal/service/`：当 Handler/Model 层次过于狭窄时使用的复杂业务服务。
-- `internal/common/`：共享的响应、绑定（bind）、常量以及通用错误。
-- `internal/util/`：纯实用工具，不导入任何框架。
-- `internal/logger/`：Zap 和 OTel 日志助手。
+- `internal/common/`：共享的通用模型及响应（如 `internal/common/response`）、绑定（bind）、常量以及通用错误。
+- `internal/util/`：纯底层工具包，无任何 HTTP/数据库框架依赖。
 - `internal/listener/`：事件监听器和消息/Webhook 消费者。
 - `internal/otel_trace/`：链路追踪（tracing）助手。
 - `internal/testhelper/`：后端测试共享辅助能力。
 - `internal/buildinfo/`：暴露在发布/构建工作流中注入的元数据（如版本号、编译时间等）。
-- `internal/httppool/`：管理全局共享且经过优化的 HTTP 传输客户端及连接池，并集成 OTel 链路追踪。
+
+公共底层包 (`pkg/`)：
+- `pkg/cache/disk/`：纯底层的通用本地磁盘缓存引擎。
+- `pkg/cap/`：底层的通用验证码验证和生成库。
+- `pkg/httppool/`：管理全局共享且经过优化的 HTTP 传输客户端及连接池，集成 OTel 链路追踪。
+- `pkg/logger/`：Zap 和 OTel 日志助手。
+- `pkg/push/`：推送渠道客户端集成（Lark/Telegram/Email）。
+- `pkg/mail/`：邮件发送客户端。
+- `pkg/trace/`：OpenTelemetry 链路追踪配置。
+- `pkg/util/`：纯底层无副作用的系统工具（Crypto/Password/UUID）。
 
 前端目录：
 
@@ -137,15 +145,15 @@ Handler 规范：
 
 - Handler 命名为 动词 + 名词，例如 `ListUsers`。
 - 使用 `ShouldBindQuery` 或 `ShouldBindJSON` 进行绑定。
-- 成功时通过 `util.OK(data)`、`util.OKNil()` 或 `response.RespondSuccess` 返回。
-- 失败时通过 `util.Err(msg)` 或 `response.RespondFailure` 返回。
+- 成功时统一通过导入 `"github.com/Rain-kl/Wavelet/internal/common/response"` 使用 `response.OK(data)` 或 `response.OKNil()` 返回。
+- 失败时统一通过 `response.Err(msg)` 返回。
 - API 响应的外层结构必须为 `{ "error_msg": "", "data": ... }`。
 - 分页响应在 `data` 下使用 `{ "total": 0, "results": [] }`。
 - 每个 HTTP API 都需要有完整的 Swagger 注释；在 API 变更后运行 `make swagger`。
 
 错误处理与日志:
 
-- 任何关键错误在被吞掉、转换为通用响应，或由后台 worker 忽略之前，都必须通过 `internal/logger` 打印日志。
+- 任何关键错误在被吞掉、转换为通用响应，或由后台 worker 忽略之前，都必须通过 `pkg/logger` 打印日志。
 - 禁止用 `_ = ...` 静默丢弃重要错误。如果某个错误因为 best-effort 操作或确认无害而需要忽略，必须添加简短注释说明原因。
 - Handler 可以返回对用户安全的错误信息，但如果底层运行错误对生产问题排查有价值，仍然必须记录日志。
 - 避免重复刷日志：在真正处理或抑制错误的边界记录一次，然后返回或响应。
@@ -176,7 +184,7 @@ Handler 规范：
 
 - 简单查询可以直接从 model 层使用 GORM。
 - 管理员代码应首选 `db.DB(ctx)` 以获得链路追踪感知的 DB 访问。
-- 不要在 Handler 中放置复杂的 SQL；将其移至 `internal/model/` 或 `internal/service/`。
+- 不要在 Handler 中放置复杂的 SQL；将其移至 `internal/model/` 或模块内的业务服务层（如 `internal/apps/<module>/service.go` 或 `logics.go`）。
 - 在 `internal/db/migrator/goose/` 下使用 goose SQL 迁移；不要添加基于 GORM AutoMigrate 的 Schema 升级。
 - 不要创建物理数据库外键。改为关系字段添加显式索引。
 - 数据库默认值必须与 Go 模型零值（`nil`、`0`、`false`、`""`）匹配，以避免意外的插入。

@@ -14,6 +14,18 @@ import (
 	"go.uber.org/zap/zapcore"
 )
 
+// Config represents the logging configuration.
+type Config struct {
+	Level      string
+	Format     string
+	Output     string
+	FilePath   string
+	MaxSize    int
+	MaxAge     int
+	MaxBackups int
+	Compress   bool
+}
+
 var logger *otelzap.Logger
 
 // ringBufferCapacity 环形缓冲区容量
@@ -22,14 +34,16 @@ const ringBufferCapacity = 5000
 // GlobalRingBuffer 全局日志环形缓冲区，供 Admin 日志查询和 WebSocket 推送使用
 var GlobalRingBuffer *LogRingBuffer
 
-func init() {
-	logWriter, err := GetLogWriter()
+func doInit(cfg Config) {
+	logWriter, err := getLogWriterForConfig(cfg)
 	if err != nil {
 		log.Fatalf("[Logger] get log writer err: %v\n", err)
 	}
 
-	// 初始化 ring buffer（保留最近 5000 行日志）
-	GlobalRingBuffer = NewLogRingBuffer(ringBufferCapacity)
+	// 初始化 ring buffer（保留最近 5000 行日志），如果是多次调用 Init，不需要重复创建 GlobalRingBuffer
+	if GlobalRingBuffer == nil {
+		GlobalRingBuffer = NewLogRingBuffer(ringBufferCapacity)
+	}
 
 	// 使用 multi writer 同时写入原始输出和 ring buffer
 	multiWriter := zapcore.NewMultiWriteSyncer(
@@ -38,7 +52,7 @@ func init() {
 	)
 
 	zapLogger := zap.New(
-		zapcore.NewCore(getEncoder(), multiWriter, getLogLevel()),
+		zapcore.NewCore(getEncoderForConfig(cfg), multiWriter, getLogLevelForConfig(cfg)),
 		zap.AddCaller(),
 		zap.AddCallerSkip(1),
 	)
@@ -46,8 +60,21 @@ func init() {
 		zapLogger,
 		otelzap.WithMinLevel(zapLogger.Level()),
 	)
+}
 
-	fmt.Printf("[Logger] %s\n", logger.Level())
+func init() {
+	// 默认使用 console stdout INFO 日志输出，避免在 Init 前或测试中发生空指针崩溃
+	defaultCfg := Config{
+		Level:  "info",
+		Format: "console",
+		Output: "stdout",
+	}
+	doInit(defaultCfg)
+}
+
+// Init initializes the logger with a custom configuration.
+func Init(cfg Config) {
+	doInit(cfg)
 }
 
 // DebugF 输出 Debug 级别日志

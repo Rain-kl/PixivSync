@@ -1,6 +1,7 @@
 // Copyright 2026 Arctel.net
 // SPDX-License-Identifier: AGPL-3.0-only
 
+// Package cap provides CAPTCHA and proof-of-work (PoW) verification services.
 package cap
 
 import (
@@ -15,6 +16,7 @@ import (
 	"github.com/Rain-kl/Wavelet/internal/config"
 	"github.com/Rain-kl/Wavelet/internal/db"
 	"github.com/Rain-kl/Wavelet/internal/model"
+	pkgcap "github.com/Rain-kl/Wavelet/pkg/cap"
 )
 
 const (
@@ -42,11 +44,11 @@ type Config struct {
 // Manager orchestrates challenge generation and solution validation
 type Manager struct {
 	conf  Config
-	store Store
+	store pkgcap.Store
 }
 
 // NewManager creates a new CAPTCHA Manager
-func NewManager(conf Config, store Store) *Manager {
+func NewManager(conf Config, store pkgcap.Store) *Manager {
 	if conf.ChallengeCount <= 0 {
 		conf.ChallengeCount = managerDefaultChallengeCount
 	}
@@ -69,19 +71,27 @@ func NewManager(conf Config, store Store) *Manager {
 }
 
 // Generate creates a challenge response
-func (m *Manager) Generate(ctx context.Context, scope string) (*ChallengeResponse, error) {
-	c := ChallengeConfig{
+func (m *Manager) Generate(ctx context.Context, scope string) (*pkgcap.ChallengeResponse, error) {
+	c := pkgcap.ChallengeConfig{
 		Count:      m.getChallengeCount(ctx),
 		Size:       m.getChallengeSize(ctx),
 		Difficulty: m.getChallengeDifficulty(ctx),
 		Expires:    m.getChallengeTTL(ctx),
 	}
-	return GenerateChallenge(m.conf.Secret, c, scope)
+	return pkgcap.GenerateChallenge(m.conf.Secret, c, scope)
+}
+
+// RedeemResponse is returned to the client on redeem
+type RedeemResponse struct {
+	Success bool   `json:"success"`
+	Token   string `json:"token,omitempty"`
+	Expires int64  `json:"expires,omitempty"`
+	Error   string `json:"error,omitempty"`
 }
 
 // Redeem verifies PoW solutions and returns a one-time redeem token
 func (m *Manager) Redeem(ctx context.Context, token string, solutions []int, scope string) (*RedeemResponse, error) {
-	sigHex := jwtSigHex(token)
+	sigHex := pkgcap.JwtSigHex(token)
 	if sigHex == "" {
 		return &RedeemResponse{Success: false, Error: "invalid_token"}, nil
 	}
@@ -89,10 +99,7 @@ func (m *Manager) Redeem(ctx context.Context, token string, solutions []int, sco
 	nonceKey := "cap:nonce:" + sigHex
 
 	// Atomically claim the nonce slot BEFORE verifying solutions.
-	// SetNX returns true only when the key did not previously exist, so two
-	// concurrent requests carrying the same JWT can never both succeed here.
-	// TTL is set to the challenge's remaining lifetime so the slot auto-expires.
-	payload, err := VerifyChallengeSolutions(token, solutions, m.conf.Secret, scope)
+	payload, err := pkgcap.VerifyChallengeSolutions(token, solutions, m.conf.Secret, scope)
 	if err != nil {
 		return &RedeemResponse{Success: false, Error: err.Error()}, nil //nolint:nilerr // expected behavior: validation error is returned as response, not system error
 	}
@@ -115,8 +122,8 @@ func (m *Manager) Redeem(ctx context.Context, token string, solutions []int, sco
 	}
 
 	// Generate a redeem token formatted as "id:verToken"
-	id := randomHex(redeemTokenIDLength)
-	verToken := randomHex(redeemVerTokenLength)
+	id := pkgcap.RandomHex(redeemTokenIDLength)
+	verToken := pkgcap.RandomHex(redeemVerTokenLength)
 	verHashBytes := sha256.Sum256([]byte(verToken))
 	verHashHex := hex.EncodeToString(verHashBytes[:])
 
@@ -139,8 +146,6 @@ func (m *Manager) Redeem(ctx context.Context, token string, solutions []int, sco
 }
 
 // VerifyToken validates and consumes the redeem token (single-use).
-// GetAndDelete is used so that retrieval and removal happen atomically:
-// two concurrent requests carrying the same token can never both see a value.
 func (m *Manager) VerifyToken(ctx context.Context, token string, expectedScope string) (bool, error) {
 	if token == "" {
 		return false, nil
@@ -157,8 +162,7 @@ func (m *Manager) VerifyToken(ctx context.Context, token string, expectedScope s
 
 	tokenKey := "cap:token:" + id + ":" + verHashHex
 
-	// Atomically retrieve-and-delete: the first caller gets the value, any
-	// subsequent caller (even concurrent) receives (false, nil) immediately.
+	// Atomically retrieve-and-delete
 	val, exists, err := sGetAndDelete(ctx, m.store, tokenKey)
 	if err != nil {
 		return false, err
@@ -190,7 +194,7 @@ func (m *Manager) VerifyToken(ctx context.Context, token string, expectedScope s
 }
 
 // sGetAndDelete safely calls store.GetAndDelete, treating a nil store as a miss.
-func sGetAndDelete(ctx context.Context, store Store, key string) (string, bool, error) {
+func sGetAndDelete(ctx context.Context, store pkgcap.Store, key string) (string, bool, error) {
 	if store == nil {
 		return "", false, nil
 	}
@@ -258,11 +262,11 @@ func GetDefaultManager() *Manager {
 		challengeTTL := defaultChallengeTTL
 		tokenTTL := defaultTokenTTL
 
-		var store Store
+		var store pkgcap.Store
 		if config.Config != nil && config.Config.Redis.Enabled && db.Redis != nil {
-			store = NewRedisStore(db.Redis)
+			store = pkgcap.NewRedisStore(db.Redis)
 		} else {
-			store = NewMemoryStore(1 * time.Minute)
+			store = pkgcap.NewMemoryStore(1 * time.Minute)
 		}
 
 		defaultManager = NewManager(Config{

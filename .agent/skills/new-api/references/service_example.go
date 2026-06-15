@@ -12,7 +12,7 @@ import (
 	"go.uber.org/zap"
 )
 
-// CustomService 示例业务 Service 结构体
+// CustomService 示例业务 Service 结构体（通常放在 internal/apps/custom/service.go 中）
 type CustomService struct {
 	// 这里可以注入数据库连接、配置对象或者其他基础服务的客户端
 	// 例如：db *gorm.DB

@@ -3,8 +3,7 @@
 
 package user
 
-import (
-	"bytes"
+import ("bytes"
 	"context"
 	"encoding/json"
 	"net/http"
@@ -18,11 +17,11 @@ import (
 	"github.com/Rain-kl/Wavelet/internal/db"
 	"github.com/Rain-kl/Wavelet/internal/model"
 	"github.com/Rain-kl/Wavelet/internal/testhelper"
-	"github.com/Rain-kl/Wavelet/internal/util"
 	"github.com/gin-contrib/sessions"
 	"github.com/gin-contrib/sessions/cookie"
 	"github.com/gin-gonic/gin"
-)
+
+	"github.com/Rain-kl/Wavelet/internal/common/response")
 
 func setupUserTestRouter(t *testing.T) *gin.Engine {
 	t.Helper()
@@ -49,7 +48,7 @@ func setupUserTestRouter(t *testing.T) *gin.Engine {
 	gin.SetMode(gin.TestMode)
 	r := gin.New()
 	store := cookie.NewStore([]byte(config.Config.App.SessionSecret))
-	store.Options(util.GetSessionOptions(3600))
+	store.Options(oauth.GetSessionOptions(3600))
 	r.Use(sessions.Sessions(config.Config.App.SessionCookieName, store))
 
 	api := r.Group("/api/v1")
@@ -92,7 +91,7 @@ func sessionCookieFromResponse(t *testing.T, w *httptest.ResponseRecorder) *http
 func basicUserInfoFromResponse(t *testing.T, w *httptest.ResponseRecorder) oauth.BasicUserInfo {
 	t.Helper()
 
-	var resp util.ResponseAny
+	var resp response.Any
 	if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
 		t.Fatalf("basicUserInfoFromResponse() decode response failed: %v", err)
 	}

@@ -13,7 +13,7 @@ import (
 
 	"github.com/Rain-kl/Wavelet/internal/model"
 	"github.com/Rain-kl/Wavelet/internal/task"
-	"github.com/Rain-kl/Wavelet/internal/util/mail"
+	"github.com/Rain-kl/Wavelet/pkg/mail"
 )
 
 // 异步任务名称与管理类型定义

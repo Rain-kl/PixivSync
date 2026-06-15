@@ -10,7 +10,6 @@ import (
 	"github.com/Rain-kl/Wavelet/internal/apps/pixez"
 	"github.com/Rain-kl/Wavelet/internal/apps/upload"
 	"github.com/Rain-kl/Wavelet/internal/apps/user"
-	"github.com/Rain-kl/Wavelet/internal/service"
 	"github.com/Rain-kl/Wavelet/internal/task"
 )
 
@@ -20,8 +19,8 @@ func Register() {
 	task.RegisterTaskMeta(upload.StorageMigrationMeta)
 
 	// system cleanup
-	task.RegisterHandler(service.SystemCleanupTask, &service.SystemCleanupHandler{})
-	task.RegisterTaskMeta(service.SystemCleanupMeta)
+	task.RegisterHandler(upload.SystemCleanupTask, &upload.SystemCleanupHandler{})
+	task.RegisterTaskMeta(upload.SystemCleanupMeta)
 
 	// upload
 	task.RegisterHandler(upload.WarmImageCacheTask, &upload.WarmImageCacheHandler{})

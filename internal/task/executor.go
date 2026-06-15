@@ -11,9 +11,9 @@ import (
 	"time"
 
 	"github.com/Rain-kl/Wavelet/internal/db/idgen"
-	"github.com/Rain-kl/Wavelet/internal/logger"
 	"github.com/Rain-kl/Wavelet/internal/model"
-	"github.com/Rain-kl/Wavelet/internal/otel_trace"
+	"github.com/Rain-kl/Wavelet/pkg/logger"
+	otel_trace "github.com/Rain-kl/Wavelet/pkg/trace"
 	"github.com/hibiken/asynq"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/codes"

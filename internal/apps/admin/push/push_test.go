@@ -3,8 +3,7 @@
 
 package push
 
-import (
-	"bytes"
+import ("bytes"
 	"context"
 	"encoding/json"
 	"net/http"
@@ -25,7 +24,8 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"gorm.io/gorm"
-)
+
+	"github.com/Rain-kl/Wavelet/internal/common/response")
 
 var adminLoginEvent = EventMetadata{
 	Key:  "admin_login",
@@ -344,7 +344,7 @@ func TestPushRouters(t *testing.T) {
 		r.ServeHTTP(w, req)
 
 		assert.Equal(t, http.StatusOK, w.Code)
-		var resp util.ResponseAny
+		var resp response.Any
 		err = json.Unmarshal(w.Body.Bytes(), &resp)
 		require.NoError(t, err)
 
@@ -415,7 +415,7 @@ func TestPushRouters(t *testing.T) {
 		r.ServeHTTP(w, req)
 
 		assert.Equal(t, http.StatusOK, w.Code)
-		var resp util.ResponseAny
+		var resp response.Any
 		json.Unmarshal(w.Body.Bytes(), &resp)
 
 		dataMap, ok := resp.Data.(map[string]any)
@@ -449,7 +449,7 @@ func TestPushRouters(t *testing.T) {
 		r.ServeHTTP(w, req)
 
 		assert.Equal(t, http.StatusOK, w.Code)
-		var resp util.ResponseAny
+		var resp response.Any
 		err := json.Unmarshal(w.Body.Bytes(), &resp)
 		require.NoError(t, err)
 
@@ -674,7 +674,7 @@ func TestPushChannelAPI(t *testing.T) {
 		r.ServeHTTP(w, req)
 
 		assert.Equal(t, http.StatusOK, w.Code)
-		var resp util.ResponseAny
+		var resp response.Any
 		json.Unmarshal(w.Body.Bytes(), &resp)
 
 		dataMap, ok := resp.Data.(map[string]any)
@@ -689,7 +689,7 @@ func TestPushChannelAPI(t *testing.T) {
 		r.ServeHTTP(w, req)
 
 		assert.Equal(t, http.StatusOK, w.Code)
-		var resp util.ResponseAny
+		var resp response.Any
 		json.Unmarshal(w.Body.Bytes(), &resp)
 		list, ok := resp.Data.([]any)
 		assert.True(t, ok)

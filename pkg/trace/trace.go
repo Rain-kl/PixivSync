@@ -2,7 +2,7 @@
 // Copyright 2026 Arctel.net
 // SPDX-License-Identifier: AGPL-3.0-only
 
-package otel_trace
+package trace
 
 import (
 	"context"
@@ -21,15 +21,26 @@ func init() {
 	prop := newPropagator()
 	otel.SetTextMapPropagator(prop)
 
-	// 初始化 Trace Provider
-	tracerProvider, err := newTracerProvider()
+	// 初始化 Tracer 实例为 No-op 默认以避免未初始化前或测试环境崩溃
+	Tracer = otel.GetTracerProvider().Tracer("github.com/Rain-kl/Wavelet")
+}
+
+// Config 链路追踪配置
+type Config struct {
+	AppName      string
+	SamplingRate float64
+}
+
+// Init 初始化 Tracer Provider 并关联全局 Tracer 实例
+func Init(cfg Config) {
+	tracerProvider, err := newTracerProvider(cfg)
 	if err != nil {
 		log.Fatalf("[Trace] init trace provider failed: %v", err)
 	}
 	shutdownFuncs = append(shutdownFuncs, tracerProvider.Shutdown)
 	otel.SetTracerProvider(tracerProvider)
 
-	// 初始化 Tracer
+	// 更新 Tracer
 	Tracer = tracerProvider.Tracer("github.com/Rain-kl/Wavelet")
 }
 
@@ -38,7 +49,6 @@ func Shutdown(ctx context.Context) {
 	for _, fn := range shutdownFuncs {
 		_ = fn(ctx)
 	}
-	shutdownFuncs = nil
 }
 
 // Start 创建一个新的 Trace Span

@@ -4,8 +4,7 @@
 
 package task
 
-import (
-	"bytes"
+import ("bytes"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -18,7 +17,6 @@ import (
 	"github.com/Rain-kl/Wavelet/internal/apps/upload"
 	"github.com/Rain-kl/Wavelet/internal/apps/user"
 	"github.com/Rain-kl/Wavelet/internal/model"
-	"github.com/Rain-kl/Wavelet/internal/service"
 	"github.com/Rain-kl/Wavelet/internal/task"
 	"github.com/Rain-kl/Wavelet/internal/testhelper"
 	"github.com/Rain-kl/Wavelet/internal/util"
@@ -26,7 +24,8 @@ import (
 	"github.com/hibiken/asynq"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-)
+
+	"github.com/Rain-kl/Wavelet/internal/common/response")
 
 func setupTaskTestEnvironment(t *testing.T) func() {
 	_, mr, cleanup := testhelper.SetupTestEnvironment(t)
@@ -78,7 +77,7 @@ func TestListTaskTypes(t *testing.T) {
 		t.Errorf("expected 200 OK, got %d", w.Code)
 	}
 
-	var resp util.ResponseAny
+	var resp response.Any
 	_ = json.Unmarshal(w.Body.Bytes(), &resp)
 
 	dataBytes, _ := json.Marshal(resp.Data)
@@ -92,7 +91,7 @@ func TestListTaskTypes(t *testing.T) {
 	foundCleanup := false
 	foundWarmImageCache := false
 	for _, m := range taskMetas {
-		if m.Type == service.TaskTypeSystemCleanup {
+		if m.Type == upload.TaskTypeSystemCleanup {
 			foundCleanup = true
 		}
 		if m.Type == upload.TaskTypeWarmImageCache {
@@ -100,7 +99,7 @@ func TestListTaskTypes(t *testing.T) {
 		}
 	}
 	if !foundCleanup {
-		t.Errorf("expected task type %s to be listed", service.TaskTypeSystemCleanup)
+		t.Errorf("expected task type %s to be listed", upload.TaskTypeSystemCleanup)
 	}
 	if !foundWarmImageCache {
 		t.Errorf("expected task type %s to be listed", upload.TaskTypeWarmImageCache)
@@ -116,7 +115,7 @@ func TestDispatchTask(t *testing.T) {
 
 	t.Run("dispatch valid task successfully", func(t *testing.T) {
 		payload := DispatchTaskRequest{
-			TaskType: service.TaskTypeSystemCleanup,
+			TaskType: upload.TaskTypeSystemCleanup,
 		}
 		body, _ := json.Marshal(payload)
 		req, _ := http.NewRequest("POST", "/api/v1/admin/tasks/dispatch", bytes.NewBuffer(body))
@@ -126,7 +125,7 @@ func TestDispatchTask(t *testing.T) {
 
 		assert.Equal(t, http.StatusOK, w.Code, "Body: %s", w.Body.String())
 
-		var resp util.ResponseAny
+		var resp response.Any
 		_ = json.Unmarshal(w.Body.Bytes(), &resp)
 		assert.Empty(t, resp.ErrorMsg)
 		assert.NotNil(t, resp.Data)
@@ -150,7 +149,7 @@ func TestDispatchTask(t *testing.T) {
 
 		assert.Equal(t, http.StatusOK, w.Code, "Body: %s", w.Body.String())
 
-		var resp util.ResponseAny
+		var resp response.Any
 		json.Unmarshal(w.Body.Bytes(), &resp)
 		assert.Empty(t, resp.ErrorMsg)
 		assert.NotNil(t, resp.Data)
@@ -168,7 +167,7 @@ func TestDispatchTask(t *testing.T) {
 		router.ServeHTTP(w, req)
 
 		assert.Equal(t, http.StatusBadRequest, w.Code)
-		var resp util.ResponseAny
+		var resp response.Any
 		json.Unmarshal(w.Body.Bytes(), &resp)
 		assert.Contains(t, resp.ErrorMsg, "无效的 JSON 格式")
 	})
@@ -185,7 +184,7 @@ func TestDispatchTask(t *testing.T) {
 		router.ServeHTTP(w, req)
 
 		assert.Equal(t, http.StatusBadRequest, w.Code)
-		var resp util.ResponseAny
+		var resp response.Any
 		json.Unmarshal(w.Body.Bytes(), &resp)
 		assert.Contains(t, resp.ErrorMsg, "不能为空")
 	})
@@ -202,7 +201,7 @@ func TestDispatchTask(t *testing.T) {
 
 		assert.Equal(t, http.StatusBadRequest, w.Code)
 
-		var resp util.ResponseAny
+		var resp response.Any
 		json.Unmarshal(w.Body.Bytes(), &resp)
 		assert.Equal(t, InvalidTaskType, resp.ErrorMsg)
 	})
@@ -244,7 +243,7 @@ func TestListTaskExecutions(t *testing.T) {
 
 		assert.Equal(t, http.StatusOK, w.Code)
 
-		var resp util.ResponseAny
+		var resp response.Any
 		json.Unmarshal(w.Body.Bytes(), &resp)
 
 		dataBytes, _ := json.Marshal(resp.Data)
@@ -261,7 +260,7 @@ func TestListTaskExecutions(t *testing.T) {
 
 		assert.Equal(t, http.StatusOK, w.Code)
 
-		var resp util.ResponseAny
+		var resp response.Any
 		json.Unmarshal(w.Body.Bytes(), &resp)
 
 		dataBytes, _ := json.Marshal(resp.Data)
@@ -278,7 +277,7 @@ func TestListTaskExecutions(t *testing.T) {
 
 		assert.Equal(t, http.StatusOK, w.Code)
 
-		var resp util.ResponseAny
+		var resp response.Any
 		json.Unmarshal(w.Body.Bytes(), &resp)
 
 		dataBytes, _ := json.Marshal(resp.Data)
@@ -295,7 +294,7 @@ func TestListTaskExecutions(t *testing.T) {
 
 		assert.Equal(t, http.StatusOK, w.Code)
 
-		var resp util.ResponseAny
+		var resp response.Any
 		json.Unmarshal(w.Body.Bytes(), &resp)
 
 		dataBytes, _ := json.Marshal(resp.Data)
@@ -312,7 +311,7 @@ func TestListTaskExecutions(t *testing.T) {
 
 		assert.Equal(t, http.StatusOK, w.Code)
 
-		var resp util.ResponseAny
+		var resp response.Any
 		json.Unmarshal(w.Body.Bytes(), &resp)
 
 		dataBytes, _ := json.Marshal(resp.Data)
@@ -355,7 +354,7 @@ func TestGetTaskExecution(t *testing.T) {
 
 		assert.Equal(t, http.StatusOK, w.Code)
 
-		var resp util.ResponseAny
+		var resp response.Any
 		json.Unmarshal(w.Body.Bytes(), &resp)
 
 		dataBytes, _ := json.Marshal(resp.Data)
@@ -419,7 +418,7 @@ func TestRetryTask(t *testing.T) {
 
 		assert.Equal(t, http.StatusOK, w.Code)
 
-		var resp util.ResponseAny
+		var resp response.Any
 		json.Unmarshal(w.Body.Bytes(), &resp)
 		assert.Empty(t, resp.ErrorMsg)
 		assert.NotNil(t, resp.Data)

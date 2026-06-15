@@ -4,15 +4,15 @@
 
 package oauth
 
-import (
-	"net/http"
+import ("net/http"
 
-	"github.com/Rain-kl/Wavelet/internal/logger"
 	"github.com/Rain-kl/Wavelet/internal/model"
-	"github.com/Rain-kl/Wavelet/internal/util"
+	"github.com/Rain-kl/Wavelet/pkg/logger"
 	"github.com/gin-contrib/sessions"
 	"github.com/gin-gonic/gin"
-)
+	"github.com/Rain-kl/Wavelet/internal/util"
+
+	"github.com/Rain-kl/Wavelet/internal/common/response")
 
 // BasicUserInfo 用户基本信息结构体
 type BasicUserInfo struct {
@@ -54,8 +54,8 @@ func BuildBasicUserInfo(user *model.User, needChange bool) BasicUserInfo {
 // @Tags oauth
 // @Produce json
 // @Security SessionCookie
-// @Success 200 {object} util.ResponseAny{data=oauth.BasicUserInfo} "用户信息"
-// @Failure 401 {object} util.ResponseAny "未登录"
+// @Success 200 {object} response.Any{data=oauth.BasicUserInfo} "用户信息"
+// @Failure 401 {object} response.Any "未登录"
 // @Router /api/v1/oauth/user-info [get]
 // @Router /api/v1/user-info [get]
 // @Router /api/v1/user/self [get]
@@ -66,7 +66,7 @@ func UserInfo(c *gin.Context) {
 
 	c.JSON(
 		http.StatusOK,
-		util.OK(BuildBasicUserInfo(user, needChange)),
+		response.OK(BuildBasicUserInfo(user, needChange)),
 	)
 }
 
@@ -75,8 +75,8 @@ func UserInfo(c *gin.Context) {
 // @Description 生成 OAuth 登录 URL，前端跳转至该地址完成授权。返回的 URL 中包含 state 参数用于 CSRF 防护。
 // @Tags oauth
 // @Produce json
-// @Success 200 {object} util.ResponseAny{data=string} "OAuth 登录 URL"
-// @Failure 500 {object} util.ResponseAny "Redis 异常或内部错误"
+// @Success 200 {object} response.Any{data=string} "OAuth 登录 URL"
+// @Failure 500 {object} response.Any "Redis 异常或内部错误"
 // @Router /api/v1/oauth/login [get]
 
 // Logout 退出登录
@@ -85,8 +85,8 @@ func UserInfo(c *gin.Context) {
 // @Tags oauth
 // @Produce json
 // @Security SessionCookie
-// @Success 200 {object} util.ResponseAny{data=string} "退出成功"
-// @Failure 500 {object} util.ResponseAny "Session 清除失败"
+// @Success 200 {object} response.Any{data=string} "退出成功"
+// @Failure 500 {object} response.Any "Session 清除失败"
 // @Router /api/v1/oauth/logout [get]
 func Logout(c *gin.Context) {
 	session := sessions.Default(c)
@@ -95,11 +95,11 @@ func Logout(c *gin.Context) {
 	if userID != nil {
 		logger.InfoF(c.Request.Context(), "[LoginAudit] user logged out: %v, ID: %v, IP: %s", username, userID, c.ClientIP())
 	}
-	session.Options(util.GetSessionOptions(-1))
+	session.Options(GetSessionOptions(-1))
 	session.Clear()
 	if err := session.Save(); err != nil {
-		c.JSON(http.StatusInternalServerError, util.Err(err.Error()))
+		c.JSON(http.StatusInternalServerError, response.Err(err.Error()))
 		return
 	}
-	c.JSON(http.StatusOK, util.OKNil())
+	c.JSON(http.StatusOK, response.OKNil())
 }

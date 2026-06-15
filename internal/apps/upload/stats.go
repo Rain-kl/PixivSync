@@ -3,16 +3,15 @@
 
 package upload
 
-import (
-	"net/http"
+import ("net/http"
 	"strings"
 	"time"
 
 	"github.com/Rain-kl/Wavelet/internal/db"
 	"github.com/Rain-kl/Wavelet/internal/model"
-	"github.com/Rain-kl/Wavelet/internal/util"
 	"github.com/gin-gonic/gin"
-)
+
+	"github.com/Rain-kl/Wavelet/internal/common/response")
 
 const (
 	catImage    = "图片"
@@ -49,10 +48,10 @@ type fileStatsResponse struct {
 // @Tags admin
 // @Produce json
 // @Security SessionCookie
-// @Success 200 {object} util.ResponseAny{data=fileStatsResponse} "获取成功"
-// @Failure 401 {object} util.ResponseAny "未登录"
-// @Failure 403 {object} util.ResponseAny "无管理员权限"
-// @Failure 500 {object} util.ResponseAny "内部错误"
+// @Success 200 {object} response.Any{data=fileStatsResponse} "获取成功"
+// @Failure 401 {object} response.Any "未登录"
+// @Failure 403 {object} response.Any "无管理员权限"
+// @Failure 500 {object} response.Any "内部错误"
 // @Router /api/v1/admin/uploads/stats [get]
 func GetFileStats(c *gin.Context) {
 	ctx := c.Request.Context()
@@ -67,7 +66,7 @@ func GetFileStats(c *gin.Context) {
 		Where("status != ?", model.UploadStatusDeleted).
 		Scan(&summary).Error
 	if err != nil {
-		c.JSON(http.StatusOK, util.Err(err.Error()))
+		c.JSON(http.StatusOK, response.Err(err.Error()))
 		return
 	}
 
@@ -84,7 +83,7 @@ func GetFileStats(c *gin.Context) {
 		Group("type").
 		Scan(&typeRaw).Error
 	if err != nil {
-		c.JSON(http.StatusOK, util.Err(err.Error()))
+		c.JSON(http.StatusOK, response.Err(err.Error()))
 		return
 	}
 
@@ -113,7 +112,7 @@ func GetFileStats(c *gin.Context) {
 		Where("status != ?", model.UploadStatusDeleted).
 		Scan(&fileRaws).Error
 	if err != nil {
-		c.JSON(http.StatusOK, util.Err(err.Error()))
+		c.JSON(http.StatusOK, response.Err(err.Error()))
 		return
 	}
 
@@ -154,7 +153,7 @@ func GetFileStats(c *gin.Context) {
 		Where("status != ? AND created_at >= ?", model.UploadStatusDeleted, startTime).
 		Scan(&trendRaws).Error
 	if err != nil {
-		c.JSON(http.StatusOK, util.Err(err.Error()))
+		c.JSON(http.StatusOK, response.Err(err.Error()))
 		return
 	}
 
@@ -185,7 +184,7 @@ func GetFileStats(c *gin.Context) {
 		})
 	}
 
-	c.JSON(http.StatusOK, util.OK(fileStatsResponse{
+	c.JSON(http.StatusOK, response.OK(fileStatsResponse{
 		TotalCount: summary.TotalCount,
 		TotalSize:  summary.TotalSize,
 		Trend:      trend,

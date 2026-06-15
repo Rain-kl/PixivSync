@@ -4,8 +4,7 @@
 // Package risk_control 提供风险控制中间件
 package risk_control
 
-import (
-	"encoding/json"
+import ("encoding/json"
 	"net/http"
 	"time"
 
@@ -15,7 +14,8 @@ import (
 	"github.com/Rain-kl/Wavelet/internal/model"
 	"github.com/Rain-kl/Wavelet/internal/util"
 	"github.com/gin-gonic/gin"
-)
+
+	"github.com/Rain-kl/Wavelet/internal/common/response")
 
 // RiskControlMiddleware 全局日志采集中间件
 func RiskControlMiddleware() gin.HandlerFunc {
@@ -28,7 +28,7 @@ func RiskControlMiddleware() gin.HandlerFunc {
 
 		// 1. 限流背压检测（检测本地缓冲队列是否已满）
 		if IsBufferFull() {
-			c.AbortWithStatusJSON(http.StatusTooManyRequests, util.Err("系统繁忙，请稍后再试"))
+			c.AbortWithStatusJSON(http.StatusTooManyRequests, response.Err("系统繁忙，请稍后再试"))
 			return
 		}
 

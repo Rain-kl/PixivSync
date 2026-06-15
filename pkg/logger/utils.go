@@ -10,39 +10,20 @@ import (
 	"log"
 	"os"
 	"path/filepath"
-	"sync"
 
-	"github.com/Rain-kl/Wavelet/internal/config"
 	"go.opentelemetry.io/otel/trace"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
 	"gopkg.in/natefinch/lumberjack.v2"
 )
 
-var (
-	logWriter         zapcore.WriteSyncer
-	initLogWriterOnce sync.Once
-	initLogWriterErr  error
-)
-
-// GetLogWriter 获取日志输出写入器
-func GetLogWriter() (zapcore.WriteSyncer, error) {
-	initLogWriterOnce.Do(func() {
-		logWriter, initLogWriterErr = initWriter()
-	})
-
-	return logWriter, initLogWriterErr
-}
-
 // logDirPerm 日志目录权限
 const logDirPerm = 0750
 
-func initWriter() (zapcore.WriteSyncer, error) {
-	logConfig := config.Config.Log
-
-	if logConfig.Output == "file" {
+func getLogWriterForConfig(cfg Config) (zapcore.WriteSyncer, error) {
+	if cfg.Output == "file" {
 		// 初始化日志目录
-		logPath := logConfig.FilePath
+		logPath := cfg.FilePath
 		logDir := filepath.Dir(logPath)
 		if err := os.MkdirAll(logDir, logDirPerm); err != nil {
 			return nil, fmt.Errorf(errCreateLogFileDirFailed, err)
@@ -51,10 +32,10 @@ func initWriter() (zapcore.WriteSyncer, error) {
 		// 配置日志轮转
 		logOutput := &lumberjack.Logger{
 			Filename:   logPath,
-			MaxSize:    logConfig.MaxSize,
-			MaxBackups: logConfig.MaxBackups,
-			MaxAge:     logConfig.MaxAge,
-			Compress:   logConfig.Compress,
+			MaxSize:    cfg.MaxSize,
+			MaxBackups: cfg.MaxBackups,
+			MaxAge:     cfg.MaxAge,
+			Compress:   cfg.Compress,
 		}
 
 		return zapcore.AddSync(logOutput), nil
@@ -63,8 +44,8 @@ func initWriter() (zapcore.WriteSyncer, error) {
 	return zapcore.AddSync(os.Stdout), nil
 }
 
-// getEncoder 获取日志编码器
-func getEncoder() zapcore.Encoder {
+// getEncoderForConfig 获取日志编码器
+func getEncoderForConfig(cfg Config) zapcore.Encoder {
 	// 编码器配置
 	encoderConfig := zapcore.EncoderConfig{
 		TimeKey:        "time",
@@ -80,15 +61,15 @@ func getEncoder() zapcore.Encoder {
 		EncodeCaller:   zapcore.ShortCallerEncoder,
 	}
 
-	if config.Config.Log.Format == "json" {
+	if cfg.Format == "json" {
 		return zapcore.NewJSONEncoder(encoderConfig)
 	}
 	return zapcore.NewConsoleEncoder(encoderConfig)
 }
 
-// getLogLevel 获取日志级别
-func getLogLevel() zapcore.Level {
-	level := config.Config.Log.Level
+// getLogLevelForConfig 获取日志级别
+func getLogLevelForConfig(cfg Config) zapcore.Level {
+	level := cfg.Level
 
 	switch level {
 	case "debug":
@@ -100,7 +81,7 @@ func getLogLevel() zapcore.Level {
 	case "error":
 		return zapcore.ErrorLevel
 	default:
-		log.Fatalf("[Logger] invalid log level: %s\n", level)
+		log.Printf("[Logger] invalid log level: %s, defaulting to info\n", level)
 		return zapcore.InfoLevel
 	}
 }

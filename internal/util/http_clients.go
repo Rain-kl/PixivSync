@@ -12,7 +12,7 @@ import (
 	"net/url"
 	"time"
 
-	"go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp"
+	"github.com/Rain-kl/Wavelet/pkg/httppool"
 )
 
 // IsLocalhost 检查 URL 是否为 localhost
@@ -35,12 +35,8 @@ const (
 
 // 配置HTTP客户端 使用 otelhttp 自动注入 trace span
 var httpClient = &http.Client{
-	Timeout: httpClientTimeout * time.Second,
-	Transport: otelhttp.NewTransport(&http.Transport{
-		MaxIdleConns:        httpMaxIdleConns,
-		MaxIdleConnsPerHost: httpMaxIdleConnsPerHost,
-		IdleConnTimeout:     httpIdleConnTimeout * time.Second,
-	}),
+	Timeout:   httpClientTimeout * time.Second,
+	Transport: httppool.DefaultTransport(),
 }
 
 // SetHTTPClient 替换全局 HTTP 客户端实例

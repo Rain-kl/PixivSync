@@ -4,8 +4,7 @@
 
 package upload
 
-import (
-	"bytes"
+import ("bytes"
 	"context"
 	"encoding/json"
 	"errors"
@@ -19,9 +18,9 @@ import (
 	"github.com/Rain-kl/Wavelet/internal/common"
 	"github.com/Rain-kl/Wavelet/internal/db"
 	"github.com/Rain-kl/Wavelet/internal/diskcache"
-	"github.com/Rain-kl/Wavelet/internal/logger"
 	"github.com/Rain-kl/Wavelet/internal/model"
 	"github.com/Rain-kl/Wavelet/internal/util"
+	"github.com/Rain-kl/Wavelet/pkg/logger"
 	"github.com/gin-gonic/gin"
 	"gorm.io/gorm"
 )
@@ -34,10 +33,10 @@ import (
 // @Param id path string true "文件 ID"
 // @Param quality query string false "图片质量 (low, medium, high, origin)，默认为 origin"
 // @Success 200 {file} file "成功获取文件内容"
-// @Failure 400 {object} util.ResponseAny "文件 ID 格式错误"
-// @Failure 401 {object} util.ResponseAny "未登录"
-// @Failure 404 {object} util.ResponseAny "文件未找到"
-// @Failure 500 {object} util.ResponseAny "服务内部错误"
+// @Failure 400 {object} response.Any "文件 ID 格式错误"
+// @Failure 401 {object} response.Any "未登录"
+// @Failure 404 {object} response.Any "文件未找到"
+// @Failure 500 {object} response.Any "服务内部错误"
 // @Router /f/{id} [get]
 func ServeFileByID(c *gin.Context) {
 	upload, err := getUploadRecordByID(c)

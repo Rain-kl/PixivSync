@@ -2,7 +2,8 @@
 // Copyright 2026 Arctel.net
 // SPDX-License-Identifier: AGPL-3.0-only
 
-package util
+// Package response provides shared HTTP API response structures.
+package response
 
 // Response 通用响应体
 type Response[T any] struct {
@@ -10,9 +11,9 @@ type Response[T any] struct {
 	Data     T      `json:"data"`
 }
 
-// ResponseAny 用于 Swagger 文档的响应类型（非泛型）
+// Any 用于 Swagger 文档的响应类型（非泛型）
 // swag 不支持泛型，使用此类型替代 Response[T]
-type ResponseAny struct {
+type Any struct {
 	ErrorMsg string      `json:"error_msg" example:""`
 	Data     interface{} `json:"data"`
 }

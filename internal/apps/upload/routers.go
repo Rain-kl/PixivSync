@@ -4,8 +4,7 @@
 
 package upload
 
-import (
-	"archive/zip"
+import ("archive/zip"
 	"bytes"
 	"context"
 	"crypto/sha256"
@@ -26,12 +25,13 @@ import (
 	"github.com/Rain-kl/Wavelet/internal/common"
 	"github.com/Rain-kl/Wavelet/internal/db"
 	"github.com/Rain-kl/Wavelet/internal/db/idgen"
-	"github.com/Rain-kl/Wavelet/internal/logger"
 	"github.com/Rain-kl/Wavelet/internal/model"
 	"github.com/Rain-kl/Wavelet/internal/storage"
 	"github.com/Rain-kl/Wavelet/internal/util"
+	"github.com/Rain-kl/Wavelet/pkg/logger"
 	"github.com/gin-gonic/gin"
 	"gorm.io/gorm"
+	"github.com/Rain-kl/Wavelet/internal/common/response"
 )
 
 type batchDownloadRequest struct {
@@ -48,10 +48,10 @@ type batchDownloadRequest struct {
 // @Param type formData string false "业务分类 (例如: avatar, attachment, doc，默认为 generic)"
 // @Param metadata formData string false "额外的 JSON 格式元数据"
 // @Security SessionCookie
-// @Success 200 {object} util.ResponseAny{data=model.Upload} "上传成功"
-// @Failure 400 {object} util.ResponseAny "请求参数错误或文件受限"
-// @Failure 401 {object} util.ResponseAny "未登录"
-// @Failure 500 {object} util.ResponseAny "内部错误"
+// @Success 200 {object} response.Any{data=model.Upload} "上传成功"
+// @Failure 400 {object} response.Any "请求参数错误或文件受限"
+// @Failure 401 {object} response.Any "未登录"
+// @Failure 500 {object} response.Any "内部错误"
 // @Router /api/v1/upload [post]
 //
 //nolint:revive
@@ -67,20 +67,20 @@ func UploadFile(c *gin.Context) {
 
 	header, err := c.FormFile("file")
 	if err != nil {
-		c.JSON(http.StatusOK, util.Err(ErrNoFileSelected))
+		c.JSON(http.StatusOK, response.Err(ErrNoFileSelected))
 		return
 	}
 
 	file, err := header.Open()
 	if err != nil {
-		c.JSON(http.StatusOK, util.Err(ErrOpenFileFailed))
+		c.JSON(http.StatusOK, response.Err(ErrOpenFileFailed))
 		return
 	}
 	defer func() { _ = file.Close() }()
 
 	// 校验大小
 	if header.Size > maxUploadSize {
-		c.JSON(http.StatusOK, util.Err(ErrGenericFileTooLarge))
+		c.JSON(http.StatusOK, response.Err(ErrGenericFileTooLarge))
 		return
 	}
 
@@ -93,7 +93,7 @@ func UploadFile(c *gin.Context) {
 
 	// 3. 校验文件后缀是否在允许的系统配置列表中
 	if errMsg := validateUploadExtension(ctx, ext); errMsg != "" {
-		c.JSON(http.StatusOK, util.Err(errMsg))
+		c.JSON(http.StatusOK, response.Err(errMsg))
 		return
 	}
 
@@ -102,7 +102,7 @@ func UploadFile(c *gin.Context) {
 	var buf bytes.Buffer
 	size, err := io.Copy(&buf, io.TeeReader(file, hashWriter))
 	if err != nil {
-		c.JSON(http.StatusOK, util.Err(ErrProcessFileFailed))
+		c.JSON(http.StatusOK, response.Err(ErrProcessFileFailed))
 		return
 	}
 
@@ -111,7 +111,7 @@ func UploadFile(c *gin.Context) {
 
 	// 校验真实 MIME Type 是否与常见图片扩展名匹配，防止 Polyglot / HTML 注入攻击
 	if isImageExtension(ext) && !strings.HasPrefix(mimeType, "image/") {
-		c.JSON(http.StatusOK, util.Err(ErrFileContentExtensionMismatch))
+		c.JSON(http.StatusOK, response.Err(ErrFileContentExtensionMismatch))
 		return
 	}
 
@@ -129,7 +129,7 @@ func UploadFile(c *gin.Context) {
 		var err error
 		accessMode, err = strconv.Atoi(accessModeStr)
 		if err != nil || (accessMode != 0 && accessMode != 1) {
-			c.JSON(http.StatusOK, util.Err("无效的 access_mode 参数"))
+			c.JSON(http.StatusOK, response.Err("无效的 access_mode 参数"))
 			return
 		}
 	}
@@ -140,14 +140,14 @@ func UploadFile(c *gin.Context) {
 		return
 	}
 	if lookupErr != nil && !errors.Is(lookupErr, gorm.ErrRecordNotFound) {
-		c.JSON(http.StatusOK, util.Err(ErrFileValidationFailed))
+		c.JSON(http.StatusOK, response.Err(ErrFileValidationFailed))
 		return
 	}
 
 	// 7. 解析可选元数据字段
 	meta, errMsg := parseUploadMetadata(c, mimeType)
 	if errMsg != "" {
-		c.JSON(http.StatusOK, util.Err(errMsg))
+		c.JSON(http.StatusOK, response.Err(errMsg))
 		return
 	}
 
@@ -157,7 +157,7 @@ func UploadFile(c *gin.Context) {
 	// 8. 写入当前活动存储驱动。
 	storageDriver, subPath, errMsg := storeUploadFile(ctx, subPath, size, mimeType, &buf, &meta)
 	if errMsg != "" {
-		c.JSON(http.StatusOK, util.Err(errMsg))
+		c.JSON(http.StatusOK, response.Err(errMsg))
 		return
 	}
 
@@ -179,11 +179,11 @@ func UploadFile(c *gin.Context) {
 	}
 
 	if err := saveUploadRecord(ctx, &newUpload, storageDriver, subPath); err != "" {
-		c.JSON(http.StatusOK, util.Err(err))
+		c.JSON(http.StatusOK, response.Err(err))
 		return
 	}
 
-	c.JSON(http.StatusOK, util.OK(newUpload))
+	c.JSON(http.StatusOK, response.OK(newUpload))
 }
 
 // DownloadFile 通用单文件下载接口
@@ -195,9 +195,9 @@ func UploadFile(c *gin.Context) {
 // @Param quality query string false "图片质量 (low, medium, high, origin)，默认为 origin"
 // @Security SessionCookie
 // @Success 200 {file} file "成功下载文件"
-// @Failure 400 {object} util.ResponseAny "参数错误"
-// @Failure 404 {object} util.ResponseAny "文件不存在"
-// @Failure 500 {object} util.ResponseAny "服务内部错误"
+// @Failure 400 {object} response.Any "参数错误"
+// @Failure 404 {object} response.Any "文件不存在"
+// @Failure 500 {object} response.Any "服务内部错误"
 // @Router /api/v1/admin/uploads/download/{id} [get]
 func DownloadFile(c *gin.Context) {
 	upload, err := getUploadRecordByID(c)
@@ -207,10 +207,10 @@ func DownloadFile(c *gin.Context) {
 			return
 		}
 		if _, ok := err.(*strconv.NumError); ok {
-			c.JSON(http.StatusOK, util.Err(ErrInvalidFileID))
+			c.JSON(http.StatusOK, response.Err(ErrInvalidFileID))
 			return
 		}
-		c.JSON(http.StatusOK, util.Err(ErrQueryUploadRecordFailed))
+		c.JSON(http.StatusOK, response.Err(ErrQueryUploadRecordFailed))
 		return
 	}
 
@@ -247,15 +247,15 @@ func DownloadFile(c *gin.Context) {
 // @Param request body upload.batchDownloadRequest true "包含文件 ID 数组 of string 的请求体"
 // @Security SessionCookie
 // @Success 200 {file} file "成功下载打包后的 ZIP"
-// @Failure 400 {object} util.ResponseAny "参数错误"
-// @Failure 500 {object} util.ResponseAny "打包失败"
+// @Failure 400 {object} response.Any "参数错误"
+// @Failure 500 {object} response.Any "打包失败"
 // @Router /api/v1/admin/uploads/download/batch [post]
 func BatchDownloadFiles(c *gin.Context) {
 	ctx := c.Request.Context()
 
 	var req batchDownloadRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusOK, util.Err(ErrInvalidBatchDownloadRequest))
+		c.JSON(http.StatusOK, response.Err(ErrInvalidBatchDownloadRequest))
 		return
 	}
 
@@ -264,7 +264,7 @@ func BatchDownloadFiles(c *gin.Context) {
 	for _, idStr := range req.IDs {
 		id, err := strconv.ParseUint(idStr, 10, 64)
 		if err != nil {
-			c.JSON(http.StatusOK, util.Err(fmt.Sprintf(ErrInvalidIDValueFormat, idStr)))
+			c.JSON(http.StatusOK, response.Err(fmt.Sprintf(ErrInvalidIDValueFormat, idStr)))
 			return
 		}
 		ids = append(ids, id)
@@ -273,12 +273,12 @@ func BatchDownloadFiles(c *gin.Context) {
 	// 查库获取所有匹配且正常的文件记录
 	var uploads []model.Upload
 	if err := db.DB(ctx).Where("id IN ? AND status IN (?, ?)", ids, model.UploadStatusPending, model.UploadStatusUsed).Find(&uploads).Error; err != nil {
-		c.JSON(http.StatusOK, util.Err(ErrRetrieveUploadRecordsFailed))
+		c.JSON(http.StatusOK, response.Err(ErrRetrieveUploadRecordsFailed))
 		return
 	}
 
 	if len(uploads) == 0 {
-		c.JSON(http.StatusOK, util.Err(ErrNoValidFilesForArchive))
+		c.JSON(http.StatusOK, response.Err(ErrNoValidFilesForArchive))
 		return
 	}
 
@@ -363,7 +363,7 @@ func tryInstantUpload(ctx context.Context, c *gin.Context, currUser *model.User,
 		return false, err
 	}
 	if StorageReadOnly(ctx) {
-		c.JSON(http.StatusConflict, util.Err(ErrStorageReadOnly))
+		c.JSON(http.StatusConflict, response.Err(ErrStorageReadOnly))
 		return true, nil
 	}
 
@@ -385,12 +385,12 @@ func tryInstantUpload(ctx context.Context, c *gin.Context, currUser *model.User,
 	}
 
 	if err := db.DB(ctx).Create(&newUpload).Error; err != nil {
-		c.JSON(http.StatusOK, util.Err(ErrSaveUploadRecordFailed))
+		c.JSON(http.StatusOK, response.Err(ErrSaveUploadRecordFailed))
 		return true, err
 	}
 
 	logger.InfoF(ctx, "文件触发秒传成功! ID: %d, Path: %s", id, existing.FilePath)
-	c.JSON(http.StatusOK, util.OK(newUpload))
+	c.JSON(http.StatusOK, response.OK(newUpload))
 	return true, nil
 }
 

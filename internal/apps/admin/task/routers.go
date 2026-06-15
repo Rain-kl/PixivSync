@@ -4,23 +4,22 @@
 
 package task
 
-import (
-	"fmt"
+import ("fmt"
 	"net/http"
 	"strconv"
 	"strings"
 	"time"
 
 	"github.com/Rain-kl/Wavelet/internal/apps/admin"
-	"github.com/Rain-kl/Wavelet/internal/logger"
 	"github.com/Rain-kl/Wavelet/internal/model"
 	"github.com/Rain-kl/Wavelet/internal/task"
 	taskhandlers "github.com/Rain-kl/Wavelet/internal/task/handlers"
 	"github.com/Rain-kl/Wavelet/internal/task/scheduler"
-	"github.com/Rain-kl/Wavelet/internal/util"
+	"github.com/Rain-kl/Wavelet/pkg/logger"
 	"github.com/gin-gonic/gin"
 	"github.com/robfig/cron/v3"
-)
+
+	"github.com/Rain-kl/Wavelet/internal/common/response")
 
 func init() {
 	taskhandlers.Register()
@@ -32,12 +31,12 @@ func init() {
 // @Tags admin
 // @Produce json
 // @Security SessionCookie
-// @Success 200 {object} util.ResponseAny{data=[]task.TaskMeta} "任务类型列表"
-// @Failure 401 {object} util.ResponseAny "未登录"
-// @Failure 403 {object} util.ResponseAny "无管理员权限"
+// @Success 200 {object} response.Any{data=[]task.TaskMeta} "任务类型列表"
+// @Failure 401 {object} response.Any "未登录"
+// @Failure 403 {object} response.Any "无管理员权限"
 // @Router /api/v1/admin/tasks/types [get]
 func ListTaskTypes(c *gin.Context) {
-	c.JSON(http.StatusOK, util.OK(task.GetDispatchableTasks()))
+	c.JSON(http.StatusOK, response.OK(task.GetDispatchableTasks()))
 }
 
 // DispatchTaskRequest 下发任务请求
@@ -57,22 +56,22 @@ type DispatchTaskRequest struct {
 // @Produce json
 // @Security SessionCookie
 // @Param request body DispatchTaskRequest true "任务请求参数"
-// @Success 200 {object} util.ResponseAny{data=string} "任务已入队"
-// @Failure 400 {object} util.ResponseAny "任务类型不存在或参数错误"
-// @Failure 401 {object} util.ResponseAny "未登录"
-// @Failure 403 {object} util.ResponseAny "无管理员权限"
-// @Failure 500 {object} util.ResponseAny "任务入队失败"
+// @Success 200 {object} response.Any{data=string} "任务已入队"
+// @Failure 400 {object} response.Any "任务类型不存在或参数错误"
+// @Failure 401 {object} response.Any "未登录"
+// @Failure 403 {object} response.Any "无管理员权限"
+// @Failure 500 {object} response.Any "任务入队失败"
 // @Router /api/v1/admin/tasks/dispatch [post]
 func DispatchTask(c *gin.Context) {
 	var req DispatchTaskRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, util.Err(err.Error()))
+		c.JSON(http.StatusBadRequest, response.Err(err.Error()))
 		return
 	}
 
 	meta := task.GetTaskMeta(req.TaskType)
 	if meta == nil {
-		c.JSON(http.StatusBadRequest, util.Err(InvalidTaskType))
+		c.JSON(http.StatusBadRequest, response.Err(InvalidTaskType))
 		return
 	}
 
@@ -83,17 +82,17 @@ func DispatchTask(c *gin.Context) {
 
 	validated, err := task.ValidateAndNormalizePayload(meta.AsynqTask, payloadBytes)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, util.Err(err.Error()))
+		c.JSON(http.StatusBadRequest, response.Err(err.Error()))
 		return
 	}
 
 	taskID, err := task.DispatchTask(c.Request.Context(), req.TaskType, validated, "manual")
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, util.Err(fmt.Sprintf("%s: %v", TaskDispatchFailed, err)))
+		c.JSON(http.StatusInternalServerError, response.Err(fmt.Sprintf("%s: %v", TaskDispatchFailed, err)))
 		return
 	}
 
-	c.JSON(http.StatusOK, util.OK(taskID))
+	c.JSON(http.StatusOK, response.OK(taskID))
 }
 
 // ListTaskExecutions 查询任务执行记录列表
@@ -106,14 +105,14 @@ func DispatchTask(c *gin.Context) {
 // @Param task_type query string false "任务类型筛选"
 // @Param page query int false "页码" default(1)
 // @Param page_size query int false "每页条数" default(20)
-// @Success 200 {object} util.ResponseAny{data=object} "任务执行记录列表"
-// @Failure 401 {object} util.ResponseAny "未登录"
-// @Failure 403 {object} util.ResponseAny "无管理员权限"
+// @Success 200 {object} response.Any{data=object} "任务执行记录列表"
+// @Failure 401 {object} response.Any "未登录"
+// @Failure 403 {object} response.Any "无管理员权限"
 // @Router /api/v1/admin/tasks/executions [get]
 func ListTaskExecutions(c *gin.Context) {
 	var req model.ListTaskExecutionsRequest
 	if err := c.ShouldBindQuery(&req); err != nil {
-		c.JSON(http.StatusBadRequest, util.Err(err.Error()))
+		c.JSON(http.StatusBadRequest, response.Err(err.Error()))
 		return
 	}
 
@@ -125,11 +124,11 @@ func ListTaskExecutions(c *gin.Context) {
 
 	executions, total, err := model.ListTaskExecutions(c.Request.Context(), req)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, util.Err(err.Error()))
+		c.JSON(http.StatusInternalServerError, response.Err(err.Error()))
 		return
 	}
 
-	c.JSON(http.StatusOK, util.OK(gin.H{
+	c.JSON(http.StatusOK, response.OK(gin.H{
 		"items":     executions,
 		"total":     total,
 		"page":      req.Page,
@@ -144,26 +143,26 @@ func ListTaskExecutions(c *gin.Context) {
 // @Produce json
 // @Security SessionCookie
 // @Param id path int true "任务执行记录 ID"
-// @Success 200 {object} util.ResponseAny{data=model.TaskExecution} "任务执行详情"
-// @Failure 400 {object} util.ResponseAny "参数错误"
-// @Failure 401 {object} util.ResponseAny "未登录"
-// @Failure 403 {object} util.ResponseAny "无管理员权限"
-// @Failure 404 {object} util.ResponseAny "记录不存在"
+// @Success 200 {object} response.Any{data=model.TaskExecution} "任务执行详情"
+// @Failure 400 {object} response.Any "参数错误"
+// @Failure 401 {object} response.Any "未登录"
+// @Failure 403 {object} response.Any "无管理员权限"
+// @Failure 404 {object} response.Any "记录不存在"
 // @Router /api/v1/admin/tasks/executions/{id} [get]
 func GetTaskExecution(c *gin.Context) {
 	id, err := strconv.ParseUint(c.Param("id"), 10, 64)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, util.Err(admin.InvalidTaskExecutionID))
+		c.JSON(http.StatusBadRequest, response.Err(admin.InvalidTaskExecutionID))
 		return
 	}
 
 	execution, err := model.GetTaskExecutionByID(c.Request.Context(), id)
 	if err != nil {
-		c.JSON(http.StatusNotFound, util.Err(TaskNotFound))
+		c.JSON(http.StatusNotFound, response.Err(TaskNotFound))
 		return
 	}
 
-	c.JSON(http.StatusOK, util.OK(execution))
+	c.JSON(http.StatusOK, response.OK(execution))
 }
 
 // RetryTask 重试失败的任务
@@ -173,17 +172,17 @@ func GetTaskExecution(c *gin.Context) {
 // @Produce json
 // @Security SessionCookie
 // @Param id path int true "任务执行记录 ID"
-// @Success 200 {object} util.ResponseAny{data=string} "新任务的 TaskID"
-// @Failure 400 {object} util.ResponseAny "任务不支持重试或参数错误"
-// @Failure 401 {object} util.ResponseAny "未登录"
-// @Failure 403 {object} util.ResponseAny "无管理员权限"
-// @Failure 404 {object} util.ResponseAny "记录不存在"
-// @Failure 500 {object} util.ResponseAny "重试失败"
+// @Success 200 {object} response.Any{data=string} "新任务的 TaskID"
+// @Failure 400 {object} response.Any "任务不支持重试或参数错误"
+// @Failure 401 {object} response.Any "未登录"
+// @Failure 403 {object} response.Any "无管理员权限"
+// @Failure 404 {object} response.Any "记录不存在"
+// @Failure 500 {object} response.Any "重试失败"
 // @Router /api/v1/admin/tasks/executions/{id}/retry [post]
 func RetryTask(c *gin.Context) {
 	id, err := strconv.ParseUint(c.Param("id"), 10, 64)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, util.Err(admin.InvalidTaskExecutionID))
+		c.JSON(http.StatusBadRequest, response.Err(admin.InvalidTaskExecutionID))
 		return
 	}
 
@@ -192,16 +191,16 @@ func RetryTask(c *gin.Context) {
 		errMsg := err.Error()
 		switch {
 		case strings.Contains(errMsg, "不存在"):
-			c.JSON(http.StatusNotFound, util.Err(errMsg))
+			c.JSON(http.StatusNotFound, response.Err(errMsg))
 		case strings.Contains(errMsg, "只有失败的任务") || strings.Contains(errMsg, "不支持重试") || strings.Contains(errMsg, "已达到最大重试"):
-			c.JSON(http.StatusBadRequest, util.Err(errMsg))
+			c.JSON(http.StatusBadRequest, response.Err(errMsg))
 		default:
-			c.JSON(http.StatusInternalServerError, util.Err(fmt.Sprintf("%s: %v", TaskRetryFailed, err)))
+			c.JSON(http.StatusInternalServerError, response.Err(fmt.Sprintf("%s: %v", TaskRetryFailed, err)))
 		}
 		return
 	}
 
-	c.JSON(http.StatusOK, util.OK(newTaskID))
+	c.JSON(http.StatusOK, response.OK(newTaskID))
 }
 
 // ListSchedules 获取定时任务列表
@@ -210,17 +209,17 @@ func RetryTask(c *gin.Context) {
 // @Tags admin
 // @Produce json
 // @Security SessionCookie
-// @Success 200 {object} util.ResponseAny{data=[]model.Schedule} "定时任务列表"
-// @Failure 401 {object} util.ResponseAny "未登录"
-// @Failure 403 {object} util.ResponseAny "无管理员权限"
+// @Success 200 {object} response.Any{data=[]model.Schedule} "定时任务列表"
+// @Failure 401 {object} response.Any "未登录"
+// @Failure 403 {object} response.Any "无管理员权限"
 // @Router /api/v1/admin/tasks/schedules [get]
 func ListSchedules(c *gin.Context) {
 	schedules, err := model.ListSchedules(c.Request.Context())
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, util.Err(err.Error()))
+		c.JSON(http.StatusInternalServerError, response.Err(err.Error()))
 		return
 	}
-	c.JSON(http.StatusOK, util.OK(schedules))
+	c.JSON(http.StatusOK, response.OK(schedules))
 }
 
 // CreateScheduleRequest 创建定时任务请求
@@ -240,29 +239,29 @@ type CreateScheduleRequest struct {
 // @Produce json
 // @Security SessionCookie
 // @Param request body CreateScheduleRequest true "创建定时任务请求参数"
-// @Success 200 {object} util.ResponseAny{data=model.Schedule} "创建成功的定时任务信息"
-// @Failure 400 {object} util.ResponseAny "Cron 表达式无效、异步任务类型不存在或参数错误"
-// @Failure 401 {object} util.ResponseAny "未登录"
-// @Failure 403 {object} util.ResponseAny "无管理员权限"
-// @Failure 500 {object} util.ResponseAny "保存定时任务失败"
+// @Success 200 {object} response.Any{data=model.Schedule} "创建成功的定时任务信息"
+// @Failure 400 {object} response.Any "Cron 表达式无效、异步任务类型不存在或参数错误"
+// @Failure 401 {object} response.Any "未登录"
+// @Failure 403 {object} response.Any "无管理员权限"
+// @Failure 500 {object} response.Any "保存定时任务失败"
 // @Router /api/v1/admin/tasks/schedules [post]
 func CreateSchedule(c *gin.Context) {
 	var req CreateScheduleRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, util.Err(err.Error()))
+		c.JSON(http.StatusBadRequest, response.Err(err.Error()))
 		return
 	}
 
 	// 校验 Cron 表达式
 	if _, err := cron.ParseStandard(req.Cron); err != nil {
-		c.JSON(http.StatusBadRequest, util.Err(InvalidCronExpression))
+		c.JSON(http.StatusBadRequest, response.Err(InvalidCronExpression))
 		return
 	}
 
 	// 校验关联的异步任务类型
 	meta := task.GetTaskMeta(req.TaskType)
 	if meta == nil {
-		c.JSON(http.StatusBadRequest, util.Err(InvalidTaskType))
+		c.JSON(http.StatusBadRequest, response.Err(InvalidTaskType))
 		return
 	}
 
@@ -273,7 +272,7 @@ func CreateSchedule(c *gin.Context) {
 	}
 	validated, err := task.ValidateAndNormalizePayload(meta.AsynqTask, payloadBytes)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, util.Err(err.Error()))
+		c.JSON(http.StatusBadRequest, response.Err(err.Error()))
 		return
 	}
 
@@ -286,7 +285,7 @@ func CreateSchedule(c *gin.Context) {
 	}
 
 	if err := model.CreateSchedule(c.Request.Context(), schedule); err != nil {
-		c.JSON(http.StatusInternalServerError, util.Err(fmt.Sprintf("%s: %v", ScheduleSaveFailed, err)))
+		c.JSON(http.StatusInternalServerError, response.Err(fmt.Sprintf("%s: %v", ScheduleSaveFailed, err)))
 		return
 	}
 
@@ -295,7 +294,7 @@ func CreateSchedule(c *gin.Context) {
 		logger.ErrorF(c.Request.Context(), "[TaskAdmin] 重载调度器失败: %v", err)
 	}
 
-	c.JSON(http.StatusOK, util.OK(schedule))
+	c.JSON(http.StatusOK, response.OK(schedule))
 }
 
 // UpdateScheduleRequest 修改定时任务请求
@@ -316,43 +315,43 @@ type UpdateScheduleRequest struct {
 // @Security SessionCookie
 // @Param id path int true "定时任务 ID"
 // @Param request body UpdateScheduleRequest true "修改定时任务请求参数"
-// @Success 200 {object} util.ResponseAny{data=model.Schedule} "修改后的定时任务信息"
-// @Failure 400 {object} util.ResponseAny "Cron 表达式无效、参数错误"
-// @Failure 401 {object} util.ResponseAny "未登录"
-// @Failure 403 {object} util.ResponseAny "无管理员权限"
-// @Failure 404 {object} util.ResponseAny "定时任务不存在"
-// @Failure 500 {object} util.ResponseAny "修改定时任务失败"
+// @Success 200 {object} response.Any{data=model.Schedule} "修改后的定时任务信息"
+// @Failure 400 {object} response.Any "Cron 表达式无效、参数错误"
+// @Failure 401 {object} response.Any "未登录"
+// @Failure 403 {object} response.Any "无管理员权限"
+// @Failure 404 {object} response.Any "定时任务不存在"
+// @Failure 500 {object} response.Any "修改定时任务失败"
 // @Router /api/v1/admin/tasks/schedules/{id} [put]
 func UpdateSchedule(c *gin.Context) {
 	id, err := strconv.ParseUint(c.Param("id"), 10, 64)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, util.Err("无效的定时任务ID"))
+		c.JSON(http.StatusBadRequest, response.Err("无效的定时任务ID"))
 		return
 	}
 
 	var req UpdateScheduleRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, util.Err(err.Error()))
+		c.JSON(http.StatusBadRequest, response.Err(err.Error()))
 		return
 	}
 
 	// 检查定时任务是否存在
 	schedule, err := model.GetScheduleByID(c.Request.Context(), id)
 	if err != nil {
-		c.JSON(http.StatusNotFound, util.Err(ScheduleNotFound))
+		c.JSON(http.StatusNotFound, response.Err(ScheduleNotFound))
 		return
 	}
 
 	// 校验 Cron 表达式
 	if _, err := cron.ParseStandard(req.Cron); err != nil {
-		c.JSON(http.StatusBadRequest, util.Err(InvalidCronExpression))
+		c.JSON(http.StatusBadRequest, response.Err(InvalidCronExpression))
 		return
 	}
 
 	// 校验关联的异步任务类型
 	meta := task.GetTaskMeta(req.TaskType)
 	if meta == nil {
-		c.JSON(http.StatusBadRequest, util.Err(InvalidTaskType))
+		c.JSON(http.StatusBadRequest, response.Err(InvalidTaskType))
 		return
 	}
 
@@ -363,7 +362,7 @@ func UpdateSchedule(c *gin.Context) {
 	}
 	validated, err := task.ValidateAndNormalizePayload(meta.AsynqTask, payloadBytes)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, util.Err(err.Error()))
+		c.JSON(http.StatusBadRequest, response.Err(err.Error()))
 		return
 	}
 
@@ -374,7 +373,7 @@ func UpdateSchedule(c *gin.Context) {
 	schedule.IsActive = *req.IsActive
 
 	if err := model.UpdateSchedule(c.Request.Context(), schedule); err != nil {
-		c.JSON(http.StatusInternalServerError, util.Err(fmt.Sprintf("%s: %v", ScheduleSaveFailed, err)))
+		c.JSON(http.StatusInternalServerError, response.Err(fmt.Sprintf("%s: %v", ScheduleSaveFailed, err)))
 		return
 	}
 
@@ -383,7 +382,7 @@ func UpdateSchedule(c *gin.Context) {
 		logger.ErrorF(c.Request.Context(), "[TaskAdmin] 重载调度器失败: %v", err)
 	}
 
-	c.JSON(http.StatusOK, util.OK(schedule))
+	c.JSON(http.StatusOK, response.OK(schedule))
 }
 
 // DeleteSchedule 删除定时任务
@@ -393,21 +392,21 @@ func UpdateSchedule(c *gin.Context) {
 // @Produce json
 // @Security SessionCookie
 // @Param id path int true "定时任务 ID"
-// @Success 200 {object} util.ResponseAny{data=string} "删除结果"
-// @Failure 400 {object} util.ResponseAny "参数错误"
-// @Failure 401 {object} util.ResponseAny "未登录"
-// @Failure 403 {object} util.ResponseAny "无管理员权限"
-// @Failure 500 {object} util.ResponseAny "删除定时任务失败"
+// @Success 200 {object} response.Any{data=string} "删除结果"
+// @Failure 400 {object} response.Any "参数错误"
+// @Failure 401 {object} response.Any "未登录"
+// @Failure 403 {object} response.Any "无管理员权限"
+// @Failure 500 {object} response.Any "删除定时任务失败"
 // @Router /api/v1/admin/tasks/schedules/{id} [delete]
 func DeleteSchedule(c *gin.Context) {
 	id, err := strconv.ParseUint(c.Param("id"), 10, 64)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, util.Err("无效的定时任务ID"))
+		c.JSON(http.StatusBadRequest, response.Err("无效的定时任务ID"))
 		return
 	}
 
 	if err := model.DeleteSchedule(c.Request.Context(), id); err != nil {
-		c.JSON(http.StatusInternalServerError, util.Err(fmt.Sprintf("%s: %v", ScheduleDeleteFailed, err)))
+		c.JSON(http.StatusInternalServerError, response.Err(fmt.Sprintf("%s: %v", ScheduleDeleteFailed, err)))
 		return
 	}
 
@@ -416,5 +415,5 @@ func DeleteSchedule(c *gin.Context) {
 		logger.ErrorF(c.Request.Context(), "[TaskAdmin] 重载调度器失败: %v", err)
 	}
 
-	c.JSON(http.StatusOK, util.OKNil())
+	c.JSON(http.StatusOK, response.OKNil())
 }

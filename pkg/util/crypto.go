@@ -2,6 +2,7 @@
 // Copyright 2026 Arctel.net
 // SPDX-License-Identifier: AGPL-3.0-only
 
+// Package util provides generic utility functions.
 package util
 
 import (
@@ -16,8 +17,18 @@ import (
 	"io"
 )
 
-// aesKeyLength AES-256 密钥字节长度
-const aesKeyLength = 32
+const (
+	aesKeyLength = 32
+
+	errInvalidSignKey         = "invalid sign key: %w"
+	errSignKeyLengthInvalid   = "sign key must be 32 bytes (64 hex characters)"
+	errCreateCipherFailed     = "failed to create cipher: %w"
+	errCreateGCMFailed        = "failed to create GCM: %w"
+	errGenerateNonceFailed    = "failed to generate nonce: %w"
+	errDecodeCiphertextFailed = "failed to decode ciphertext: %w"
+	errCiphertextTooShort     = "ciphertext too short"
+	errDecryptFailed          = "failed to decrypt: %w"
+)
 
 // Encrypt 使用 SignKey 加密字符串数据
 // signKey: 64 字符 hex 编码的密钥（对应 32 字节，用于 AES-256）

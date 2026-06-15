@@ -41,7 +41,7 @@ description: "Wavelet 项目专用：新增或修改 Asynq 异步任务、后台
 - 成功返回 `&task.TaskResult{Message: ..., Detail: ...}`。
 - 失败返回 error，由任务框架处理状态和重试。
 - 不要吞掉关键错误。
-- 复杂 SQL 放到 `internal/model/` 或 `internal/service/`。
+- 复杂 SQL 放到 `internal/model/` 或模块内的业务服务层（如 `internal/apps/<module>/service.go` 或 `logics.go`）。
 - 新增 Go 文件后检查许可证头，必要时运行 `make license`。
 
 ### 注册

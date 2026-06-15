@@ -3,15 +3,14 @@
 
 package updater
 
-import (
-	"context"
+import ("context"
 	"net/http"
 	"time"
 
-	"github.com/Rain-kl/Wavelet/internal/logger"
-	"github.com/Rain-kl/Wavelet/internal/util"
+	"github.com/Rain-kl/Wavelet/pkg/logger"
 	"github.com/gin-gonic/gin"
-)
+
+	"github.com/Rain-kl/Wavelet/internal/common/response")
 
 // GetUpdateStatus 获取应用更新状态
 // @Summary 获取应用更新状态
@@ -19,19 +18,19 @@ import (
 // @Tags admin
 // @Produce json
 // @Security SessionCookie
-// @Success 200 {object} util.ResponseAny{data=updater.Status} "更新状态"
-// @Failure 401 {object} util.ResponseAny "未登录"
-// @Failure 403 {object} util.ResponseAny "无管理员权限"
-// @Failure 500 {object} util.ResponseAny "查询失败"
+// @Success 200 {object} response.Any{data=updater.Status} "更新状态"
+// @Failure 401 {object} response.Any "未登录"
+// @Failure 403 {object} response.Any "无管理员权限"
+// @Failure 500 {object} response.Any "查询失败"
 // @Router /api/v1/admin/update [get]
 func GetUpdateStatus(c *gin.Context) {
 	status, _, err := defaultManager.status(c.Request.Context())
 	if err != nil {
 		logger.ErrorF(c.Request.Context(), "[Updater] check release failed: %v", err)
-		c.JSON(http.StatusInternalServerError, util.Err(err.Error()))
+		c.JSON(http.StatusInternalServerError, response.Err(err.Error()))
 		return
 	}
-	c.JSON(http.StatusOK, util.OK(status))
+	c.JSON(http.StatusOK, response.OK(status))
 }
 
 // ApplyUpdate 下载并应用应用更新
@@ -40,22 +39,22 @@ func GetUpdateStatus(c *gin.Context) {
 // @Tags admin
 // @Produce json
 // @Security SessionCookie
-// @Success 200 {object} util.ResponseAny "升级已准备并即将重启"
-// @Failure 400 {object} util.ResponseAny "当前版本不可升级"
-// @Failure 401 {object} util.ResponseAny "未登录"
-// @Failure 403 {object} util.ResponseAny "无管理员权限"
-// @Failure 500 {object} util.ResponseAny "升级准备失败"
+// @Success 200 {object} response.Any "升级已准备并即将重启"
+// @Failure 400 {object} response.Any "当前版本不可升级"
+// @Failure 401 {object} response.Any "未登录"
+// @Failure 403 {object} response.Any "无管理员权限"
+// @Failure 500 {object} response.Any "升级准备失败"
 // @Router /api/v1/admin/update/apply [post]
 func ApplyUpdate(c *gin.Context) {
 	executable, stagedBinary, err := defaultManager.prepareUpgrade(c.Request.Context())
 	if err != nil {
 		logger.ErrorF(c.Request.Context(), "[Updater] prepare upgrade failed: %v", err)
-		c.JSON(http.StatusBadRequest, util.Err(err.Error()))
+		c.JSON(http.StatusBadRequest, response.Err(err.Error()))
 		return
 	}
 
 	logger.InfoF(c.Request.Context(), "[Updater] upgrade prepared; restarting with %s", stagedBinary)
-	c.JSON(http.StatusOK, util.OKNil())
+	c.JSON(http.StatusOK, response.OKNil())
 
 	go func() {
 		time.Sleep(time.Second)

@@ -8,12 +8,31 @@ import (
 	"log"
 
 	"github.com/Rain-kl/Wavelet/internal/buildinfo"
+	"github.com/Rain-kl/Wavelet/internal/config"
 	"github.com/Rain-kl/Wavelet/internal/db/migrator"
+	"github.com/Rain-kl/Wavelet/pkg/logger"
+	"github.com/Rain-kl/Wavelet/pkg/trace"
 	"github.com/spf13/cobra"
 )
 
 var rootCmd = &cobra.Command{
 	Use: "wavelet",
+	PersistentPreRun: func(_ *cobra.Command, _ []string) {
+		logger.Init(logger.Config{
+			Level:      config.Config.Log.Level,
+			Format:     config.Config.Log.Format,
+			Output:     config.Config.Log.Output,
+			FilePath:   config.Config.Log.FilePath,
+			MaxSize:    config.Config.Log.MaxSize,
+			MaxAge:     config.Config.Log.MaxAge,
+			MaxBackups: config.Config.Log.MaxBackups,
+			Compress:   config.Config.Log.Compress,
+		})
+		trace.Init(trace.Config{
+			AppName:      config.Config.App.AppName,
+			SamplingRate: config.Config.Otel.SamplingRate,
+		})
+	},
 	PreRun: func(_ *cobra.Command, _ []string) {
 		migrator.Migrate()
 	},

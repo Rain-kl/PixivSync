@@ -2,7 +2,7 @@
 // Copyright 2026 Arctel.net
 // SPDX-License-Identifier: AGPL-3.0-only
 
-package otel_trace
+package trace
 
 import (
 	sdktrace "go.opentelemetry.io/otel/sdk/trace"
