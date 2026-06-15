@@ -362,7 +362,7 @@ func tryInstantUpload(ctx context.Context, c *gin.Context, currUser *model.User,
 	if err != nil {
 		return false, err
 	}
-	if storageReadOnly(ctx) {
+	if StorageReadOnly(ctx) {
 		c.JSON(http.StatusConflict, util.Err(ErrStorageReadOnly))
 		return true, nil
 	}
@@ -396,7 +396,7 @@ func tryInstantUpload(ctx context.Context, c *gin.Context, currUser *model.User,
 
 // storeUploadFile 将文件写入当前活动存储驱动。
 func storeUploadFile(ctx context.Context, subPath string, size int64, mimeType string, buf *bytes.Buffer, meta *model.UploadMetadata) (string, string, string) {
-	if storageReadOnly(ctx) {
+	if StorageReadOnly(ctx) {
 		return "", "", ErrStorageReadOnly
 	}
 	driver, backend, err := storage.Active(ctx)

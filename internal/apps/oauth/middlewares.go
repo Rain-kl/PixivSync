@@ -5,6 +5,7 @@
 package oauth
 
 import (
+	"context"
 	"errors"
 	"net/http"
 
@@ -28,6 +29,19 @@ type loginRequiredAuditLog struct {
 	Referer    string `json:"referer"`
 }
 
+func getUserByToken(ctx context.Context, tokenStr string) (*model.User, *model.AccessToken, error) {
+	tokenHash := model.HashToken(tokenStr)
+	var tokenRecord model.AccessToken
+	if err := db.DB(ctx).Where("token_hash = ?", tokenHash).First(&tokenRecord).Error; err != nil {
+		return nil, nil, err
+	}
+	var user model.User
+	if err := db.DB(ctx).Where("id = ? AND is_active = ?", tokenRecord.UserID, true).First(&user).Error; err != nil {
+		return nil, nil, err
+	}
+	return &user, &tokenRecord, nil
+}
+
 // GetUserFromRequest 校验 Access Token 或 Session 并返回用户对象，如果未登录或用户失效则返回 error
 func GetUserFromRequest(c *gin.Context) (*model.User, error) {
 	ctx := c.Request.Context()
@@ -41,18 +55,16 @@ func GetUserFromRequest(c *gin.Context) (*model.User, error) {
 		}
 	}
 
-	var user model.User
-
 	// 优先使用 Access Token 鉴权
 	if tokenStr != "" {
-		tokenHash := model.HashToken(tokenStr)
-		var tokenRecord model.AccessToken
-		if err := db.DB(ctx).Where("token_hash = ?", tokenHash).First(&tokenRecord).Error; err == nil {
-			if err := db.DB(ctx).Where("id = ? AND is_active = ?", tokenRecord.UserID, true).First(&user).Error; err == nil {
-				util.SetToContext(c, TokenAuthKey, true)
-				util.SetToContext(c, TokenAdminKey, tokenRecord.IsAdmin)
-				return &user, nil
+		if user, tokenRecord, err := getUserByToken(ctx, tokenStr); err == nil {
+			// 强行阻止 system 用户任何会话/Token 鉴权通过
+			if user.Username == "system" {
+				return nil, errors.New("system user is not allowed to login")
 			}
+			util.SetToContext(c, TokenAuthKey, true)
+			util.SetToContext(c, TokenAdminKey, tokenRecord.IsAdmin)
+			return user, nil
 		}
 	}
 
@@ -62,6 +74,7 @@ func GetUserFromRequest(c *gin.Context) (*model.User, error) {
 		return nil, errors.New("unauthorized")
 	}
 
+	var user model.User
 	// load user from db to make sure is active
 	tx := db.DB(ctx).Where("id = ? AND is_active = ?", userID, true).First(&user)
 	if tx.Error != nil {
@@ -80,6 +93,11 @@ func GetUserFromRequest(c *gin.Context) (*model.User, error) {
 	// set keys in context for session auth
 	util.SetToContext(c, TokenAuthKey, false)
 	util.SetToContext(c, TokenAdminKey, false)
+
+	// 强行阻止 system 用户任何会话/Token 鉴权通过
+	if user.Username == "system" {
+		return nil, errors.New("system user is not allowed to login")
+	}
 
 	return &user, nil
 }

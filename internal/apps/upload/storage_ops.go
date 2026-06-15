@@ -12,7 +12,7 @@ import (
 	"github.com/Rain-kl/Wavelet/internal/storage"
 )
 
-func storageReadOnly(ctx context.Context) bool {
+func StorageReadOnly(ctx context.Context) bool {
 	execution, ok, err := latestStorageMigrationExecution(ctx)
 	if err != nil {
 		logger.ErrorF(ctx, "读取存储维护状态失败: %v", err)
@@ -66,5 +66,3 @@ func currentMigrationTargetConfig(ctx context.Context) (storage.Config, bool, er
 	}
 	return target, true, nil
 }
-
-

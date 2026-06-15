@@ -56,8 +56,12 @@
 - `docs/`：自动生成的 Swagger 文档。请勿手动编辑生成的文件。
 - `frontend/`：Next.js 应用。
 - `internal/`：私有 Go 后端代码。
+- `pkg/`：公共 Go 库/工具包（留作扩展或存放不依赖特定业务的通用代码）。
 - `scripts/`：本地和 CI 辅助脚本。
 - `support-files/`：部署和数据库辅助文件。
+- `bin/`：本地编译生成的二进制可执行文件。
+- `data/`：本地运行时数据文件目录（如 PostgreSQL、Redis 数据等）。
+- `uploads/`：本地文件上传存储目录。
 
 后端目录：
 
@@ -78,6 +82,8 @@
 - `internal/listener/`：事件监听器和消息/Webhook 消费者。
 - `internal/otel_trace/`：链路追踪（tracing）助手。
 - `internal/testhelper/`：后端测试共享辅助能力。
+- `internal/buildinfo/`：暴露在发布/构建工作流中注入的元数据（如版本号、编译时间等）。
+- `internal/httppool/`：管理全局共享且经过优化的 HTTP 传输客户端及连接池，并集成 OTel 链路追踪。
 
 前端目录：
 
@@ -99,9 +105,19 @@
 - `frontend/components/common/admin/system.tsx`：系统参数管理。
 - `frontend/components/common/admin/files.tsx`：上传文件管理。
 - `frontend/components/common/admin/users.tsx`：用户管理。
+- `frontend/components/common/admin/access-analytics.tsx`：访问分析与图表展示。
+- `frontend/components/common/admin/access-logs.tsx`：访问日志审计 UI。
+- `frontend/components/common/admin/app-logs.tsx`：应用日志查看 UI。
+- `frontend/components/common/admin/database-manage.tsx`：数据库备份、恢复与管理 UI。
+- `frontend/components/common/admin/file-list.tsx`：管理员文件列表管理组件。
+- `frontend/components/common/admin/file-stats.tsx`：文件存储状态与统计 UI。
+- `frontend/components/common/admin/status.tsx`：系统运行状态与监控 UI。
+- `frontend/components/common/admin/storage-config-tab.tsx`：存储策略与配置 tab 页。
+- `frontend/components/common/admin/system-logs.tsx`：系统日志查看组件。
 - `frontend/components/common/general/manage-pannel.tsx`：通用列表/详情管理器。
 - `frontend/components/common/general/password-dialog.tsx`：敏感操作密码确认对话框。
 - `frontend/components/common/settings/system-settings.tsx`：管理员图形化系统设置。
+- `frontend/components/common/user/file-manager.tsx`：用户端文件管理组件。
 
 
 ## 开发要求

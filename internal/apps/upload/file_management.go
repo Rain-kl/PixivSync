@@ -115,7 +115,7 @@ func ListFiles(c *gin.Context) {
 // @Router /api/v1/admin/uploads/{id} [delete]
 func DeleteFile(c *gin.Context) {
 	ctx := c.Request.Context()
-	if storageReadOnly(ctx) {
+	if StorageReadOnly(ctx) {
 		c.JSON(http.StatusConflict, util.Err(ErrStorageReadOnly))
 		return
 	}
@@ -259,7 +259,7 @@ func ListMyFiles(c *gin.Context) {
 func DeleteMyFile(c *gin.Context) {
 	currUser, _ := util.GetFromContext[*model.User](c, oauth.UserObjKey)
 	ctx := c.Request.Context()
-	if storageReadOnly(ctx) {
+	if StorageReadOnly(ctx) {
 		c.JSON(http.StatusConflict, util.Err(ErrStorageReadOnly))
 		return
 	}
@@ -313,7 +313,7 @@ type updateMyFileRequest struct {
 func UpdateMyFile(c *gin.Context) {
 	currUser, _ := util.GetFromContext[*model.User](c, oauth.UserObjKey)
 	ctx := c.Request.Context()
-	if storageReadOnly(ctx) {
+	if StorageReadOnly(ctx) {
 		c.JSON(http.StatusConflict, util.Err(ErrStorageReadOnly))
 		return
 	}

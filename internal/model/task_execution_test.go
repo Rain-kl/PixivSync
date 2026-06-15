@@ -56,7 +56,7 @@ func TestCreateTaskExecution(t *testing.T) {
 
 	execution := &TaskExecution{
 		TaskID:      "manual_cleanup_123",
-		TaskType:    "upload:cleanup_unused",
+		TaskType:    "system:cleanup",
 		TaskName:    "清理未使用上传",
 		Status:      TaskExecutionStatusPending,
 		Retryable:   true,
@@ -81,7 +81,7 @@ func TestGetTaskExecutionByTaskID(t *testing.T) {
 	// 创建记录
 	execution := &TaskExecution{
 		TaskID:      "test_task_id_001",
-		TaskType:    "upload:cleanup_unused",
+		TaskType:    "system:cleanup",
 		TaskName:    "清理未使用上传",
 		Status:      TaskExecutionStatusPending,
 		Retryable:   true,
@@ -112,7 +112,7 @@ func TestGetTaskExecutionByID(t *testing.T) {
 
 	execution := &TaskExecution{
 		TaskID:      "test_by_id_001",
-		TaskType:    "upload:cleanup_unused",
+		TaskType:    "system:cleanup",
 		TaskName:    "清理未使用上传",
 		Status:      TaskExecutionStatusPending,
 		TriggeredBy: "system",
@@ -134,7 +134,7 @@ func TestUpdateTaskExecution(t *testing.T) {
 	// 创建记录
 	execution := &TaskExecution{
 		TaskID:      "test_update_001",
-		TaskType:    "upload:cleanup_unused",
+		TaskType:    "system:cleanup",
 		TaskName:    "清理未使用上传",
 		Status:      TaskExecutionStatusPending,
 		TriggeredBy: "manual",
@@ -178,7 +178,7 @@ func TestUpdateTaskExecutionFailed(t *testing.T) {
 
 	execution := &TaskExecution{
 		TaskID:      "test_fail_001",
-		TaskType:    "upload:cleanup_unused",
+		TaskType:    "system:cleanup",
 		TaskName:    "清理未使用上传",
 		Status:      TaskExecutionStatusPending,
 		Retryable:   true,
@@ -212,7 +212,7 @@ func TestUpdateTaskExecutionDoesNotPersistBufferedLog(t *testing.T) {
 
 	execution := &TaskExecution{
 		TaskID:      "test_omit_log_001",
-		TaskType:    "upload:cleanup_unused",
+		TaskType:    "system:cleanup",
 		TaskName:    "清理未使用上传",
 		Status:      TaskExecutionStatusPending,
 		TriggeredBy: "manual",
@@ -249,7 +249,7 @@ func TestAppendTaskExecutionLog(t *testing.T) {
 
 	execution := &TaskExecution{
 		TaskID:      "test_log_001",
-		TaskType:    "upload:cleanup_unused",
+		TaskType:    "system:cleanup",
 		TaskName:    "清理未使用上传",
 		Status:      TaskExecutionStatusPending,
 		TriggeredBy: "manual",
@@ -334,7 +334,7 @@ func TestGetTaskExecutionLogPrefersRedis(t *testing.T) {
 
 	execution := &TaskExecution{
 		TaskID:      "redis_priority_001",
-		TaskType:    "upload:cleanup_unused",
+		TaskType:    "system:cleanup",
 		TaskName:    "清理未使用上传",
 		Status:      TaskExecutionStatusRunning,
 		Log:         "数据库旧日志",
@@ -358,10 +358,10 @@ func TestListTaskExecutions(t *testing.T) {
 
 	// 创建多条记录，包含不同状态和类型
 	records := []*TaskExecution{
-		{TaskID: "list_001", TaskType: "upload:cleanup_unused", TaskName: "清理上传", Status: TaskExecutionStatusSucceeded, TriggeredBy: "manual"},
-		{TaskID: "list_002", TaskType: "upload:cleanup_unused", TaskName: "清理上传", Status: TaskExecutionStatusFailed, TriggeredBy: "system"},
+		{TaskID: "list_001", TaskType: "system:cleanup", TaskName: "系统垃圾清理", Status: TaskExecutionStatusSucceeded, TriggeredBy: "manual"},
+		{TaskID: "list_002", TaskType: "system:cleanup", TaskName: "系统垃圾清理", Status: TaskExecutionStatusFailed, TriggeredBy: "system"},
 		{TaskID: "list_003", TaskType: "other:task", TaskName: "其他任务", Status: TaskExecutionStatusPending, TriggeredBy: "manual"},
-		{TaskID: "list_004", TaskType: "upload:cleanup_unused", TaskName: "清理上传", Status: TaskExecutionStatusRunning, TriggeredBy: "manual"},
+		{TaskID: "list_004", TaskType: "system:cleanup", TaskName: "系统垃圾清理", Status: TaskExecutionStatusRunning, TriggeredBy: "manual"},
 		{TaskID: "list_005", TaskType: "other:task", TaskName: "其他任务", Status: TaskExecutionStatusSucceeded, TriggeredBy: "system"},
 	}
 	for _, r := range records {
@@ -409,7 +409,7 @@ func TestListTaskExecutions(t *testing.T) {
 	assert.NotEqual(t, items[0].ID, items2[0].ID)
 
 	// 状态 + 类型组合筛选
-	items, total, err = ListTaskExecutions(ctx, ListTaskExecutionsRequest{Status: "succeeded", TaskType: "upload:cleanup_unused", Page: 1, PageSize: 10})
+	items, total, err = ListTaskExecutions(ctx, ListTaskExecutionsRequest{Status: "succeeded", TaskType: "system:cleanup", Page: 1, PageSize: 10})
 	require.NoError(t, err)
 	assert.Equal(t, int64(1), total)
 	assert.Equal(t, "list_001", items[0].TaskID)

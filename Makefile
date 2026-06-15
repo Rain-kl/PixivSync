@@ -30,6 +30,20 @@ code-check:
 	golangci-lint run
 	cd frontend && pnpm tsc --noEmit --jsx preserve && npx eslint . --max-warnings 0
 
+build-backend:
+	@echo "==> Building backend version=$(VERSION) build_date=$(BUILD_DATE)..."
+	go build \
+		-ldflags "-s -w -X '$(MODULE)/internal/buildinfo.Version=$(VERSION)' -X '$(MODULE)/internal/buildinfo.BuildTime=$(BUILD_DATE)'" \
+		-o bin/wavelet \
+		main.go
+
+build-frontend:
+	@echo "==> Building frontend version=$(VERSION) build_date=$(BUILD_DATE)..."
+	cd frontend && \
+		NEXT_PUBLIC_APP_VERSION="$(VERSION)" \
+		NEXT_PUBLIC_APP_BUILD_DATE="$(BUILD_DATE)" \
+		pnpm build:embed
+
 build-test:
 	@echo "==> Running frontend and backend build tests in parallel..."
 	@PIDS=""; \

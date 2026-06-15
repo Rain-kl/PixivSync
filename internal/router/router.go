@@ -20,6 +20,7 @@ import (
 	admin_cache "github.com/Rain-kl/Wavelet/internal/apps/admin/cache"
 	admin_db_manage "github.com/Rain-kl/Wavelet/internal/apps/admin/db_manage"
 	admin_logs "github.com/Rain-kl/Wavelet/internal/apps/admin/logs"
+	admin_push "github.com/Rain-kl/Wavelet/internal/apps/admin/push"
 	admin_status "github.com/Rain-kl/Wavelet/internal/apps/admin/status"
 	admin_task "github.com/Rain-kl/Wavelet/internal/apps/admin/task"
 	admin_template "github.com/Rain-kl/Wavelet/internal/apps/admin/template"
@@ -37,6 +38,7 @@ import (
 
 	// Swagger 文档生成
 	_ "github.com/Rain-kl/Wavelet/docs"
+	_ "github.com/Rain-kl/Wavelet/internal/apps/admin/push/custom_events"
 	"github.com/Rain-kl/Wavelet/internal/apps/admin/system_config"
 	"github.com/Rain-kl/Wavelet/internal/apps/oauth"
 	"github.com/Rain-kl/Wavelet/internal/config"
@@ -58,6 +60,11 @@ func Serve() {
 
 	// 初始化 ClickHouse 异步日志写入器
 	risk_control.InitLogWriter()
+
+	// 运行内置事件同步
+	if err := admin_push.SyncEvents(context.Background()); err != nil {
+		log.Printf("[API] sync push events failed: %v\n", err)
+	}
 
 	// 初始化路由
 	r := gin.New()
@@ -171,6 +178,7 @@ func registerRoutes(r *gin.Engine) {
 
 			// Register custom business routes
 			registerCustomRoutes(apiV1Router)
+
 		}
 	}
 
@@ -332,6 +340,24 @@ func registerAdminRoutes(apiV1Router *gin.RouterGroup) {
 		adminRouter.PUT("/auth-sources/:id", admin_auth_source.UpdateAuthSource)
 		adminRouter.PUT("/auth-sources/:id/toggle", admin_auth_source.ToggleAuthSource)
 		adminRouter.DELETE("/auth-sources/:id", admin_auth_source.DeleteAuthSource)
+
+		// Push Notifications
+		adminRouter.GET("/push/events", admin_push.ListEvents)
+		adminRouter.GET("/push/events/builtin", admin_push.ListBuiltInEvents)
+		adminRouter.POST("/push/events", admin_push.CreateEvent)
+		adminRouter.PUT("/push/events/:id", admin_push.UpdateEvent)
+		adminRouter.DELETE("/push/events/:id", admin_push.DeleteEvent)
+		adminRouter.POST("/push/events/:id/toggle", admin_push.ToggleEvent)
+		adminRouter.GET("/push/histories", admin_push.ListHistories)
+		adminRouter.POST("/push/test", admin_push.TestPush)
+
+		// Message Channels CRUD
+		adminRouter.GET("/push/channels/definitions", admin_push.ListChannelDefinitions)
+		adminRouter.GET("/push/channels", admin_push.ListChannels)
+		adminRouter.POST("/push/channels", admin_push.CreateChannel)
+		adminRouter.PUT("/push/channels/:id", admin_push.UpdateChannel)
+		adminRouter.DELETE("/push/channels/:id", admin_push.DeleteChannel)
+		adminRouter.POST("/push/channels/test", admin_push.TestChannel)
 	}
 }
 

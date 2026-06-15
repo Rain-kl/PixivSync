@@ -20,6 +20,7 @@ import (
 	"github.com/Rain-kl/Wavelet/internal/db"
 	"github.com/Rain-kl/Wavelet/internal/diskcache"
 	"github.com/Rain-kl/Wavelet/internal/model"
+	"github.com/Rain-kl/Wavelet/internal/service"
 	"github.com/Rain-kl/Wavelet/internal/storage"
 	"github.com/Rain-kl/Wavelet/internal/task"
 	"github.com/Rain-kl/Wavelet/internal/testhelper"
@@ -27,7 +28,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestCleanupUnusedUploadsHandler_Execute(t *testing.T) {
+func TestSystemCleanupHandler_Execute(t *testing.T) {
 	_, _, cleanup := testhelper.SetupTestEnvironment(t)
 	defer cleanup()
 
@@ -42,6 +43,8 @@ func TestCleanupUnusedUploadsHandler_Execute(t *testing.T) {
 	defer storageMock()
 
 	ctx := context.Background()
+	err := db.DB(ctx).AutoMigrate(&model.PushHistory{})
+	require.NoError(t, err)
 
 	// 准备测试数据：创建一些上传记录
 	now := time.Now()
@@ -81,14 +84,40 @@ func TestCleanupUnusedUploadsHandler_Execute(t *testing.T) {
 		require.NoError(t, err)
 	}
 
+	// 准备推送历史测试数据：1个旧的（应删除），1个新的（应保留）
+	oldPush := &model.PushHistory{
+		EventKey:  "admin_login",
+		Channel:   "email",
+		Target:    "admin@test.com",
+		Title:     "Old Login",
+		Content:   "Old Content",
+		Level:     "INFO",
+		Status:    "success",
+		CreatedAt: now.AddDate(0, 0, -10),
+	}
+	newPush := &model.PushHistory{
+		EventKey:  "admin_login",
+		Channel:   "lark",
+		Target:    "http://webhook.com",
+		Title:     "New Login",
+		Content:   "New Content",
+		Level:     "INFO",
+		Status:    "success",
+		CreatedAt: now,
+	}
+	err = db.DB(ctx).Create(oldPush).Error
+	require.NoError(t, err)
+	err = db.DB(ctx).Create(newPush).Error
+	require.NoError(t, err)
+
 	// 执行 handler
-	handler := &CleanupUnusedUploadsHandler{}
+	handler := &service.SystemCleanupHandler{}
 	result, err := handler.Execute(ctx, nil)
 
 	// 验证结果
 	require.NoError(t, err)
 	require.NotNil(t, result)
-	assert.Contains(t, result.Message, "共处理 2 个文件，成功删除 2 个")
+	assert.Contains(t, result.Message, "系统清理完成。成功清理未使用的上传文件 2/2 个；清理历史推送审计日志 1 条。")
 
 	// 验证数据库状态：pending 且超过1小时的应被标记为 deleted
 	var pendingCount int64
@@ -102,9 +131,19 @@ func TestCleanupUnusedUploadsHandler_Execute(t *testing.T) {
 	var usedCount int64
 	db.DB(ctx).Model(&model.Upload{}).Where("status = ?", model.UploadStatusUsed).Count(&usedCount)
 	assert.Equal(t, int64(1), usedCount, "used 状态的文件不应受影响")
+
+	// 验证推送历史数据状态：10天前的应被删除，今天的应保留
+	var pushCount int64
+	db.DB(ctx).Model(&model.PushHistory{}).Count(&pushCount)
+	assert.Equal(t, int64(1), pushCount, "应只剩1条推送历史记录")
+
+	var remainingPush model.PushHistory
+	err = db.DB(ctx).First(&remainingPush).Error
+	require.NoError(t, err)
+	assert.Equal(t, "New Login", remainingPush.Title)
 }
 
-func TestCleanupUnusedUploadsHandler_ExecuteNoFiles(t *testing.T) {
+func TestSystemCleanupHandler_ExecuteNoFiles(t *testing.T) {
 	_, _, cleanup := testhelper.SetupTestEnvironment(t)
 	defer cleanup()
 
@@ -119,19 +158,21 @@ func TestCleanupUnusedUploadsHandler_ExecuteNoFiles(t *testing.T) {
 	defer storageMock()
 
 	ctx := context.Background()
+	err := db.DB(ctx).AutoMigrate(&model.PushHistory{})
+	require.NoError(t, err)
 
 	// 没有任何上传记录
-	handler := &CleanupUnusedUploadsHandler{}
+	handler := &service.SystemCleanupHandler{}
 	result, err := handler.Execute(ctx, nil)
 
 	require.NoError(t, err)
 	require.NotNil(t, result)
-	assert.Contains(t, result.Message, "共处理 0 个文件，成功删除 0 个")
+	assert.Contains(t, result.Message, "系统清理完成。成功清理未使用的上传文件 0/0 个；清理历史推送审计日志 0 条。")
 }
 
-func TestCleanupUnusedUploadsHandler_ImplementsTaskHandler(t *testing.T) {
-	// 编译期验证 CleanupUnusedUploadsHandler 实现了 TaskHandler 接口
-	var _ task.TaskHandler = (*CleanupUnusedUploadsHandler)(nil)
+func TestSystemCleanupHandler_ImplementsTaskHandler(t *testing.T) {
+	// 编译期验证 SystemCleanupHandler 实现了 TaskHandler 接口
+	var _ task.TaskHandler = (*service.SystemCleanupHandler)(nil)
 }
 
 func TestWarmImageCacheHandlerValidatePayload(t *testing.T) {

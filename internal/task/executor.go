@@ -67,6 +67,16 @@ func GetTaskID(ctx context.Context) string {
 	return ""
 }
 
+// IsFinalAttempt 判断当前任务执行是否为最后一次重试尝试（若再次失败即为最终失败）
+func IsFinalAttempt(ctx context.Context) bool {
+	retryCount, hasRetryCount := asynq.GetRetryCount(ctx)
+	maxRetry, hasMaxRetry := asynq.GetMaxRetry(ctx)
+	if !hasRetryCount || !hasMaxRetry {
+		return true
+	}
+	return retryCount >= maxRetry
+}
+
 // AppendLog 追加日志到任务执行记录
 // 在 TaskHandler.Execute 中调用，日志会自动追加到 TaskExecution.Log 字段
 func AppendLog(ctx context.Context, format string, args ...interface{}) {
@@ -238,12 +248,8 @@ func ProcessTask(ctx context.Context, t *asynq.Task) error {
 	// 加载或动态创建执行记录
 	now := time.Now()
 	execution, err := getOrCreateTaskExecution(ctx, taskID, t, now)
-	if err == nil && execution != nil && execution.TriggeredBy != "schedule" {
-		execution.Status = model.TaskExecutionStatusRunning
-		execution.StartedAt = &now
-		if updateErr := model.UpdateTaskExecution(ctx, execution); updateErr != nil {
-			logger.ErrorF(ctx, "[TaskExecutor] 更新执行状态失败 taskID=%s: %v", taskID, updateErr)
-		}
+	if err == nil {
+		updateExecutionOnStart(ctx, execution, now)
 	}
 
 	if execution != nil {
@@ -271,6 +277,27 @@ func ProcessTask(ctx context.Context, t *asynq.Task) error {
 	}
 
 	return execErr
+}
+
+func updateExecutionOnStart(ctx context.Context, execution *model.TaskExecution, now time.Time) {
+	if execution == nil {
+		return
+	}
+	dirty := false
+	if retryCount, hasRetry := asynq.GetRetryCount(ctx); hasRetry && execution.RetryCount != retryCount {
+		execution.RetryCount = retryCount
+		dirty = true
+	}
+	if execution.Status != model.TaskExecutionStatusRunning {
+		execution.Status = model.TaskExecutionStatusRunning
+		execution.StartedAt = &now
+		dirty = true
+	}
+	if dirty {
+		if updateErr := model.UpdateTaskExecution(ctx, execution); updateErr != nil {
+			logger.ErrorF(ctx, "[TaskExecutor] 更新执行状态失败 taskID=%s: %v", execution.TaskID, updateErr)
+		}
+	}
 }
 
 // getOrCreateTaskExecution 获取已有的任务执行记录，如果不存在则针对已知任务类型动态创建记录

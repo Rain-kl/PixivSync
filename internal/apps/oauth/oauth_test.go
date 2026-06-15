@@ -26,6 +26,8 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/go-jose/go-jose/v4"
 	"github.com/redis/go-redis/v9"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"golang.org/x/oauth2"
 	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
@@ -1179,4 +1181,77 @@ func TestOIDCPolicyEnforcement(t *testing.T) {
 	if wCallbackSourceInactive.Code != http.StatusBadRequest {
 		t.Errorf("expected 400 for callback when OIDC source deactivated, got %d, body: %s", wCallbackSourceInactive.Code, wCallbackSourceInactive.Body.String())
 	}
+}
+
+func TestSystemUserBlockedByMiddleware(t *testing.T) {
+	initializeTestConfig()
+	dbConn := setupTestDB(t)
+
+	// 1. 创建正常管理员
+	adminUser := &model.User{ID: 1001, Username: "normal_admin", IsAdmin: true, IsActive: true}
+	err := dbConn.Create(adminUser).Error
+	require.NoError(t, err)
+
+	// 2. 创建系统用户 (根据架构设计，系统用户 id = 999)
+	systemUser := &model.User{ID: 999, Username: "system", Nickname: "系统", Password: "*", IsActive: true}
+	err = dbConn.Create(systemUser).Error
+	require.NoError(t, err)
+
+	// 3. 设置全局测试数据库连接并构建测试路由组
+	db.SetDB(dbConn)
+	rProtected := gin.New()
+	store := cookie.NewStore([]byte("secret"))
+	rProtected.Use(sessions.Sessions("mysession", store))
+	rProtected.Use(LoginRequired())
+	rProtected.GET("/test-auth", func(c *gin.Context) {
+		c.JSON(http.StatusOK, gin.H{"status": "ok"})
+	})
+
+	// 4. 测试未登录用户 (401)
+	w1 := httptest.NewRecorder()
+	req1, _ := http.NewRequest("GET", "/test-auth", nil)
+	rProtected.ServeHTTP(w1, req1)
+	assert.Equal(t, http.StatusUnauthorized, w1.Code)
+
+	// 5. 测试正常用户登录并访问 (200)
+	rLogin := gin.New()
+	rLogin.Use(sessions.Sessions("mysession", store))
+	rLogin.GET("/login-mock", func(c *gin.Context) {
+		session := sessions.Default(c)
+		session.Set("user_id", uint64(1001))
+		_ = session.Save()
+		c.Status(200)
+	})
+
+	wLogin := httptest.NewRecorder()
+	reqLogin, _ := http.NewRequest("GET", "/login-mock", nil)
+	rLogin.ServeHTTP(wLogin, reqLogin)
+	cookieStr := wLogin.Header().Get("Set-Cookie")
+
+	w2 := httptest.NewRecorder()
+	req2, _ := http.NewRequest("GET", "/test-auth", nil)
+	req2.Header.Set("Cookie", cookieStr)
+	rProtected.ServeHTTP(w2, req2)
+	assert.Equal(t, http.StatusOK, w2.Code)
+
+	// 6. 测试 system 用户（ID: 999）登录并访问 (被中间件阻断返回 401)
+	rLoginSystem := gin.New()
+	rLoginSystem.Use(sessions.Sessions("mysession", store))
+	rLoginSystem.GET("/login-system-mock", func(c *gin.Context) {
+		session := sessions.Default(c)
+		session.Set("user_id", uint64(999))
+		_ = session.Save()
+		c.Status(200)
+	})
+
+	wLoginSystem := httptest.NewRecorder()
+	reqLoginSystem, _ := http.NewRequest("GET", "/login-system-mock", nil)
+	rLoginSystem.ServeHTTP(wLoginSystem, reqLoginSystem)
+	cookieSystemStr := wLoginSystem.Header().Get("Set-Cookie")
+
+	w3 := httptest.NewRecorder()
+	req3, _ := http.NewRequest("GET", "/test-auth", nil)
+	req3.Header.Set("Cookie", cookieSystemStr)
+	rProtected.ServeHTTP(w3, req3)
+	assert.Equal(t, http.StatusUnauthorized, w3.Code)
 }

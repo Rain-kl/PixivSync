@@ -27,6 +27,7 @@ import {ConfigService} from './config';
 import {UploadService} from './upload';
 import {DbManageService} from './db-manage';
 import {PixezService} from './pixez';
+import {PushService} from './push';
 
 /**
  * 服务对象
@@ -48,6 +49,8 @@ const services = {
   upload: UploadService,
   /** 数据库管理服务 */
   dbManage: DbManageService,
+  /** 通知推送服务 */
+  push: PushService,
   /** PixEz 镜像同步服务 */
   pixez: PixezService,
 } as const;
@@ -134,6 +137,10 @@ export type { UploadImageResponse } from './upload';
 // 数据库管理服务
 export { DbManageService } from './db-manage';
 export type { DBOverview, TableDataResponse, ExecuteSQLResponse } from './db-manage';
+
+// 通知推送服务
+export { PushService } from './push';
+export type { PushEvent, PushHistory, PushChannelConfig, ListPushHistoriesRequest, ListPushHistoriesResponse, UpdatePushEventRequest, TestPushRequest } from './push';
 
 // PixEz 服务
 export { PixezService } from './pixez';

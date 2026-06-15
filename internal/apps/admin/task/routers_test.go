@@ -18,6 +18,7 @@ import (
 	"github.com/Rain-kl/Wavelet/internal/apps/upload"
 	"github.com/Rain-kl/Wavelet/internal/apps/user"
 	"github.com/Rain-kl/Wavelet/internal/model"
+	"github.com/Rain-kl/Wavelet/internal/service"
 	"github.com/Rain-kl/Wavelet/internal/task"
 	"github.com/Rain-kl/Wavelet/internal/testhelper"
 	"github.com/Rain-kl/Wavelet/internal/util"
@@ -91,7 +92,7 @@ func TestListTaskTypes(t *testing.T) {
 	foundCleanup := false
 	foundWarmImageCache := false
 	for _, m := range taskMetas {
-		if m.Type == upload.TaskTypeCleanupUploads {
+		if m.Type == service.TaskTypeSystemCleanup {
 			foundCleanup = true
 		}
 		if m.Type == upload.TaskTypeWarmImageCache {
@@ -99,7 +100,7 @@ func TestListTaskTypes(t *testing.T) {
 		}
 	}
 	if !foundCleanup {
-		t.Errorf("expected task type %s to be listed", upload.TaskTypeCleanupUploads)
+		t.Errorf("expected task type %s to be listed", service.TaskTypeSystemCleanup)
 	}
 	if !foundWarmImageCache {
 		t.Errorf("expected task type %s to be listed", upload.TaskTypeWarmImageCache)
@@ -115,7 +116,7 @@ func TestDispatchTask(t *testing.T) {
 
 	t.Run("dispatch valid task successfully", func(t *testing.T) {
 		payload := DispatchTaskRequest{
-			TaskType: upload.TaskTypeCleanupUploads,
+			TaskType: service.TaskTypeSystemCleanup,
 		}
 		body, _ := json.Marshal(payload)
 		req, _ := http.NewRequest("POST", "/api/v1/admin/tasks/dispatch", bytes.NewBuffer(body))
@@ -227,9 +228,9 @@ func TestListTaskExecutions(t *testing.T) {
 	// 准备测试数据
 	now := time.Now()
 	records := []*model.TaskExecution{
-		{TaskID: "exec_001", TaskType: "upload:cleanup_unused", TaskName: "清理上传", Status: model.TaskExecutionStatusSucceeded, TriggeredBy: "manual", Duration: 1500, Result: "清理完成", StartedAt: &now, FinishedAt: &now},
-		{TaskID: "exec_002", TaskType: "upload:cleanup_unused", TaskName: "清理上传", Status: model.TaskExecutionStatusFailed, TriggeredBy: "system", ErrorMessage: "连接超时", StartedAt: &now, FinishedAt: &now},
-		{TaskID: "exec_003", TaskType: "upload:cleanup_unused", TaskName: "清理上传", Status: model.TaskExecutionStatusPending, TriggeredBy: "manual", Retryable: true, MaxRetry: 3},
+		{TaskID: "exec_001", TaskType: "system:cleanup", TaskName: "系统垃圾清理", Status: model.TaskExecutionStatusSucceeded, TriggeredBy: "manual", Duration: 1500, Result: "清理完成", StartedAt: &now, FinishedAt: &now},
+		{TaskID: "exec_002", TaskType: "system:cleanup", TaskName: "系统垃圾清理", Status: model.TaskExecutionStatusFailed, TriggeredBy: "system", ErrorMessage: "连接超时", StartedAt: &now, FinishedAt: &now},
+		{TaskID: "exec_003", TaskType: "system:cleanup", TaskName: "系统垃圾清理", Status: model.TaskExecutionStatusPending, TriggeredBy: "manual", Retryable: true, MaxRetry: 3},
 	}
 	for _, r := range records {
 		err := model.CreateTaskExecution(ctx, r)
@@ -271,7 +272,7 @@ func TestListTaskExecutions(t *testing.T) {
 	})
 
 	t.Run("filter by task_type (asynq task name)", func(t *testing.T) {
-		req, _ := http.NewRequest("GET", "/api/v1/admin/tasks/executions?task_type=upload:cleanup_unused", nil)
+		req, _ := http.NewRequest("GET", "/api/v1/admin/tasks/executions?task_type=system:cleanup", nil)
 		w := httptest.NewRecorder()
 		router.ServeHTTP(w, req)
 
@@ -288,7 +289,7 @@ func TestListTaskExecutions(t *testing.T) {
 	})
 
 	t.Run("filter by task_type (management task type)", func(t *testing.T) {
-		req, _ := http.NewRequest("GET", "/api/v1/admin/tasks/executions?task_type=cleanup_unused_uploads", nil)
+		req, _ := http.NewRequest("GET", "/api/v1/admin/tasks/executions?task_type=system_cleanup", nil)
 		w := httptest.NewRecorder()
 		router.ServeHTTP(w, req)
 
@@ -333,8 +334,8 @@ func TestGetTaskExecution(t *testing.T) {
 	// 创建测试记录
 	execution := &model.TaskExecution{
 		TaskID:      "detail_001",
-		TaskType:    "upload:cleanup_unused",
-		TaskName:    "清理上传",
+		TaskType:    "system:cleanup",
+		TaskName:    "系统垃圾清理",
 		Status:      model.TaskExecutionStatusSucceeded,
 		Log:         "[10:00:01] 开始扫描\n[10:00:02] 找到 50 个文件\n[10:00:03] 清理完成",
 		Result:      "共清理 50 个文件",
@@ -397,8 +398,8 @@ func TestRetryTask(t *testing.T) {
 		now := time.Now()
 		execution := &model.TaskExecution{
 			TaskID:       "retry_api_001",
-			TaskType:     "upload:cleanup_unused",
-			TaskName:     "清理上传",
+			TaskType:     "system:cleanup",
+			TaskName:     "系统垃圾清理",
 			Status:       model.TaskExecutionStatusFailed,
 			ErrorMessage: "S3 连接超时",
 			Retryable:    true,
@@ -437,8 +438,8 @@ func TestRetryTask(t *testing.T) {
 	t.Run("retry succeeded task fails", func(t *testing.T) {
 		execution := &model.TaskExecution{
 			TaskID:      "retry_succeeded_001",
-			TaskType:    "upload:cleanup_unused",
-			TaskName:    "清理上传",
+			TaskType:    "system:cleanup",
+			TaskName:    "系统垃圾清理",
 			Status:      model.TaskExecutionStatusSucceeded,
 			Retryable:   true,
 			MaxRetry:    3,
@@ -458,8 +459,8 @@ func TestRetryTask(t *testing.T) {
 	t.Run("retry non-retryable task fails", func(t *testing.T) {
 		execution := &model.TaskExecution{
 			TaskID:      "retry_not_allowed_001",
-			TaskType:    "upload:cleanup_unused",
-			TaskName:    "清理上传",
+			TaskType:    "system:cleanup",
+			TaskName:    "系统垃圾清理",
 			Status:      model.TaskExecutionStatusFailed,
 			Retryable:   false,
 			TriggeredBy: "manual",
@@ -502,8 +503,8 @@ func TestRetryTaskMaxRetryExceeded(t *testing.T) {
 
 	execution := &model.TaskExecution{
 		TaskID:      "retry_max_api_001",
-		TaskType:    "upload:cleanup_unused",
-		TaskName:    "清理上传",
+		TaskType:    "system:cleanup",
+		TaskName:    "系统垃圾清理",
 		Status:      model.TaskExecutionStatusFailed,
 		Retryable:   true,
 		MaxRetry:    1,

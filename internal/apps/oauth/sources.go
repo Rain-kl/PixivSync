@@ -14,6 +14,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/Rain-kl/Wavelet/internal/apps/admin/push/custom_events"
 	"github.com/Rain-kl/Wavelet/internal/common"
 	"github.com/Rain-kl/Wavelet/internal/config"
 	"github.com/Rain-kl/Wavelet/internal/db"
@@ -674,6 +675,8 @@ func handleCallbackLogin(ctx context.Context, c *gin.Context, source *model.Auth
 	}
 
 	logger.InfoF(ctx, "[LoginAudit] successful OAuth login via source: %s, external ID: %s, user: %s, ID: %d, IP: %s", source.Name, userInfo.Sub, user.Username, user.ID, c.ClientIP())
+
+	custom_events.TriggerAdminLoginEvent(ctx, &user, c.ClientIP())
 
 	c.JSON(http.StatusOK, util.OK(buildCallbackResult(&user, "logged_in")))
 }
