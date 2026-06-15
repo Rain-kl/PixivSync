@@ -19,6 +19,8 @@ const (
 	TypeCustom = "custom"
 	// TypeEmail 邮件推送消息通道类型
 	TypeEmail = "email"
+	// TypeTelegram 电报机器人推送消息通道类型
+	TypeTelegram = "telegram"
 )
 
 // PushChannel 消息通道模型
@@ -53,6 +55,10 @@ func (pc *PushChannel) Validate() error {
 		pc.Type = TypeCustom
 	}
 
+	if pc.Type == TypeTelegram && pc.URL == "" {
+		pc.URL = "https://api.telegram.org"
+	}
+
 	if pc.Name == "" {
 		return errors.New("channel name is required")
 	}
@@ -77,6 +83,10 @@ func (pc *PushChannel) Validate() error {
 		return validateJSON(pc.Other)
 	case TypeEmail:
 		// Email channel SMTP configs fall back to global settings, so they are not required to be filled.
+	case TypeTelegram:
+		if pc.Token == "" {
+			return errors.New("telegram bot token is required")
+		}
 	}
 	return nil
 }

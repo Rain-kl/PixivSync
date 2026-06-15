@@ -56,8 +56,8 @@ func ListDefinitions() []Definition {
 	defMu.RLock()
 	defer defMu.RUnlock()
 
-	// We want a stable order: custom, lark, email
-	order := []string{channelCustom, channelLark, channelEmail}
+	// We want a stable order: custom, lark, telegram, email
+	order := []string{channelCustom, channelLark, channelTelegram, channelEmail}
 	res := make([]Definition, 0, len(definitions))
 	for _, t := range order {
 		if d, ok := definitions[t]; ok {
@@ -136,6 +136,39 @@ func init() {
 				Required:    false,
 				Placeholder: "可选，留空则默认使用系统内置的精美互动卡片",
 				Description: "若填写，必须是合法的飞书卡片 JSON 格式",
+			},
+		},
+	})
+
+	// Register Telegram channel
+	RegisterChannelDefinition(Definition{
+		Type:        channelTelegram,
+		Name:        "Telegram 机器人",
+		Description: "配置 Telegram 机器人推送消息。",
+		Fields: []Field{
+			{
+				Key:         KeyURL,
+				Label:       "API 基础地址 (可选)",
+				Type:        TypeText,
+				Required:    false,
+				Placeholder: "https://api.telegram.org",
+				Description: "接口请求的 HTTPS 基础地址，留空默认为 https://api.telegram.org",
+			},
+			{
+				Key:         KeyToken,
+				Label:       "机器人 Token (Bot Token)",
+				Type:        TypePassword,
+				Required:    true,
+				Placeholder: "在此输入 Telegram 机器人的 Bot Token",
+				Description: "通过 BotFather 申请到的机器人 Access Token",
+			},
+			{
+				Key:         KeyOther,
+				Label:       "默认会话 ID (Chat ID) (可选)",
+				Type:        TypeText,
+				Required:    false,
+				Placeholder: "例如 -100123456789 或 @channel_name",
+				Description: "默认的消息接收 Chat ID。如果通知事件中未配置 targets，将推送到此 ID",
 			},
 		},
 	})

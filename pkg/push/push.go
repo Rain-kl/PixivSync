@@ -10,7 +10,10 @@ import (
 	"sync"
 )
 
-const defaultTitle = "系统通知"
+const (
+	defaultTitle = "系统通知"
+	levelInfo    = "INFO"
+)
 
 // Config 基础通知渠道配置
 type Config struct {

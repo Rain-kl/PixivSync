@@ -7,6 +7,7 @@ const (
 	channelCustom    = "custom"
 	channelEmail     = "email"
 	channelLark      = "lark"
+	channelTelegram  = "telegram"
 	defaultLevelInfo = "INFO"
 	keyTitle         = "title"
 	keyContent       = "content"

@@ -178,9 +178,9 @@ export function SettingsTab() {
       }
     }
 
-    // 协议安全校验（非邮件服务强制 HTTPS 协议）
+    // 协议安全校验（非邮件服务且配置了地址时，强制 HTTPS 协议）
     if (channelType !== "email") {
-      if (!channelUrl.startsWith("https://")) {
+      if (channelUrl && !channelUrl.startsWith("https://")) {
         toast.error("地址必须以 https:// 开头以确保安全性")
         return
       }

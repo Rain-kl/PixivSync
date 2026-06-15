@@ -115,7 +115,7 @@ func (p *LarkPusher) Send(ctx context.Context, cfg Config, _ string, body map[st
 				content := msg.Content
 				level := strings.ToUpper(msg.Level)
 				if level == "" {
-					level = "INFO"
+					level = levelInfo
 				}
 
 				headerColor := "blue"
@@ -170,7 +170,7 @@ func (p *LarkPusher) Send(ctx context.Context, cfg Config, _ string, body map[st
 			content = strings.Join(parts, "\n")
 		}
 
-		level := "INFO"
+		level := levelInfo
 		if l, ok := body["level"].(string); ok && l != "" {
 			level = strings.ToUpper(l)
 		}

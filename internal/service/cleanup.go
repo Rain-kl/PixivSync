@@ -1,6 +1,7 @@
 // Copyright 2026 Arctel.net
 // SPDX-License-Identifier: Apache-2.0
 
+// Package service implements Wavelet's core background service processes.
 package service
 
 import (

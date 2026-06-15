@@ -362,6 +362,13 @@ func (t *EventTrigger) enqueueSingleCustomPushChannelTask(ctx context.Context, m
 			Key:     token, // SMTP Username
 			Secret:  other, // SMTP Password
 		}
+	case channelTelegram:
+		config = pkgpush.Config{
+			Channel: channelTelegram,
+			URL:     channel.URL,
+			Secret:  channel.Token, // Telegram Bot Token
+			Key:     channel.Other, // Default Chat ID
+		}
 	default: // custom
 		config = pkgpush.Config{
 			Channel: channelCustom,

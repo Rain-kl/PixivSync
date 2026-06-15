@@ -28,6 +28,7 @@
 - Go skills：使用针对性的 `go-*` skills 来获取 Go 实现细节，如测试、错误处理、包、Context、并发、日志、文档和审查。
 - `shadcn`：在添加、修改或组合 shadcn/ui 组件时使用。
 - `code-review-skill`：在提交 PR 之前使用，检查代码质量、样式、潜在错误和最佳实践。
+- `push-notification`：在添加或修改系统通知推送事件、修改消息推送底层设计、调用统一触发器投递消息、或开发带消息推送功能的业务功能时使用。
 
 ## 严格遵循事项 (Guardrails)
 

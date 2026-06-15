@@ -12,6 +12,7 @@ import (
 	"github.com/Rain-kl/Wavelet/internal/storage"
 )
 
+// StorageReadOnly checks if the storage system is in read-only maintenance mode.
 func StorageReadOnly(ctx context.Context) bool {
 	execution, ok, err := latestStorageMigrationExecution(ctx)
 	if err != nil {

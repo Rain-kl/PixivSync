@@ -20,7 +20,7 @@ import (
 
 // ListChannelDefinitions 获取各种消息通道的表单配置定义列表
 // @Summary 获取所有消息通道配置字段定义
-// @Description 返回系统支持的所有消息通道类型（如飞书、邮件、自定义）的动态表单定义，需要管理员权限
+// @Description 返回系统支持的所有消息通道类型（如飞书、邮件、自定义、Telegram）的动态表单定义，需要管理员权限
 // @Tags admin-push
 // @Produce json
 // @Security SessionCookie
@@ -279,6 +279,7 @@ func TestChannel(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, util.Err(err.Error()))
 		return
 	}
+	url = tempChannel.URL
 
 	var config pkgpush.Config
 	var renderedJSON string
@@ -297,6 +298,13 @@ func TestChannel(c *gin.Context) {
 			URL:     url,
 			Key:     token,
 			Secret:  other,
+		}
+	case channelTelegram:
+		config = pkgpush.Config{
+			Channel: channelTelegram,
+			URL:     url,
+			Secret:  token,
+			Key:     other,
 		}
 	default:
 		config = pkgpush.Config{

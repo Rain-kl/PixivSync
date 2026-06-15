@@ -107,70 +107,55 @@ import (
 
 ---
 
-## 模板模板渲染与支持的系统变量 (Template Rendering & Variables)
+## 模板渲染与支持的系统变量 (Template Rendering & Variables)
 
 消息的 `title`、`content` 以及 `ext` 字段中的字符串值都支持变量占位符替换，采用双花括号形式 `{{variable}}`。
 
 ### 1. 通用事件参数 (Common Variables)
-任何通知事件触发时，均支持以下通用参数的渲染：
+在 Wavelet 系统中，`user` 是一个通用的、必传的事件参数。如果在触发通知事件时未提供 `user`（或为 `nil`），底层 `EventTrigger` 会自动注入一个系统的虚拟用户（ID 为 999，昵称为“系统”）。因此，以下变量是所有通知事件均支持的通用渲染参数：
+
 - `{{time}}`：事件发生/触发的具体时间（格式：`2006-01-02 15:04:05`）
+- `{{user.id}}`：触发用户/系统用户的 ID
+- `{{user.username}}`：触发用户/系统用户的用户名
+- `{{user.nickname}}`：触发用户/系统用户的昵称
+- `{{user.email}}`：触发用户/系统用户的电子邮箱
+- `{{user.phone}}`：触发用户/系统用户的手机号
+- `{{user.bio}}`：触发用户/系统用户的个人简介
+- `{{user.gender}}`：触发用户/系统用户的性别
+- `{{user.location}}`：触发用户/系统用户的所在地
+- `{{user.website}}`：触发用户/系统用户的个人网站
+
+*(注：系统中的任何自定义事件，若传入了对应的复杂结构体，其结构体 JSON 字段均可通过扁平化点路径方式直接在模板中进行引用。)*
 
 ### 2. 特定事件携带的业务变量 (Event Specific Variables)
-特定事件在触发时会携带复杂的业务对象（例如 `user`），可以通过点（`.`）路径语法获取其属性：
+除了通用的 `user` 和 `time` 外，特定事件在触发时还可以携带额外的上下文参数：
 
 - **管理员登录提醒 (`admin_login`)**
-  - `{{user.id}}`：管理员 ID
-  - `{{user.username}}`：管理员用户名
-  - `{{user.email}}`：管理员邮箱地址
   - `{{ip}}`：管理员登录来源的客户端 IP
   - `{{time}}`：管理员登录成功时间
 
-- **新用户注册提醒 (`user_registered`)**
-  - `{{user.id}}`：新注册用户 ID
-  - `{{user.username}}`：新注册用户名
-  - `{{user.email}}`：新注册用户邮箱地址
-  - `{{time}}`：注册成功时间
+### 3. 自定义消息通道的请求体变量说明 (Custom Channel JSON Variables)
+在配置“自定义消息通道”时，其请求体 (JSON Schema) 支持以 `$` 开头的变量替换。支持的替换变量如下：
+
+```json
+{
+  "title": "$title",
+  "description": "$description",
+  "content": "$content",
+  "url": "$url",
+  "to": "$to"
+}
+```
+
+- `$title`：通知的标题（如：“管理员登录提醒”）
+- `$description`：当前通知事件的描述
+- `$content`：通知的具体渲染后正文内容
+- `$url`：附加的操作或详情链接（若有）
+- `$to`：当前派发的推送目标（如邮箱、ID 或 Chat ID，即 resolved target）
 
 ---
 
 ## 严格遵循事项与防线 (Guardrails)
 
-### 1. 严格禁止包循环引用 (No Circular Dependencies)
-- `custom_events` 包在定义事件时会导入并依赖 `push` 包的 `EventMetadata` 与 `DefaultTrigger` 等底层逻辑。
-- **因此，`push` 包本身绝对不能导入 `custom_events` 包**（否则编译会抛出 package dependency cycle 错误）。
-- 对新事件的自动注册只能在 `custom_events` 内部使用 `init()` 调用 `push.RegisterBuiltInEvent` 来实现。
-
-### 2. 单元测试防循环依赖隔离 (Unit Testing Isolation)
-- 在对 `push` 包自身进行单元测试（如 `push_test.go`）时，由于 `custom_events` 依赖 `push`，测试文件 `push_test.go` 也无法直接导入 `custom_events`。
-- **防线策略**：在 `push_test.go` 的 `init()` 中本地声明并使用 `RegisterBuiltInEvent` 注册测试专用的 `EventMetadata`，以此来完成 `push` 包的隔离自测。
-
-### 3. 禁止绕过统一触发器 (Always Use EventTrigger)
+### 1. 禁止绕过统一触发器 (Always Use EventTrigger)
 - 所有推送请求必须经过 `EventTrigger.Trigger`，以确保进行“事件是否启用”、“目标渠道过滤”、“全局推送配置读取”及“发送日志审计”等流程。
-
-### 4. 代码质量与零 Lint 警报
-- **魔法值防范**：对于推送日志级别（如 `"INFO"`），不要在多个文件里写硬编码字符串，应统一在 `constants.go` 中引用 `defaultLevelInfo` 常量。
-- **命名规范**：不要定义容易造成 Stuttering 的导出类型，例如在 `push` 包内不要使用 `PushSendPayload`，应重命名为 `SendPayload`。
-
----
-
-## 验证计划 (Verification Guide)
-
-1. **授权许可头部补全**：
-   新增/修改 Go 文件后，运行自动许可证生成：
-   ```bash
-   make license
-   ```
-2. **Swagger 文档重新构建**：
-   如果修改了路由或 Swagger 注释：
-   ```bash
-   make swagger
-   ```
-3. **静态代码质量门禁 (0 Issues)**：
-   运行静态检查，必须保证后端与前端均无任何警告：
-   ```bash
-   make code-check
-   ```
-4. **单元测试通过**：
-   ```bash
-   go test ./internal/apps/admin/push/...
-   ```

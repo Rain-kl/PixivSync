@@ -620,6 +620,17 @@ func TestPushChannelAPI(t *testing.T) {
 		c6 := &model.PushChannel{Name: "lark_channel", Type: "lark", URL: "https://open.feishu.cn", Other: ""}
 		assert.NoError(t, c6.Validate())
 
+		// Telegram 渠道校验
+		cTelegramErr := &model.PushChannel{Name: "tg_channel", Type: "telegram", URL: "https://api.telegram.org", Token: "", Other: ""}
+		assert.Error(t, cTelegramErr.Validate())
+
+		cTelegramErr2 := &model.PushChannel{Name: "tg_channel", Type: "telegram", URL: "http://api.telegram.org", Token: "123:abc", Other: ""}
+		assert.Error(t, cTelegramErr2.Validate())
+
+		cTelegramOk := &model.PushChannel{Name: "tg_channel", Type: "telegram", URL: "", Token: "123:abc", Other: "-100123"}
+		assert.NoError(t, cTelegramOk.Validate())
+		assert.Equal(t, "https://api.telegram.org", cTelegramOk.URL)
+
 		// 邮件配置校验：允许空配置以复用系统全局设置
 		c7 := &model.PushChannel{Name: "email_channel", Type: "email", URL: "", Token: "", Other: ""}
 		assert.NoError(t, c7.Validate())
