@@ -124,7 +124,7 @@ Handler 规范：
 - Handler 命名为 动词 + 名词，例如 `ListUsers`。
 - 使用 `ShouldBindQuery` 或 `ShouldBindJSON` 进行绑定。
 - 成功时统一通过导入 `"github.com/Rain-kl/Wavelet/internal/common/response"` 使用 `response.OK(data)` 或 `response.OKNil()` 返回。
-- 失败时统一通过 `response.Err(msg)` 返回。
+- 失败时统一通过 `response.AbortWithError(c, code, msg)` 返回（这会自动将业务错误和状态码挂载到 Context 并中断请求，全局中间件捕获后会将其完整记录到 OpenTelemetry Trace/Jaeger，并格式化输出 JSON）。
 - API 响应的外层结构必须为 `{ "error_msg": "", "data": ... }`。
 - 分页响应在 `data` 下使用 `{ "total": 0, "results": [] }`。
 - 每个 HTTP API 都需要有完整的 Swagger 注释；在 API 变更后运行 `make swagger`。

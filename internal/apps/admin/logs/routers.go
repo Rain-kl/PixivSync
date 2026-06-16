@@ -5,7 +5,8 @@
 // Package logs 提供日志查询与分析功能
 package logs
 
-import ("context"
+import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -21,7 +22,8 @@ import ("context"
 	"github.com/Rain-kl/Wavelet/pkg/logger"
 	"github.com/gin-gonic/gin"
 
-	"github.com/Rain-kl/Wavelet/internal/common/response")
+	"github.com/Rain-kl/Wavelet/internal/common/response"
+)
 
 const (
 	defaultLimit   = 200
@@ -57,7 +59,7 @@ func GetLogs(c *gin.Context) {
 
 	var cursor, limit int
 	if _, err := parsePositiveInt(cursorStr, &cursor); err != nil {
-		c.JSON(http.StatusBadRequest, response.Err(admin.InvalidCursorParam))
+		response.AbortWithError(c, http.StatusBadRequest, admin.InvalidCursorParam)
 		return
 	}
 	if _, err := parsePositiveInt(limitStr, &limit); err != nil || limit <= 0 {
@@ -288,7 +290,7 @@ func fetchAccessLogDetails(ctx context.Context, whereClause string, args []inter
 func GetAccessLogs(c *gin.Context) {
 	// 1. 检查 ClickHouse 是否启用
 	if !config.Config.ClickHouse.Enabled || db.ChConn == nil {
-		c.JSON(http.StatusBadRequest, response.Err("ClickHouse 存储服务未启用，无法检索访问日志"))
+		response.AbortWithError(c, http.StatusBadRequest, "ClickHouse 存储服务未启用，无法检索访问日志")
 		return
 	}
 
@@ -309,7 +311,7 @@ func GetAccessLogs(c *gin.Context) {
 	// 3. 构建过滤条件
 	conditions, args, userIDs, err := buildAccessLogFilters(c.Request.Context(), c)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, response.Err(err.Error()))
+		response.AbortWithError(c, http.StatusInternalServerError, err.Error())
 		return
 	}
 	if userIDs != nil && len(userIDs) == 0 {
@@ -326,7 +328,7 @@ func GetAccessLogs(c *gin.Context) {
 	var total uint64
 	countQuery := fmt.Sprintf("SELECT count() FROM w_user_access_logs %s", whereClause)
 	if err := db.ChConn.QueryRow(c.Request.Context(), countQuery, args...).Scan(&total); err != nil {
-		c.JSON(http.StatusInternalServerError, response.Err("查询 ClickHouse 日志统计失败: "+err.Error()))
+		response.AbortWithError(c, http.StatusInternalServerError, "查询 ClickHouse 日志统计失败: "+err.Error())
 		return
 	}
 	if total == 0 {
@@ -337,7 +339,7 @@ func GetAccessLogs(c *gin.Context) {
 	// 5. 分页查询明细数据
 	list, err := fetchAccessLogDetails(c.Request.Context(), whereClause, args, pageSize, offset)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, response.Err(err.Error()))
+		response.AbortWithError(c, http.StatusInternalServerError, err.Error())
 		return
 	}
 
@@ -388,7 +390,7 @@ type logsAnalyticsResponse struct {
 func GetLogsAnalytics(c *gin.Context) {
 	// 1. 检查 ClickHouse 是否启用
 	if !config.Config.ClickHouse.Enabled || db.ChConn == nil {
-		c.JSON(http.StatusBadRequest, response.Err("ClickHouse 存储服务未启用，无法获取分析数据"))
+		response.AbortWithError(c, http.StatusBadRequest, "ClickHouse 存储服务未启用，无法获取分析数据")
 		return
 	}
 

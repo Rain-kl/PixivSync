@@ -7,11 +7,13 @@ package router
 
 import (
 	"context"
+	"errors"
 	"net/http"
 	"strconv"
 	"strings"
 	"time"
 
+	"github.com/Rain-kl/Wavelet/internal/common/response"
 	"github.com/Rain-kl/Wavelet/internal/config"
 	"github.com/Rain-kl/Wavelet/internal/model"
 	"github.com/Rain-kl/Wavelet/pkg/logger"
@@ -101,5 +103,32 @@ func corsMiddleware() gin.HandlerFunc {
 		}
 
 		c.Next()
+	}
+}
+
+// errorHandlerMiddleware 捕获 c.Errors 并统一格式化为 JSON 返回给客户端，同时将其记录到 Span 异常中
+func errorHandlerMiddleware() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		c.Next()
+
+		if len(c.Errors) > 0 {
+			err := c.Errors.Last().Err
+			span := trace.SpanFromContext(c.Request.Context())
+
+			// 1. 如果有活跃的 Span，将错误信息记录到 Trace 中，并把 Span 状态置为 Error
+			if span.IsRecording() {
+				span.RecordError(err)
+				span.SetStatus(codes.Error, err.Error())
+			}
+
+			// 2. 将错误转化为统一的 JSON 格式响应给客户端
+			var apiErr *response.APIError
+			if errors.As(err, &apiErr) {
+				c.JSON(apiErr.Code, response.Err(apiErr.Msg))
+			} else {
+				// 兜底策略：未知的系统级错误
+				c.JSON(http.StatusInternalServerError, response.Err("内部系统错误"))
+			}
+		}
 	}
 }
