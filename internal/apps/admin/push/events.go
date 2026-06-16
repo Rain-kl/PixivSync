@@ -109,9 +109,8 @@ func (t *EventTrigger) Trigger(ctx context.Context, meta EventMetadata, body map
 			body["user"] = getSystemUser(asyncCtx)
 		}
 
-		// 1. Check if the event is enabled in the database
-		var event model.PushEvent
-		err := db.DB(asyncCtx).Where("event_key = ? AND enabled = ?", meta.Key, true).First(&event).Error
+		// 1. Check if the event is enabled (try Redis cache first)
+		eventPtr, err := model.GetActivePushEventByKey(asyncCtx, meta.Key)
 		if err != nil {
 			if errors.Is(err, gorm.ErrRecordNotFound) {
 				return
@@ -119,6 +118,7 @@ func (t *EventTrigger) Trigger(ctx context.Context, meta EventMetadata, body map
 			logger.ErrorF(asyncCtx, "push_event_trigger: failed to get active event %s: %v", meta.Key, err)
 			return
 		}
+		event := *eventPtr
 
 		if len(event.Channels) == 0 {
 			return
@@ -220,11 +220,10 @@ func (t *EventTrigger) parseDefaultTemplate(meta EventMetadata, flatBody map[str
 
 func (t *EventTrigger) enqueuePushTasks(ctx context.Context, meta EventMetadata, event *model.PushEvent, msg NotificationMessage, flatBody map[string]any) {
 	for _, channelName := range event.Channels {
-		// 检查是不是自定义数据库渠道
-		var customChannel model.PushChannel
-		err := db.DB(ctx).Where("name = ? AND enabled = ?", channelName, true).First(&customChannel).Error
+		// 检查是不是自定义数据库渠道 (使用 Redis 缓存优先)
+		customChannel, err := model.GetActivePushChannelByName(ctx, channelName)
 		if err == nil {
-			t.enqueueCustomPushChannelTasks(ctx, meta, event, &customChannel, msg, flatBody)
+			t.enqueueCustomPushChannelTasks(ctx, meta, event, customChannel, msg, flatBody)
 			continue
 		}
 

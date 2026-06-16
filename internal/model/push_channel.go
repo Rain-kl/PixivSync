@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/Rain-kl/Wavelet/internal/db"
+	"gorm.io/gorm"
 )
 
 const (
@@ -111,4 +112,48 @@ func GetPushChannelByName(ctx context.Context, name string) (*PushChannel, error
 		return nil, err
 	}
 	return &channel, nil
+}
+
+const activePushChannelCacheTTL = 24 * time.Hour
+
+// GetActivePushChannelByName 根据名称获取启用的消息通道 (优先从 Redis 缓存获取)
+func GetActivePushChannelByName(ctx context.Context, name string) (*PushChannel, error) {
+	cacheKey := "push:channel:active:" + name
+	var channel PushChannel
+	if db.Redis != nil {
+		if err := db.GetJSON(ctx, cacheKey, &channel); err == nil {
+			return &channel, nil
+		}
+	}
+
+	err := db.DB(ctx).Where("name = ? AND enabled = ?", name, true).First(&channel).Error
+	if err != nil {
+		return nil, err
+	}
+
+	if db.Redis != nil {
+		// 缓存有效时间设置为 24 小时
+		_ = db.SetJSON(ctx, cacheKey, channel, activePushChannelCacheTTL)
+	}
+
+	return &channel, nil
+}
+
+// DeleteActivePushChannelCache 清理启用消息通道的缓存
+func DeleteActivePushChannelCache(ctx context.Context, name string) {
+	if db.Redis != nil {
+		_ = db.Redis.Del(ctx, db.PrefixedKey("push:channel:active:"+name)).Err()
+	}
+}
+
+// AfterSave GORM 保存后钩子，用于自动清理缓存
+func (pc *PushChannel) AfterSave(tx *gorm.DB) error {
+	DeleteActivePushChannelCache(tx.Statement.Context, pc.Name)
+	return nil
+}
+
+// AfterDelete GORM 删除后钩子，用于自动清理缓存
+func (pc *PushChannel) AfterDelete(tx *gorm.DB) error {
+	DeleteActivePushChannelCache(tx.Statement.Context, pc.Name)
+	return nil
 }

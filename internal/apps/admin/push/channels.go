@@ -109,6 +109,9 @@ func CreateChannel(c *gin.Context) {
 		return
 	}
 
+	// 缓存一致性：清除渠道缓存
+	model.DeleteActivePushChannelCache(ctx, channel.Name)
+
 	c.JSON(http.StatusOK, response.OK(channel))
 }
 
@@ -176,6 +179,9 @@ func UpdateChannel(c *gin.Context) {
 		return
 	}
 
+	// 缓存一致性：清除渠道缓存
+	model.DeleteActivePushChannelCache(ctx, channel.Name)
+
 	c.JSON(http.StatusOK, response.OK(channel))
 }
 
@@ -211,6 +217,9 @@ func DeleteChannel(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, response.Err(err.Error()))
 		return
 	}
+
+	// 缓存一致性：清除渠道缓存
+	model.DeleteActivePushChannelCache(ctx, channel.Name)
 
 	c.JSON(http.StatusOK, response.OKNil())
 }
