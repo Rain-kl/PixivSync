@@ -15,37 +15,19 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/Rain-kl/Wavelet/internal/apps/admin"
-	admin_auth_source "github.com/Rain-kl/Wavelet/internal/apps/admin/auth_source"
-	admin_cache "github.com/Rain-kl/Wavelet/internal/apps/admin/cache"
-	admin_db_manage "github.com/Rain-kl/Wavelet/internal/apps/admin/db_manage"
-	admin_logs "github.com/Rain-kl/Wavelet/internal/apps/admin/logs"
 	admin_push "github.com/Rain-kl/Wavelet/internal/apps/admin/push"
-	admin_status "github.com/Rain-kl/Wavelet/internal/apps/admin/status"
-	admin_task "github.com/Rain-kl/Wavelet/internal/apps/admin/task"
-	admin_template "github.com/Rain-kl/Wavelet/internal/apps/admin/template"
-	admin_updater "github.com/Rain-kl/Wavelet/internal/apps/admin/updater"
-	admin_user "github.com/Rain-kl/Wavelet/internal/apps/admin/user"
-	capApp "github.com/Rain-kl/Wavelet/internal/apps/cap"
-	publicconfig "github.com/Rain-kl/Wavelet/internal/apps/config"
-	"github.com/Rain-kl/Wavelet/internal/apps/health"
 	"github.com/Rain-kl/Wavelet/internal/apps/risk_control"
-	"github.com/Rain-kl/Wavelet/internal/apps/upload"
-	"github.com/Rain-kl/Wavelet/internal/apps/user"
-	"github.com/Rain-kl/Wavelet/internal/model"
+	router_root "github.com/Rain-kl/Wavelet/internal/router/root"
+	v1 "github.com/Rain-kl/Wavelet/internal/router/v1"
 
 	// Swagger 文档生成
-	_ "github.com/Rain-kl/Wavelet/docs"
 	_ "github.com/Rain-kl/Wavelet/internal/apps/admin/push/custom_events"
-	"github.com/Rain-kl/Wavelet/internal/apps/admin/system_config"
 	"github.com/Rain-kl/Wavelet/internal/apps/oauth"
 	"github.com/Rain-kl/Wavelet/internal/config"
 	otel_trace "github.com/Rain-kl/Wavelet/pkg/trace"
 	"github.com/gin-contrib/sessions"
 	"github.com/gin-contrib/sessions/redis"
 	"github.com/gin-gonic/gin"
-	swaggerFiles "github.com/swaggo/files"
-	ginSwagger "github.com/swaggo/gin-swagger"
 	"go.opentelemetry.io/contrib/instrumentation/github.com/gin-gonic/gin/otelgin"
 )
 
@@ -137,253 +119,15 @@ func Serve() {
 }
 
 func registerRoutes(r *gin.Engine) {
-	// Serve files by ID
-	r.GET("/f/:id", upload.ServeFileByID)
-
-	// Dynamic robots.txt serving
-	r.GET("/robots.txt", publicconfig.GetRobotsTXT)
+	// Register custom root routes, Swagger, and frontend serving
+	router_root.RegisterRootRoutes(r)
 
 	apiGroup := r.Group(config.Config.App.APIPrefix)
 	{
-		if !config.Config.App.IsProduction() {
-			// Swagger
-			apiGroup.GET("/swagger/*any", ginSwagger.WrapHandler(swaggerFiles.Handler))
-		}
-
-		// CAPTCHA
-		registerCaptchaRoutes(apiGroup)
-
-		// Health
-		apiGroup.GET("/health", health.Health)
-
 		// API V1
 		apiV1Router := apiGroup.Group("/v1")
 		{
-			// OAuth
-			registerOAuthRoutes(apiV1Router)
-
-			// User
-			registerUserRoutes(apiV1Router)
-
-			// Upload
-			registerUploadRoutes(apiV1Router)
-
-			// Config (public)
-			registerConfigRoutes(apiV1Router)
-
-			// Admin
-			registerAdminRoutes(apiV1Router)
-
-			// Register custom business routes
-			registerCustomRoutes(apiV1Router)
-
+			v1.RegisterV1Routes(apiV1Router, apiGroup)
 		}
-	}
-
-	// 注册前端静态路由（当启用 embed_frontend 编译标签时）
-	registerFrontend(r)
-}
-
-func registerCaptchaRoutes(apiGroup *gin.RouterGroup) {
-	capGroup := apiGroup.Group("/cap")
-	{
-		capGroup.POST("/challenge", capApp.Challenge)
-		capGroup.POST("/redeem", capApp.Redeem)
-	}
-}
-
-func registerOAuthRoutes(apiV1Router *gin.RouterGroup) {
-	apiV1Router.GET("/oauth/sources", oauth.GetLoginSources)
-	apiV1Router.GET("/oauth/login", oauth.GetLoginURL)
-	apiV1Router.GET("/oauth/:source/authorize", oauth.Authorize)
-	apiV1Router.GET("/oauth/logout", oauth.Logout)
-	apiV1Router.POST("/oauth/callback", oauth.Callback)
-	apiV1Router.GET("/oauth/user-info", oauth.LoginRequired(), oauth.UserInfo)
-	apiV1Router.GET("/user-info", oauth.LoginRequired(), oauth.UserInfo)
-	apiV1Router.GET("/oauth/external-accounts", oauth.LoginRequired(), oauth.ListExternalAccounts)
-	apiV1Router.POST("/oauth/external-accounts/:id/delete", oauth.LoginRequired(), oauth.DeleteExternalAccount)
-}
-
-func registerUserRoutes(apiV1Router *gin.RouterGroup) {
-	userRouter := apiV1Router.Group("/user")
-	{
-		userRouter.POST("/login", capApp.VerifyMiddleware(capApp.GetDefaultManager(), "login", func() bool {
-			enabled, err := model.GetBoolByKey(context.Background(), model.ConfigKeyCapLoginEnabled)
-			if err != nil {
-				return false
-			}
-			return enabled
-		}), user.Login)
-		userRouter.POST("/register", capApp.VerifyMiddleware(capApp.GetDefaultManager(), "register", func() bool {
-			enabled, err := model.GetBoolByKey(context.Background(), model.ConfigKeyCapLoginEnabled)
-			if err != nil {
-				return false
-			}
-			return enabled
-		}), user.Register)
-		userRouter.POST("/send-email-code", capApp.VerifyMiddleware(capApp.GetDefaultManager(), "send_email_code", func() bool {
-			enabled, err := model.GetBoolByKey(context.Background(), model.ConfigKeyCapLoginEnabled)
-			if err != nil {
-				return false
-			}
-			return enabled
-		}), user.SendEmailCode)
-		userRouter.GET("/logout", user.Logout)
-		userRouter.GET("/self", oauth.LoginRequired(), oauth.UserInfo)
-		userRouter.POST("/change-password", oauth.LoginRequired(), user.ChangePassword)
-		userRouter.PUT("/profile", oauth.LoginRequired(), user.UpdateProfile)
-
-		// Access Token
-		tokenRouter := userRouter.Group("/access-tokens")
-		tokenRouter.Use(oauth.LoginRequired(), oauth.DisallowTokenAuth())
-		{
-			tokenRouter.GET("", user.ListAccessTokens)
-			tokenRouter.POST("", user.CreateAccessToken)
-			tokenRouter.DELETE("/:id", user.DeleteAccessToken)
-			tokenRouter.POST("/:id/rotate", user.RotateAccessToken)
-		}
-	}
-}
-
-func registerUploadRoutes(apiV1Router *gin.RouterGroup) {
-	uploadRouter := apiV1Router.Group("/upload")
-	uploadRouter.Use(oauth.LoginRequired())
-	{
-		uploadRouter.POST("", upload.UploadFile)
-		uploadRouter.GET("/my", upload.ListMyFiles)
-		uploadRouter.DELETE("/:id", upload.DeleteMyFile)
-		uploadRouter.PUT("/:id", upload.UpdateMyFile)
-		uploadRouter.GET("/download/:id", upload.DownloadFile)
-		uploadRouter.POST("/download/batch", upload.BatchDownloadFiles)
-	}
-}
-
-func registerConfigRoutes(apiV1Router *gin.RouterGroup) {
-	configRouter := apiV1Router.Group("/config")
-	{
-		configRouter.GET("/public", publicconfig.GetPublicConfig)
-	}
-}
-
-func registerAdminRoutes(apiV1Router *gin.RouterGroup) {
-	adminRouter := apiV1Router.Group("/admin")
-	adminRouter.Use(oauth.LoginRequired(), admin.LoginAdminRequired())
-	{
-		// System status
-		adminRouter.GET("/status", admin_status.GetSystemStatus)
-
-		// Database info & export
-		adminRouter.GET("/db-info", admin_status.GetDatabaseInfo)
-		adminRouter.GET("/db-export", admin_status.ExportDatabase)
-
-		// Database management
-		adminRouter.GET("/db-manage/overview", admin_db_manage.GetDBOverview)
-		adminRouter.GET("/db-manage/tables", admin_db_manage.ListDBTables)
-		adminRouter.GET("/db-manage/table-data", admin_db_manage.GetDBTableData)
-		adminRouter.POST("/db-manage/query", admin_db_manage.ExecuteSQL)
-
-		// Cache management
-		adminRouter.GET("/cache/status", admin_cache.GetCacheStatus)
-		adminRouter.POST("/cache/config", admin_cache.UpdateCacheConfig)
-		adminRouter.POST("/cache/clear", admin_cache.ClearCache)
-
-		// Application update
-		adminRouter.GET("/update", admin_updater.GetUpdateStatus)
-		adminRouter.POST("/update/apply", admin_updater.ApplyUpdate)
-
-		// System logs
-		adminRouter.GET("/logs", admin_logs.GetLogs)
-		adminRouter.GET("/logs/access", admin_logs.GetAccessLogs)
-		adminRouter.GET("/logs/analytics", admin_logs.GetLogsAnalytics)
-		adminRouter.GET("/logs/ws", admin_logs.HandleLogWebSocket)
-
-		// Task dispatch
-		registerAdminTaskRoutes(adminRouter)
-
-		// Users
-		adminRouter.GET("/users", admin_user.ListUsers)
-		adminRouter.POST("/users", admin_user.CreateUser)
-		adminRouter.GET("/users/:id", admin_user.GetUser)
-		adminRouter.PUT("/users/:id/status", admin_user.UpdateUserStatus)
-		adminRouter.DELETE("/users/:id", admin_user.DeleteUser)
-
-		// Uploads
-		registerAdminUploadRoutes(adminRouter)
-
-		// System Config
-		adminRouter.POST("/system-configs", system_config.CreateSystemConfig)
-		adminRouter.GET("/system-configs", system_config.ListSystemConfigs)
-		adminRouter.POST("/system-configs/smtp/test", system_config.TestSMTP)
-
-		systemConfigRouter := adminRouter.Group("/system-configs/:key")
-		{
-			systemConfigRouter.GET("", system_config.GetSystemConfig)
-			systemConfigRouter.PUT("", system_config.UpdateSystemConfig)
-		}
-
-		// Templates
-		adminRouter.GET("/templates", admin_template.ListTemplates)
-		adminRouter.POST("/templates", admin_template.CreateTemplate)
-
-		templateRouter := adminRouter.Group("/templates/:key")
-		{
-			templateRouter.GET("", admin_template.GetTemplate)
-			templateRouter.PUT("", admin_template.UpdateTemplate)
-			templateRouter.DELETE("", admin_template.DeleteTemplate)
-		}
-
-		// Auth Sources
-		adminRouter.GET("/auth-sources", admin_auth_source.ListAuthSources)
-		adminRouter.POST("/auth-sources", admin_auth_source.CreateAuthSource)
-		adminRouter.PUT("/auth-sources/:id", admin_auth_source.UpdateAuthSource)
-		adminRouter.PUT("/auth-sources/:id/toggle", admin_auth_source.ToggleAuthSource)
-		adminRouter.DELETE("/auth-sources/:id", admin_auth_source.DeleteAuthSource)
-
-		// Push Notifications
-		adminRouter.GET("/push/events", admin_push.ListEvents)
-		adminRouter.GET("/push/events/builtin", admin_push.ListBuiltInEvents)
-		adminRouter.POST("/push/events", admin_push.CreateEvent)
-		adminRouter.PUT("/push/events/:id", admin_push.UpdateEvent)
-		adminRouter.DELETE("/push/events/:id", admin_push.DeleteEvent)
-		adminRouter.POST("/push/events/:id/toggle", admin_push.ToggleEvent)
-		adminRouter.GET("/push/histories", admin_push.ListHistories)
-		adminRouter.POST("/push/test", admin_push.TestPush)
-
-		// Message Channels CRUD
-		adminRouter.GET("/push/channels/definitions", admin_push.ListChannelDefinitions)
-		adminRouter.GET("/push/channels", admin_push.ListChannels)
-		adminRouter.POST("/push/channels", admin_push.CreateChannel)
-		adminRouter.PUT("/push/channels/:id", admin_push.UpdateChannel)
-		adminRouter.DELETE("/push/channels/:id", admin_push.DeleteChannel)
-		adminRouter.POST("/push/channels/test", admin_push.TestChannel)
-	}
-}
-
-func registerAdminTaskRoutes(adminRouter *gin.RouterGroup) {
-	// Task dispatch
-	adminRouter.GET("/tasks/types", admin_task.ListTaskTypes)
-	adminRouter.POST("/tasks/dispatch", admin_task.DispatchTask)
-
-	// Task executions
-	adminRouter.GET("/tasks/executions", admin_task.ListTaskExecutions)
-	adminRouter.GET("/tasks/executions/:id", admin_task.GetTaskExecution)
-	adminRouter.POST("/tasks/executions/:id/retry", admin_task.RetryTask)
-
-	// Task schedules
-	adminRouter.GET("/tasks/schedules", admin_task.ListSchedules)
-	adminRouter.POST("/tasks/schedules", admin_task.CreateSchedule)
-	adminRouter.PUT("/tasks/schedules/:id", admin_task.UpdateSchedule)
-	adminRouter.DELETE("/tasks/schedules/:id", admin_task.DeleteSchedule)
-}
-
-func registerAdminUploadRoutes(adminRouter *gin.RouterGroup) {
-	adminUploadsRouter := adminRouter.Group("/uploads")
-	{
-		adminUploadsRouter.GET("", upload.ListFiles)
-		adminUploadsRouter.GET("/stats", upload.GetFileStats)
-		adminUploadsRouter.DELETE("/:id", upload.DeleteFile)
-		adminUploadsRouter.GET("/download/:id", upload.DownloadFile)
-		adminUploadsRouter.POST("/download/batch", upload.BatchDownloadFiles)
-		adminUploadsRouter.GET("/types", upload.GetDistinctUploadTypes)
 	}
 }

@@ -57,3 +57,4 @@ s3_cache
 /uploads/
 /*-source/
 /.cache/
+/internal/router/root/dist/

@@ -3,112 +3,143 @@ name: "new-api"
 description: "Wavelet 项目专用：当新增或修改自定义业务 API、新增业务路由、新增 service 层核心逻辑时必须使用。本技能指导包职责划分、推荐文件结构、路由解耦、Swagger 文档生成与质量门禁验证。"
 ---
 
-# 新增业务 API / 接口开发规范
+# 新增业务 API 开发与路由注册规范
 
-本技能涵盖 Wavelet 的业务接口开发规范。开始开发前先阅读仓库根目录 [AGENTS.md](file:///Users/ryan/DEV/Go/Wavelet/AGENTS.md)，遵守项目级核心规则。
-
-为了保持核心路由入口的稳定性，**所有新增的定制业务接口路由统一注册在独立的 go 文件中，严禁直接堆叠到 `router.go`**。
+本技能是 Wavelet 项目接口开发与路由注册的唯一指导规范。在开发任何新接口前，请严格按照本指南进行架构决策与路由注册。
 
 ---
 
-## 包职责划分 (Package Responsibilities)
+## 核心路由准则与防线 (Routing Governance & Guardrails)
 
-按照 Go 语言最佳实践与 Google 的开发风格，接口开发应该进行严格的分层，以避免循环依赖和逻辑混乱。
+Wavelet 后端路由采用了**严格的框架层与业务层隔离机制**。请牢记以下开发原则：
 
-| 目录/包名 | 职责定位 | 框架依赖限制 | 常见包含内容 |
+1. **禁止修改框架级路由文件**：
+   - 以下文件属于系统框架/平台级接口，**禁止为了添加自定义业务接口而进行任何修改**：
+     - `internal/router/router.go`（核心入口委派）
+     - `internal/router/root/default.go`（公开文件服务、robots.txt、Swagger 及 /api/health 路由）
+     - `internal/router/root/frontend.go`（前端静态服务）
+     - `internal/router/v1/v1.go`（V1 分发层协调器）
+     - `internal/router/v1/admin.go`（框架管理员端管理接口）
+     - `internal/router/v1/user.go`（框架普通用户端基础接口、OAuth及公开接口）
+2. **仅允许在 `custom.go` 中注册业务接口**：
+   - 所有的自定义/业务相关接口注册，有且仅有以下两个合法的承载点：
+     - [internal/router/root/custom.go](file:///Users/ryan/DEV/Go/Wavelet/internal/router/root/custom.go)（用于挂载到根路径的特殊业务接口）
+     - [internal/router/v1/custom.go](file:///Users/ryan/DEV/Go/Wavelet/internal/router/v1/custom.go)（用于挂载在 API V1 下的标准自定义业务接口）
+
+---
+
+## 路由归属判定表 (Where should I register my new API?)
+
+根据接口的**访问路径特征**和**访问身份/限制条件**，决定将新开发的 API 挂载至何处：
+
+| 目标 API 路径特征 | 访问身份/条件限制 | 对应的路由注册入口 | 是否允许修改 |
 | :--- | :--- | :--- | :--- |
-| **`internal/router/`** | 路由分发层 | 依赖 Gin 框架 | `router.go` 核心路由、`custom.go` (自定义路由注册入口) |
-| **`internal/apps/custom/`** | 功能模块层 (Feature Module) | 依赖 Gin 框架 (仅限路由/Handler 部分) | 高度内聚的业务功能块。接收 HTTP 请求、解析请求体、校验基础参数、提取 Session。业务服务逻辑直接实现在当前目录下的 `service.go` 或 `logics.go` 中，不依赖 Gin/HTTP 框架。 |
-| **`internal/model/`** | 数据模型层 | 依赖 GORM / SQL 基础 | GORM 实体定义、表结构、主键生成、单表极简 SQL 查询方法。 |
-| **`internal/db/`** | 数据存储层 | 依赖 SQL 驱动 / GORM 连接 | PostgreSQL, SQLite 等数据库连接管理与 Goose 数据库迁移文件。 |
+| **`/my-custom-path`** (挂载在根路径下的特殊业务接口) | 自定义控制 | `root/custom.go` 中的 `RegisterCustomRootRoutes` | **允许修改 (业务自定义入口)** |
+| **`/api/v1/custom/...`** (API v1 下的定制业务接口) | 自定义控制 | `v1/custom.go` 中的 `RegisterCustomRoutes` | **允许修改 (业务自定义入口)** |
+| **`/api/v1/admin/...`** (系统管理员管理端接口) | 需要管理员登录 (`admin.LoginAdminRequired()`) | `v1/admin.go` | **禁止修改 (仅限系统框架路由)** |
+| **`/api/v1/user/...`** (框架普通用户基础接口) | 需要普通用户登录 (`oauth.LoginRequired()`) | `v1/user.go` | **禁止修改 (仅限系统框架路由)** |
+| **`/api/v1/public/...`** (Captcha、Config 等系统公开接口) | 所有人 (无条件 / 公开) | `v1/user.go` | **禁止修改 (仅限系统框架路由)** |
+| **`GET /f/:id`**, **`GET /robots.txt`**, **`GET /api/health`** (系统级默认及公开接口) | 所有人 (无条件 / 公开) | `root/default.go` | **禁止修改 (仅限系统框架路由)** |
 
 ---
 
-## 建议创建/修改的文件结构
+## 两个自定义路由包的用法与区别 (Root Custom vs V1 Custom)
 
-当新增一套定制的业务接口（例如名为 `custom` 的业务模块）时，根据逻辑复杂度建议采用以下文件结构：
+### 1. 根路径自定义包：`root/custom.go`
+
+* **适用场景**：适用于需要**直接挂载在主域名根路径下**的特殊自定义业务接口（如第三方 Webhook 回调、特定的短链接重定向、外部数据接口等，不需要 `/api/v1` 前缀）。
+* **用法示例**：
+  在 [root/custom.go](file:///Users/ryan/DEV/Go/Wavelet/internal/router/root/custom.go) 中实现：
+  ```go
+  package root
+
+  import (
+  	"github.com/Rain-kl/Wavelet/internal/apps/custom"
+  	"github.com/gin-gonic/gin"
+  )
+
+  // RegisterCustomRootRoutes registers custom business routes that belong to the root path.
+  func RegisterCustomRootRoutes(r *gin.Engine) {
+  	// 挂载到根路径下，如 GET /my-custom-webhook
+  	r.GET("/my-custom-webhook", custom.HandleRootWebhook)
+  }
+  ```
+  *(注：该函数已由 `root.go` 自动加载，你无需修改任何其他核心文件。)*
+
+### 2. V1 API 自定义包：`v1/custom.go`
+
+* **适用场景**：适用于普通的**自定义业务 API**，需要规范挂载在标准 API V1 路径下（即自动带有 `/api/v1/custom/...` 前缀，可选择性配置用户/管理员登录中间件）。
+* **用法示例**：
+  在 [v1/custom.go](file:///Users/ryan/DEV/Go/Wavelet/internal/router/v1/custom.go) 中实现：
+  ```go
+  package v1
+
+  import (
+  	"github.com/Rain-kl/Wavelet/internal/apps/custom"
+  	"github.com/gin-gonic/gin"
+  )
+
+  // RegisterCustomRoutes registers standard custom API routes under /api/v1.
+  func RegisterCustomRoutes(apiV1Router *gin.RouterGroup) {
+  	customRouter := apiV1Router.Group("/custom")
+  	{
+  		// 挂载到 /api/v1/custom 下，例如：POST /api/v1/custom/action
+  		customRouter.POST("/action", custom.DoActionHandler)
+  	}
+  }
+  ```
+  *(注：该函数已由 `v1/v1.go` 自动加载，你无需修改任何其他核心文件。)*
+
+---
+
+## 建议创建/修改的文件结构 (Recommended Directory Structure)
+
+当新增一套定制的业务接口（例如名为 `custom` 的业务模块）时，建议采用以下标准文件结构：
 
 ```text
 internal/
 ├── router/
-│   └── custom.go               # [修改/创建] 仅用于注册定制路由，将路由委托给 apps/custom
+│   ├── root/
+│   │   └── custom.go           # [修改] 若为根路径 API，在此处注册，将路由委派给 apps/custom
+│   └── v1/
+│       └── custom.go           # [修改] 若为 v1 API，在此处注册，将路由委派给 apps/custom
 └── apps/
     └── custom/
         ├── routers.go          # [新建] HTTP Handlers (Gin)，负责参数绑定、校验与响应
-        ├── logics.go           # [新建] 承载功能模块内闭环的业务逻辑（可以使用 logics.go 或 service.go）
-        └── errs.go             # [新建] 仅存放业务特有的错误常量定义（可选）
+        ├── logics.go           # [新建] 业务逻辑层：承载模块内闭环的纯 Go 业务逻辑，不依赖 gin.Context
+        └── errs.go             # [新建] 存放模块特有的业务错误常量定义（可选）
 ```
 
 ---
 
 ## 核心开发步骤 (Step-by-Step Flow)
 
-### 步骤 1：如果有数据库变更，编写数据库迁移
-如果需要新表或字段，请参考 [database-migration](../database-migration/SKILL.md) 技能，在 `internal/db/migrator/goose/` 目录下编写迁移文件。在 `internal/model/` 中定义 GORM 数据模型。
+### 步骤 1：数据库定义与迁移
+如果自定义功能涉及新表或字段，请参考 [database-migration](../database-migration/SKILL.md) 技能，在 `internal/db/migrator/goose/` 目录下编写迁移文件并在 `internal/model/` 中定义 GORM 数据模型。
 
-### 步骤 2：在模块内实现业务服务与逻辑 (Service / Logics)
-在编写具体逻辑前，建议选择以下结构实现业务逻辑（均置于 `internal/apps/custom/` 下）：
-- **方案 A（轻量化函数形式，推荐）**：在 `logics.go` 中定义独立的纯 Go 函数，这些函数不强依赖 `*gin.Context`。
-- **方案 B（面向对象/结构体形式）**：在 `service.go` 中定义 Service 结构体和构造函数，如 `type CustomService struct`，并将逻辑作为其方法。这适用于需要注入依赖（如 DB 连接、外部 client 等）或有状态管理的对象。
-参考示例：[logics_example.go](file:///Users/ryan/DEV/Go/Wavelet/.agent/skills/new-api/references/logics_example.go) 和 [service_example.go](file:///Users/ryan/DEV/Go/Wavelet/.agent/skills/new-api/references/service_example.go)
+### 步骤 2：在模块内实现业务逻辑 (`logics.go` / `service.go`)
+业务逻辑逻辑应当实现于 `internal/apps/custom/` 目录下：
+- **优先使用纯函数（`logics.go`）**：定义接收 `context.Context` 且不依赖 `*gin.Context` 的函数，易于单元测试。
+- **有状态服务（`service.go`）**：若需注入依赖（如 DB 连接、外部客户端等），可定义 Service 结构体和构造函数。
 
-### 步骤 3：在 `internal/apps/custom/` 下编写 HTTP Handler
-创建应用路由文件 `routers.go`，定义接口的请求和响应 DTO，编写 Handler 绑定参数并调用 Service，编写 Swagger 注释。
-参考示例：[handler_example.go](file:///Users/ryan/DEV/Go/Wavelet/.agent/skills/new-api/references/handler_example.go)
+### 步骤 3：编写 HTTP Handler (`routers.go`)
+在 `internal/apps/custom/routers.go` 中编写 Handler：
+- 负责请求参数绑定与校验（使用 `ShouldBindJSON`/`ShouldBindQuery`）。
+- 负责提取 Session / 用户身份。
+- 调用业务逻辑层，并使用 `github.com/Rain-kl/Wavelet/internal/common/response` 统一返回响应：
+  - 成功时返回：`response.OK(data)` 或 `response.OKNil()`
+  - 失败时返回：`response.Err(msg)`
+- 编写规范的 Swagger 注释。
 
-### 步骤 4：在 `internal/router/custom.go` 中注册路由
-创建路由挂载函数：
-```go
-package router
-
-import (
-	"github.com/Rain-kl/Wavelet/internal/apps/custom"
-	"github.com/gin-gonic/gin"
-)
-
-func registerCustomRoutes(apiV1Router *gin.RouterGroup) {
-	customRouter := apiV1Router.Group("/custom")
-	{
-		customRouter.POST("/action", custom.DoActionHandler)
-	}
-}
-```
-并在 [router.go](file:///Users/ryan/DEV/Go/Wavelet/internal/router/router.go) 中的 `/v1` 路由组末尾调用此函数。
+### 步骤 4：在自定义包中注册路由并委派
+根据 **路由归属判定表**，在 [root/custom.go](file:///Users/ryan/DEV/Go/Wavelet/internal/router/root/custom.go) 或 [v1/custom.go](file:///Users/ryan/DEV/Go/Wavelet/internal/router/v1/custom.go) 中编写注册代码，将路由路径绑定到步骤 3 中编写的 Handler。
 
 ---
 
-## 质量验证与门禁 (Verification Quality Gates)
+## 质量验证门禁 (Quality Gates)
 
-每当新增或修改 API 接口时，必须严格执行以下验证：
-
-1. **生成授权许可**:
-   新增 Go 文件后，运行自动添加许可证头部命令：
-   ```bash
-   make license
-   ```
-
-2. **生成 Swagger 文档**:
-   在 Handler 编写完 `@Summary` 等 Swagger 注释后，必须生成更新：
-   ```bash
-   make swagger
-   ```
-   *注意：若 Swagger 生成失败，请仔细排查注释格式或数据类型引用是否规范。*
-
-3. **静态代码检查与 Linting**:
-   运行 `golangci-lint` 与前端 TypeScript 门禁，确保没有代码风格和类型安全隐患：
-   ```bash
-   make code-check
-   ```
-
-4. **编译与功能测试**:
-   运行整包编译与自动化测试：
-   ```bash
-   make build-test
-   ```
-
----
-
-## 相关 Skills
-* [go-context](../go-context/SKILL.md)：了解如何在 Service 层正确传递取消信号和追踪 Trace。
-* [go-error-handling](../go-error-handling/SKILL.md)：了解如何优雅地将业务错误向上传递，并在 Handler 层决定响应状态码。
-* [database-migration](../database-migration/SKILL.md)：当新增接口需要额外表结构或默认配置种子时配合使用。
+每次新增或修改接口后，必须运行并验证以下各项：
+1. **自动授权许可**：`make license`（新增 Go 文件时自动添加许可头）
+2. **重新生成 Swagger 文档**：`make swagger`（若有 Swagger 注释修改）
+3. **静态代码及风格检查**：`make code-check`（确保通过 golangci-lint 和前端 TS 检查）
+4. **自动化单元测试**：`go test ./...`（确保所有测试 100% 通过）

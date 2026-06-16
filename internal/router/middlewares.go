@@ -2,6 +2,7 @@
 // Copyright 2026 Arctel.net
 // SPDX-License-Identifier: AGPL-3.0-only
 
+// Package router 提供 HTTP 路由注册与服务启动
 package router
 
 import (

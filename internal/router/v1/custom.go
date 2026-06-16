@@ -1,21 +1,17 @@
 // Copyright 2026 Arctel.net
 // SPDX-License-Identifier: AGPL-3.0-only
 
-package router
+// Package v1 contains router registrations for API V1
+package v1
 
 import (
-	"github.com/Rain-kl/Wavelet/internal/apps/custom"
 	"github.com/Rain-kl/Wavelet/internal/apps/oauth"
 	"github.com/Rain-kl/Wavelet/internal/apps/pixez"
 	"github.com/gin-gonic/gin"
 )
 
-// registerCustomRoutes registers custom business routes to keep router.go clean and stable.
-func registerCustomRoutes(apiV1Router *gin.RouterGroup) {
-	customRouter := apiV1Router.Group("/custom")
-	{
-		customRouter.GET("/hello", custom.Hello)
-	}
+// RegisterCustomRoutes registers custom business routes to keep routing clean and stable.
+func RegisterCustomRoutes(apiV1Router *gin.RouterGroup) {
 
 	// PixEz companion sync API keeps its historical /api/pixez path while
 	// using Wavelet AccessToken/session authentication.

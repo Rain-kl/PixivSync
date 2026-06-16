@@ -60,7 +60,7 @@
 - `internal/`：私有 Go 后端代码。
 - `pkg/`：公共 Go 库/工具包（留作扩展或存放不依赖特定业务的通用代码）。
 - `scripts/`：本地和 CI 辅助脚本。
-- `support-files/`：部署和数据库辅助文件。
+- `support-files/`：部署 and 数据库辅助文件。
 - `bin/`：本地编译生成的二进制可执行文件。
 - `data/`：本地运行时数据文件目录（如 PostgreSQL、Redis 数据等）。
 - `uploads/`：本地文件上传存储目录。
@@ -106,28 +106,6 @@
 - `frontend/scripts/`：前端构建和维护脚本。
 - `frontend/.next/`、`frontend/out/`、`frontend/node_modules/`：本地生成或安装的产物，不作为业务源码编辑。
 
-重要的公共组件：
-
-- `frontend/components/common/admin/task-manager.tsx`：任务管理和分发入口。
-- `frontend/components/common/admin/task-executions.tsx`：任务执行日志和重试 UI。
-- `frontend/components/common/admin/task-schedules.tsx`：定时任务管理 UI。
-- `frontend/components/common/admin/system.tsx`：系统参数管理。
-- `frontend/components/common/admin/files.tsx`：上传文件管理。
-- `frontend/components/common/admin/users.tsx`：用户管理。
-- `frontend/components/common/admin/access-analytics.tsx`：访问分析与图表展示。
-- `frontend/components/common/admin/access-logs.tsx`：访问日志审计 UI。
-- `frontend/components/common/admin/app-logs.tsx`：应用日志查看 UI。
-- `frontend/components/common/admin/database-manage.tsx`：数据库备份、恢复与管理 UI。
-- `frontend/components/common/admin/file-list.tsx`：管理员文件列表管理组件。
-- `frontend/components/common/admin/file-stats.tsx`：文件存储状态与统计 UI。
-- `frontend/components/common/admin/status.tsx`：系统运行状态与监控 UI。
-- `frontend/components/common/admin/storage-config-tab.tsx`：存储策略与配置 tab 页。
-- `frontend/components/common/admin/system-logs.tsx`：系统日志查看组件。
-- `frontend/components/common/general/manage-pannel.tsx`：通用列表/详情管理器。
-- `frontend/components/common/general/password-dialog.tsx`：敏感操作密码确认对话框。
-- `frontend/components/common/settings/system-settings.tsx`：管理员图形化系统设置。
-- `frontend/components/common/user/file-manager.tsx`：用户端文件管理组件。
-
 
 ## 开发要求
 
@@ -160,25 +138,19 @@ Handler 规范：
 
 路由与模块：
 
-- 仅在 `internal/router/router.go` 中注册路由。
-- 在 `internal/apps/<module>/` 中，使用：
-    - `routers.go` 或 `controllers.go` 作为 HTTP Handler。
-    - `middlewares.go` 作为模块特定的中间件。
-    - `errs.go` 仅包含字符串错误常量。
-    - `constants.go` 包含非错误的业务常量。
-- 对于管理（Admin）模块，首选 `internal/apps/admin/<module>/`。
-- 如果 Handler 文件超过 600 行、包含复杂的多个步骤逻辑，或混合了独立领域，请将业务逻辑拆分到 `logic.go` 或 `logics.go` 中。保持 `routers.go` 仅用于绑定、调用逻辑和响应。
+- 仅在 `internal/router/router.go` 中作为统一高层入口进行路由分发委派，不允许在 `router.go` 中直接挂载业务 Handler。
+- 关于所有的路由归属划分、接口开发隔离防线以及详细的注册和开发步骤，请直接阅读并严格遵循 [new-api](file:///Users/ryan/DEV/Go/Wavelet/.agent/skills/new-api/SKILL.md) 技能。
 
 中间件：
 
-- 全局中间件属于路由设置：`gin.Recovery()`、`otelgin.Middleware()`、日志中间件和 session 中间件。
+- 全局中间件属于路由设置：`gin.Recovery()`、`otelgin.Middleware()`、日志中间件 and session 中间件。
 - 对于登录路由组，使用 `oauth.LoginRequired()`。
 - 对于管理路由组，使用 `admin.LoginAdminRequired()`。
 
 配置管理：
 
 - 运行时代码从 `config.Config` 中读取配置，绝对不要直接从 `os.Getenv()` 中读取。
-- 当添加配置时，同时更新 `config.example.yaml` 和 `internal/config/model.go`。
+- 当添加配置时，同时更新 `config.example.yaml` and `internal/config/model.go`。
 
 数据库操作：
 
@@ -195,40 +167,34 @@ Handler 规范：
 - 不要从 `internal/util/` 中导入 `github.com/gin-gonic/gin`、`gorm.io/gorm`、`github.com/gin-contrib/sessions` 或 HTTP 中间件/框架包。
 - 如果实用工具逻辑需要 web 胶水，请将纯验证/计算保留在 `internal/util/` 中，并将 Gin 中间件/响应处理放在 `internal/apps/` 中。
 
-管理（Admin）模块工作流：
+新增接口与模块开发工作流：
 
-1. 在 `internal/model/` 中定义或扩展模型。
-2. 在 `internal/db/migrator/goose/` 下添加 goose SQL 迁移。
-3. 创建 `internal/apps/admin/<module>/routers.go` 和可选的 `errs.go`。
-4. 在 `internal/router/router.go` 中注册路由。
-5. 运行 `make swagger`。
+- 关于自定义业务接口（如 Admin/User/Custom 模块等）的详细包职责、文件结构和核心开发步骤，请直接阅读并严格遵循 [new-api](file:///Users/ryan/DEV/Go/Wavelet/.agent/skills/new-api/SKILL.md) 技能。
 
 ### 前端规则
 
 在进行任何 Next.js 工作之前，请在 `node_modules/next/dist/docs/` 中找到并阅读相关文档。您的训练数据已过时 —— 这些文档是唯一的真理来源。
 
+请直接查看并参考项目提供的示例和 Demo 代码：[frontend/app/(main)/admin/demo](file:///Users/ryan/DEV/Go/Wavelet/frontend/app/(main)/admin/demo)。
+
 样式规范：
 
 - shadcn/ui 基础组件应该使用它们的 `variant` 系统和全局 CSS 变量。当组件的变体（variant）应该拥有某种外观时，不要在业务 `className` 中硬编码颜色、背景或阴影。
 - 如果现有的变体不足以满足需求，请扩展 shadcn/ui 组件的变体，而不是硬编码一次性的颜色。
-- 使用 Lucide 图标来满足常见的图标需求。将自定义图标作为命名导出放在 `frontend/components/icons/` 中。
 
 页面标题栏规范 (新人开发与重构必读)：
 
-- **结构极简与高度专注**：标题栏应绝对干净，**禁止**在标题正下方放置任何描述性文本、小字副标题或段落（如 `<p>` 或 `CardDescription`）。这样能让用户迅速聚焦于业务主功能，避免低效的信息噪声。
 - **容器与对齐机制**：
-  - 标题容器统一使用 `flex items-center gap-2`。如果右侧有操作按钮（如“新增”、“刷新”），请使用 `justify-between` 布局让操作区与标题双向分布。
-  - 为了确保所有页面在进入/切换时，顶部的呼吸感和视觉高度完全一致，页面最外层容器**必须**统一使用 `py-6 px-1` 或 `py-6` 进行上边距对齐。
-- **无下边框**：标题栏下方**严禁**带有横线（禁用 `border-b` / `border-border`），让页面在纵向上保持连贯性与开阔感。
+    - 标题容器统一使用 `flex items-center gap-2`。如果右侧有操作按钮（如“新增”、“刷新”），请使用 `justify-between` 布局让操作区与标题双向分布。
+    - 为了确保所有页面在进入/切换时，顶部的呼吸感和视觉高度完全一致，页面最外层容器**必须**统一使用 `py-6 px-1` 或 `py-6` 进行上边距对齐。
 - **图标标准**：图标作为视觉辅助点缀，**必须**直接嵌套在标题容器中，直接使用 Lucide 图标组件，样式大小限制为 `size-5 text-primary`。**严禁**为图标包裹任何背景小卡片、圆角边框或额外的修饰容器。
 - **标题文字标准**：标题文字使用且仅使用 `h1 className="text-2xl font-semibold tracking-tight"`。不要自行定义字号、字量（如使用 `font-bold`）或添加任何渐变色，保持整个系统的字形规范化。
 - **Tabs 模块化与文件拆分规范**：凡是带有多个 Tab 页切换的复杂页面，**禁止**将所有 Tab 的渲染逻辑堆积在同一个主文件内。每个 Tab 的具体渲染内容必须单独拆分为独立的 React 组件文件（如 `tabs/events-tab.tsx`）。主页面文件应该仅用于导入子组件、注册 Tabs 触发器以及管理 Tab 的切换激活状态。这有利于防止单文件过大（避免单文件行数超过 600 行限制），并大幅度提高代码的可读性与编译维护效率。
 - **扁平化结构与避免冗余中间件**：为了消除无意义的“中间代理文件”，所有作为路由物理入口的 Tabs 状态维护、骨架及外层布局代码，**必须**直接定义在 Next.js 的 `app/` 页面文件（即 `page.tsx`）中。禁止在 `page.tsx` 中仅写一个单纯的 `<AnotherComponent />` 转发，而在外部新建一个同名中转容器。
 - **复杂度驱动的组件拆分规范**：组件的拆分不应局限于“跨页面复用”。当一个路由页面的复杂度变高时（如渲染逻辑膨胀、存在大型嵌套弹窗或多层状态管理，如单文件代码行数超过 600 行），必须主动将其拆分为子组件以维持单文件的高可读性与低耦合度。拆分时遵循就近原则：特定于该路由且不复用的子组件应放置在最邻近该路由的特征目录（Feature Folder，如 `components/` 局部文件夹）中；只有真正具备跨页面复用价值的通用业务/基础 UI 组件才应存放在全局 `components/` 共享目录下。
-  - **最佳实践标杆案例（数据管理 `/admin/database`）**：
-    该页面由于整合了“运行状态概览”、“物理表网格浏览器”、“磁盘缓存管理”和“SQL 交互控台”多个复杂大区块，重构前单文件接近 1000 行。
-    重构后，主页面 `page.tsx` 仅做高级页面骨架与排版排布，维护全局刷新机制与终端视图切换；而“数据表浏览器 (`table-browser.tsx`)”、“缓存管理 (`cache-manager.tsx`)”与“SQL 终端 (`sql-console.tsx`)”等独立高状态密度区块均被抽离为局部子组件，存放在 `frontend/app/(main)/admin/database/components/`。这保证了代码结构层次清晰、单文件小巧好维护。所有复杂页面的新开发和重构必须遵循此模式。
-
+    - **最佳实践标杆案例（数据管理 `/admin/database`）**：
+      该页面由于整合了“运行状态概览”、“物理表网格浏览器”、“磁盘缓存管理”和“SQL 交互控台”多个复杂大区块，重构前单文件接近 1000 行。
+      重构后，主页面 `page.tsx` 仅做高级页面骨架与排版排布，维护全局刷新机制与终端视图切换；而“数据表浏览器 (`table-browser.tsx`)”、“缓存管理 (`cache-manager.tsx`)”与“SQL 终端 (`sql-console.tsx`)”等独立高状态密度区块均被抽离为局部子组件，存放在 `frontend/app/(main)/admin/database/components/`。这保证了代码结构层次清晰、单文件小巧好维护。所有复杂页面的新开发和重构必须遵循此模式。
 
 页面宽度：
 
@@ -255,3 +221,4 @@ frontend/lib/services/<service-name>/
 
 - 服务类继承 `BaseService`，定义 `basePath`，并暴露有类型的静态方法。
 - 在 `frontend/lib/services/index.ts` 中注册新服务。
+
