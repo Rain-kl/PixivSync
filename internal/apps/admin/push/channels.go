@@ -1,9 +1,10 @@
 // Copyright 2026 Arctel.net
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: AGPL-3.0-only
 
 package push
 
-import ("encoding/json"
+import (
+	"encoding/json"
 	"errors"
 	"net/http"
 	"strconv"
@@ -15,7 +16,8 @@ import ("encoding/json"
 	"github.com/gin-gonic/gin"
 	"gorm.io/gorm"
 
-	"github.com/Rain-kl/Wavelet/internal/common/response")
+	"github.com/Rain-kl/Wavelet/internal/common/response"
+)
 
 // ListChannelDefinitions 获取各种消息通道的表单配置定义列表
 // @Summary 获取所有消息通道配置字段定义

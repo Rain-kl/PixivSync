@@ -1,9 +1,10 @@
 // Copyright 2026 Arctel.net
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: AGPL-3.0-only
 
 package upload
 
-import ("net/http"
+import (
+	"net/http"
 	"strings"
 	"time"
 
@@ -11,7 +12,8 @@ import ("net/http"
 	"github.com/Rain-kl/Wavelet/internal/model"
 	"github.com/gin-gonic/gin"
 
-	"github.com/Rain-kl/Wavelet/internal/common/response")
+	"github.com/Rain-kl/Wavelet/internal/common/response"
+)
 
 const (
 	catImage    = "图片"
