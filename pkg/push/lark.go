@@ -16,6 +16,8 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/Rain-kl/Wavelet/pkg/httppool"
 )
 
 func init() {
@@ -228,7 +230,7 @@ func (p *LarkPusher) Send(ctx context.Context, cfg Config, _ string, body map[st
 	}
 	httpReq.Header.Set("Content-Type", "application/json")
 
-	client := &http.Client{Timeout: 10 * time.Second}
+	client := httppool.NewClient(defaultHTTPClientTimeout)
 	resp, err := client.Do(httpReq)
 	if err != nil {
 		return fmt.Errorf("lark: http request failed: %w", err)

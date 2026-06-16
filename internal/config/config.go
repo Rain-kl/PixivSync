@@ -112,6 +112,9 @@ func applyDefaults(c *configModel) {
 	if c.App.SessionAge <= 0 {
 		c.App.SessionAge = 86400
 	}
+	if c.Otel.TracerName == "" {
+		c.Otel.TracerName = "github.com/Rain-kl/Wavelet"
+	}
 }
 
 // ─── 环境变量覆盖层 ────────────────────────────────────────────────────────────
@@ -223,6 +226,7 @@ func applyEnvOverrides(c *configModel) {
 
 	// ─── OTel ───
 	c.Otel.SamplingRate = envFloat64("OTEL_SAMPLING_RATE", c.Otel.SamplingRate)
+	c.Otel.TracerName = envStr("OTEL_TRACER_NAME", c.Otel.TracerName)
 
 	// ─── Worker ───
 	c.Worker.Concurrency = envInt("WORKER_CONCURRENCY", c.Worker.Concurrency)

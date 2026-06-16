@@ -72,7 +72,7 @@ RUN go mod download
 COPY . .
 
 # Overlay the compiled frontend into the embed path
-COPY --from=frontend-builder /workspace/frontend/out ./internal/router/dist
+COPY --from=frontend-builder /workspace/frontend/out ./internal/router/root/dist
 
 # Build matrix: GOOS × GOARCH
 # CGO_ENABLED=0 — fully static, no libc dependency, required for cross-compilation.

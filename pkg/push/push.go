@@ -8,11 +8,13 @@ import (
 	"context"
 	"fmt"
 	"sync"
+	"time"
 )
 
 const (
-	defaultTitle = "系统通知"
-	levelInfo    = "INFO"
+	defaultTitle             = "系统通知"
+	levelInfo                = "INFO"
+	defaultHTTPClientTimeout = 10 * time.Second
 )
 
 // Config 基础通知渠道配置

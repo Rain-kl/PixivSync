@@ -29,6 +29,7 @@ func init() {
 type Config struct {
 	AppName      string
 	SamplingRate float64
+	TracerName   string
 }
 
 // Init 初始化 Tracer Provider 并关联全局 Tracer 实例
@@ -41,7 +42,11 @@ func Init(cfg Config) {
 	otel.SetTracerProvider(tracerProvider)
 
 	// 更新 Tracer
-	Tracer = tracerProvider.Tracer("github.com/Rain-kl/Wavelet")
+	tracerName := cfg.TracerName
+	if tracerName == "" {
+		tracerName = "github.com/Rain-kl/Wavelet"
+	}
+	Tracer = tracerProvider.Tracer(tracerName)
 }
 
 // Shutdown 关闭所有 Trace Provider

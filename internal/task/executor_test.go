@@ -15,6 +15,8 @@ import (
 	"github.com/hibiken/asynq"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/propagation"
 	"go.opentelemetry.io/otel/trace"
 )
 
@@ -131,6 +133,41 @@ func TestAppendLogWithTaskID(t *testing.T) {
 	require.NoError(t, err)
 	assert.Contains(t, found.Log, "第一条日志")
 	assert.Contains(t, found.Log, "处理了 50 条数据")
+}
+
+func TestTaskTraceContextEnvelope(t *testing.T) {
+	payload := []byte(`{"hello":"wavelet"}`)
+	traceID := "4bf92f3577b34da6a3ce929d0e0e4736"
+	parentCtx := otel.GetTextMapPropagator().Extract(
+		context.Background(),
+		propagation.MapCarrier{
+			"traceparent": "00-" + traceID + "-00f067aa0ba902b7-01",
+		},
+	)
+
+	wrappedPayload := injectTaskTraceContext(parentCtx, payload)
+	require.NotEqual(t, string(payload), string(wrappedPayload))
+
+	gotCtx, gotPayload, ok := extractTaskTraceContext(context.Background(), wrappedPayload)
+	require.True(t, ok)
+	assert.Equal(t, payload, gotPayload)
+	assert.Equal(t, traceID, trace.SpanContextFromContext(gotCtx).TraceID().String())
+}
+
+func TestTaskTraceContextEnvelopeKeepsLegacyPayload(t *testing.T) {
+	payload := []byte(`{"legacy":true}`)
+
+	gotCtx, gotPayload, ok := extractTaskTraceContext(context.Background(), payload)
+	require.False(t, ok)
+	assert.Equal(t, context.Background(), gotCtx)
+	assert.Equal(t, payload, gotPayload)
+}
+
+func TestTaskTraceContextEnvelopeSkipsEmptyContext(t *testing.T) {
+	payload := []byte(`{"background":true}`)
+
+	wrappedPayload := injectTaskTraceContext(context.Background(), payload)
+	assert.Equal(t, payload, wrappedPayload)
 }
 
 func TestProcessTaskSuccess(t *testing.T) {

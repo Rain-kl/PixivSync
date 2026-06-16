@@ -98,6 +98,8 @@ worker:
 # ─── OpenTelemetry Tracing ──────────────────────────────────────────────────────
 otel:
   sampling_rate: 0.0           # Trace sampling rate (0.0 – 1.0)
+  tracer_name: "github.com/Rain-kl/Wavelet" # Global tracer instrumentation name
+
 
 # ─── ClickHouse (optional) ──────────────────────────────────────────────────────
 clickhouse:

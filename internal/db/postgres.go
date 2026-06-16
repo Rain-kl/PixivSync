@@ -55,6 +55,19 @@ func initSQLite() {
 		log.Fatalf("[SQLite] init connection failed: %v\n", err)
 	}
 
+	// Trace 注入
+	if err = db.Use(
+		tracing.NewPlugin(
+			tracing.WithoutMetrics(),
+			tracing.WithAttributes(
+				attribute.String("db.instance", sqlitePath),
+				attribute.String("db.system", "SQLite"),
+			),
+		),
+	); err != nil {
+		log.Fatalf("[SQLite] init trace failed: %v\n", err)
+	}
+
 	log.Printf("[SQLite] initialized (path: %s)\n", sqlitePath)
 }
 

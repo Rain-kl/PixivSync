@@ -11,7 +11,8 @@ import (
 	"fmt"
 	"net/http"
 	"strings"
-	"time"
+
+	"github.com/Rain-kl/Wavelet/pkg/httppool"
 )
 
 func init() {
@@ -131,7 +132,7 @@ func (p *TelegramPusher) sendMessage(ctx context.Context, baseURL, token, chatID
 	}
 	httpReq.Header.Set("Content-Type", "application/json")
 
-	client := &http.Client{Timeout: 10 * time.Second}
+	client := httppool.NewClient(defaultHTTPClientTimeout)
 	resp, err := client.Do(httpReq)
 	if err != nil {
 		return fmt.Errorf("http request failed: %w", err)

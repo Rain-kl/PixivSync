@@ -5,7 +5,9 @@
 package cmd
 
 import (
+	"context"
 	"log"
+	"time"
 
 	"github.com/Rain-kl/Wavelet/internal/buildinfo"
 	"github.com/Rain-kl/Wavelet/internal/config"
@@ -14,6 +16,8 @@ import (
 	"github.com/Rain-kl/Wavelet/pkg/trace"
 	"github.com/spf13/cobra"
 )
+
+const traceShutdownTimeout = 10 * time.Second
 
 var rootCmd = &cobra.Command{
 	Use: "wavelet",
@@ -31,10 +35,14 @@ var rootCmd = &cobra.Command{
 		trace.Init(trace.Config{
 			AppName:      config.Config.App.AppName,
 			SamplingRate: config.Config.Otel.SamplingRate,
+			TracerName:   config.Config.Otel.TracerName,
 		})
 	},
 	PreRun: func(_ *cobra.Command, _ []string) {
 		migrator.Migrate()
+	},
+	PersistentPostRun: func(_ *cobra.Command, _ []string) {
+		shutdownTraceProvider()
 	},
 	Run: func(_ *cobra.Command, args []string) {
 		// 无参数时默认以融合模式启动所有服务
@@ -56,6 +64,12 @@ var rootCmd = &cobra.Command{
 			log.Fatal("[CMD] unknown app mode\n")
 		}
 	},
+}
+
+func shutdownTraceProvider() {
+	ctx, cancel := context.WithTimeout(context.Background(), traceShutdownTimeout)
+	defer cancel()
+	trace.Shutdown(ctx)
 }
 
 func init() {

@@ -6,6 +6,7 @@ package task
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"time"
@@ -15,8 +16,10 @@ import (
 	"github.com/Rain-kl/Wavelet/pkg/logger"
 	otel_trace "github.com/Rain-kl/Wavelet/pkg/trace"
 	"github.com/hibiken/asynq"
+	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/codes"
+	"go.opentelemetry.io/otel/propagation"
 	"go.opentelemetry.io/otel/trace"
 )
 
@@ -56,6 +59,14 @@ func ValidateAndNormalizePayload(asynqTaskType string, payload []byte) ([]byte, 
 type contextKey string
 
 const taskIDKey contextKey = "task_execution_task_id"
+const traceEnvelopeVersion = 1
+
+type traceEnvelope struct {
+	WaveletTraceEnvelope bool              `json:"_wavelet_trace_envelope"`
+	Version              int               `json:"version"`
+	TraceContext         map[string]string `json:"trace_context,omitempty"`
+	Payload              []byte            `json:"payload"`
+}
 
 // withTaskID 将 taskID 注入 context
 func withTaskID(ctx context.Context, taskID string) context.Context {
@@ -127,7 +138,7 @@ func DispatchTask(ctx context.Context, taskType string, payload []byte, triggere
 	}
 
 	// 入队 Asynq
-	taskInfo := asynq.NewTask(meta.AsynqTask, payload)
+	taskInfo := asynq.NewTask(meta.AsynqTask, injectTaskTraceContext(ctx, payload))
 	if _, err := AsynqClient.Enqueue(
 		taskInfo,
 		asynq.TaskID(taskID),
@@ -193,7 +204,7 @@ func RetryTask(ctx context.Context, id uint64) (string, error) {
 	}
 
 	// 入队 Asynq
-	taskInfo := asynq.NewTask(execution.TaskType, []byte(execution.Payload))
+	taskInfo := asynq.NewTask(execution.TaskType, injectTaskTraceContext(ctx, []byte(execution.Payload)))
 	if _, err := AsynqClient.Enqueue(
 		taskInfo,
 		asynq.TaskID(newTaskID),
@@ -219,6 +230,9 @@ func RetryTask(ctx context.Context, id uint64) (string, error) {
 // ProcessTask Asynq 实际调用的统一处理函数
 // Worker 注册时统一使用此函数，内部自动分发到对应的 TaskHandler
 func ProcessTask(ctx context.Context, t *asynq.Task) error {
+	taskPayload := t.Payload()
+	ctx, taskPayload, hasRemoteTraceContext := extractTaskTraceContext(ctx, taskPayload)
+
 	// 初始化 Trace
 	ctx, span := otel_trace.Start(ctx, "TaskProcess_"+t.Type(), trace.WithSpanKind(trace.SpanKindConsumer))
 	defer span.End()
@@ -226,7 +240,8 @@ func ProcessTask(ctx context.Context, t *asynq.Task) error {
 	// 添加任务信息到 Span
 	span.SetAttributes(
 		attribute.String("task.type", t.Type()),
-		attribute.Int("task.payload_size", len(t.Payload())),
+		attribute.Int("task.payload_size", len(taskPayload)),
+		attribute.Bool("task.trace_context_propagated", hasRemoteTraceContext),
 		attribute.String("task.id", t.ResultWriter().TaskID()),
 	)
 
@@ -246,7 +261,7 @@ func ProcessTask(ctx context.Context, t *asynq.Task) error {
 
 	// 加载或动态创建执行记录
 	now := time.Now()
-	execution, err := getOrCreateTaskExecution(ctx, taskID, t, now)
+	execution, err := getOrCreateTaskExecution(ctx, taskID, t, taskPayload, now)
 	if err == nil {
 		updateExecutionOnStart(ctx, execution, now)
 	}
@@ -262,7 +277,7 @@ func ProcessTask(ctx context.Context, t *asynq.Task) error {
 	start := time.Now()
 
 	// 执行业务逻辑
-	result, execErr := handler.Execute(ctx, t.Payload())
+	result, execErr := handler.Execute(ctx, taskPayload)
 
 	// 计算耗时并归档记录
 	duration := time.Since(start)
@@ -276,6 +291,43 @@ func ProcessTask(ctx context.Context, t *asynq.Task) error {
 	}
 
 	return execErr
+}
+
+func injectTaskTraceContext(ctx context.Context, payload []byte) []byte {
+	carrier := propagation.MapCarrier{}
+	otel.GetTextMapPropagator().Inject(ctx, carrier)
+	if len(carrier) == 0 {
+		return payload
+	}
+
+	envelope := traceEnvelope{
+		WaveletTraceEnvelope: true,
+		Version:              traceEnvelopeVersion,
+		TraceContext:         map[string]string(carrier),
+		Payload:              payload,
+	}
+	data, err := json.Marshal(envelope)
+	if err != nil {
+		logger.ErrorF(ctx, "[TaskExecutor] 序列化任务 Trace 上下文失败: %v", err)
+		return payload
+	}
+	return data
+}
+
+func extractTaskTraceContext(ctx context.Context, payload []byte) (context.Context, []byte, bool) {
+	var envelope traceEnvelope
+	if err := json.Unmarshal(payload, &envelope); err != nil {
+		return ctx, payload, false
+	}
+	if !envelope.WaveletTraceEnvelope || envelope.Version != traceEnvelopeVersion {
+		return ctx, payload, false
+	}
+	if len(envelope.TraceContext) == 0 {
+		return ctx, envelope.Payload, false
+	}
+
+	extractedCtx := otel.GetTextMapPropagator().Extract(ctx, propagation.MapCarrier(envelope.TraceContext))
+	return extractedCtx, envelope.Payload, true
 }
 
 func updateExecutionOnStart(ctx context.Context, execution *model.TaskExecution, now time.Time) {
@@ -300,7 +352,7 @@ func updateExecutionOnStart(ctx context.Context, execution *model.TaskExecution,
 }
 
 // getOrCreateTaskExecution 获取已有的任务执行记录，如果不存在则针对已知任务类型动态创建记录
-func getOrCreateTaskExecution(ctx context.Context, taskID string, t *asynq.Task, now time.Time) (*model.TaskExecution, error) {
+func getOrCreateTaskExecution(ctx context.Context, taskID string, t *asynq.Task, payload []byte, now time.Time) (*model.TaskExecution, error) {
 	execution, err := model.GetTaskExecutionByTaskID(ctx, taskID)
 	if err == nil {
 		return execution, nil
@@ -319,7 +371,7 @@ func getOrCreateTaskExecution(ctx context.Context, taskID string, t *asynq.Task,
 		Retryable:   meta.Retryable,
 		MaxRetry:    meta.MaxRetry,
 		RetryCount:  0,
-		Payload:     string(t.Payload()),
+		Payload:     string(payload),
 		TriggeredBy: "schedule",
 		StartedAt:   &now,
 	}

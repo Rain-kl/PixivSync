@@ -40,7 +40,7 @@ COPY go.mod go.sum ./
 RUN go mod download
 
 COPY . .
-COPY --from=frontend-builder /workspace/frontend/out ./internal/router/dist
+COPY --from=frontend-builder /workspace/frontend/out ./internal/router/root/dist
 
 RUN CGO_ENABLED=0 GOOS=linux go build \
     -tags embed_frontend \

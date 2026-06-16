@@ -11,7 +11,8 @@ import (
 	"fmt"
 	"net/http"
 	"strings"
-	"time"
+
+	"github.com/Rain-kl/Wavelet/pkg/httppool"
 )
 
 func init() {
@@ -54,7 +55,7 @@ func (p *CustomPusher) Send(ctx context.Context, cfg Config, _ string, body map[
 		httpReq.Header.Set(strings.TrimSpace(parts[0]), strings.TrimSpace(parts[1]))
 	}
 
-	client := &http.Client{Timeout: 10 * time.Second}
+	client := httppool.NewClient(defaultHTTPClientTimeout)
 	resp, err := client.Do(httpReq)
 	if err != nil {
 		return fmt.Errorf("custom: http request failed: %w", err)
