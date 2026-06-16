@@ -321,8 +321,153 @@ func safeArchivePath(destination, name string) (string, error) {
 	return target, nil
 }
 
-func extractTarGz(ctx context.Context, archivePath, destination, binaryName string) (string, error) {
-	logger.InfoF(ctx, "[Updater] Extracting tar.gz archive: %s", archivePath)
+func matchBinaryName(name string, candidates []string) bool {
+	for _, candidate := range candidates {
+		if runtime.GOOS == windowsOS {
+			if strings.EqualFold(name, candidate) {
+				return true
+			}
+		} else {
+			if name == candidate {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+func getCandidateBinaryNames(executable string, repository string) []string {
+	execName := filepath.Base(executable)
+	names := []string{execName}
+
+	addName := func(base string) {
+		name := base
+		if runtime.GOOS == windowsOS && !strings.HasSuffix(strings.ToLower(name), ".exe") {
+			name += ".exe"
+		}
+		for _, existing := range names {
+			if existing == name {
+				return
+			}
+		}
+		names = append(names, name)
+	}
+
+	if parts := strings.Split(repository, "/"); len(parts) == repositoryParts {
+		addName(parts[1])
+	}
+	addName("wavelet")
+
+	return names
+}
+
+func isLikelyBinary(name string, isDir bool, mode os.FileMode) bool {
+	if isDir {
+		return false
+	}
+	base := strings.ToLower(filepath.Base(name))
+
+	// Exclude typical non-binary metadata files
+	exclusions := []string{
+		"license", "licence", "copying", "notice", "readme", "changelog",
+	}
+	for _, excl := range exclusions {
+		if strings.HasPrefix(base, excl) {
+			return false
+		}
+	}
+
+	if runtime.GOOS == windowsOS {
+		return filepath.Ext(base) == ".exe"
+	}
+
+	// On Unix, it should either have the executable permission bit set, OR have no extension
+	return (mode.Perm()&0111 != 0) || (filepath.Ext(base) == "")
+}
+
+func findBinaryInTarGz(archivePath string, candidates []string) (string, error) {
+	file, err := os.Open(archivePath) //nolint:gosec // archivePath is created by prepareUpgrade in the executable directory.
+	if err != nil {
+		return "", err
+	}
+	defer func() {
+		_ = file.Close()
+	}()
+
+	gzipReader, err := gzip.NewReader(file)
+	if err != nil {
+		return "", err
+	}
+	defer func() {
+		_ = gzipReader.Close()
+	}()
+
+	reader := tar.NewReader(gzipReader)
+	var binaries []string
+	for {
+		header, err := reader.Next()
+		if errors.Is(err, io.EOF) {
+			break
+		}
+		if err != nil {
+			return "", err
+		}
+		if header.Typeflag == tar.TypeReg && isLikelyBinary(header.Name, false, header.FileInfo().Mode()) {
+			binaries = append(binaries, header.Name)
+		}
+	}
+
+	if len(binaries) == 1 {
+		return binaries[0], nil
+	}
+
+	// Fallback to candidate match if multiple or zero likely binaries found
+	for _, name := range binaries {
+		if matchBinaryName(filepath.Base(name), candidates) {
+			return name, nil
+		}
+	}
+
+	return "", errors.New(errNoCompatibleAsset)
+}
+
+func findBinaryInZip(archivePath string, candidates []string) (string, error) {
+	reader, err := zip.OpenReader(archivePath)
+	if err != nil {
+		return "", err
+	}
+	defer func() {
+		_ = reader.Close()
+	}()
+
+	var binaries []string
+	for _, file := range reader.File {
+		if !file.FileInfo().IsDir() && isLikelyBinary(file.Name, false, file.FileInfo().Mode()) {
+			binaries = append(binaries, file.Name)
+		}
+	}
+
+	if len(binaries) == 1 {
+		return binaries[0], nil
+	}
+
+	// Fallback to candidate match if multiple or zero likely binaries found
+	for _, name := range binaries {
+		if matchBinaryName(filepath.Base(name), candidates) {
+			return name, nil
+		}
+	}
+
+	return "", errors.New(errNoCompatibleAsset)
+}
+
+func extractTarGz(ctx context.Context, archivePath, destination, targetName string, candidates []string) (string, error) {
+	binaryPathInArchive, err := findBinaryInTarGz(archivePath, candidates)
+	if err != nil {
+		return "", err
+	}
+
+	logger.InfoF(ctx, "[Updater] Extracting tar.gz archive: %s (extracting: %s)", archivePath, binaryPathInArchive)
 	file, err := os.Open(archivePath) //nolint:gosec // archivePath is created by prepareUpgrade in the executable directory.
 	if err != nil {
 		return "", err
@@ -349,10 +494,10 @@ func extractTarGz(ctx context.Context, archivePath, destination, binaryName stri
 		if err != nil {
 			return "", err
 		}
-		if header.Typeflag != tar.TypeReg || filepath.Base(header.Name) != binaryName {
+		if header.Name != binaryPathInArchive {
 			continue
 		}
-		target, err := safeArchivePath(destination, binaryName)
+		target, err := safeArchivePath(destination, targetName)
 		if err != nil {
 			return "", err
 		}
@@ -377,8 +522,13 @@ func extractTarGz(ctx context.Context, archivePath, destination, binaryName stri
 	return "", errors.New(errNoCompatibleAsset)
 }
 
-func extractZip(ctx context.Context, archivePath, destination, binaryName string) (string, error) {
-	logger.InfoF(ctx, "[Updater] Extracting zip archive: %s", archivePath)
+func extractZip(ctx context.Context, archivePath, destination, targetName string, candidates []string) (string, error) {
+	binaryPathInArchive, err := findBinaryInZip(archivePath, candidates)
+	if err != nil {
+		return "", err
+	}
+
+	logger.InfoF(ctx, "[Updater] Extracting zip archive: %s (extracting: %s)", archivePath, binaryPathInArchive)
 	reader, err := zip.OpenReader(archivePath)
 	if err != nil {
 		return "", err
@@ -388,10 +538,10 @@ func extractZip(ctx context.Context, archivePath, destination, binaryName string
 		_ = reader.Close()
 	}()
 	for _, file := range reader.File {
-		if file.FileInfo().IsDir() || filepath.Base(file.Name) != binaryName {
+		if file.Name != binaryPathInArchive {
 			continue
 		}
-		target, err := safeArchivePath(destination, binaryName)
+		target, err := safeArchivePath(destination, targetName)
 		if err != nil {
 			return "", err
 		}
@@ -469,15 +619,15 @@ func (m *manager) prepareUpgrade(ctx context.Context) (string, string, error) {
 		_ = os.RemoveAll(tempDir)
 		return "", "", err
 	}
-	binaryName := "wavelet"
-	if runtime.GOOS == windowsOS {
-		binaryName += ".exe"
-	}
+
+	targetName := filepath.Base(executable)
+	candidates := getCandidateBinaryNames(executable, status.UpstreamRepository)
+
 	var stagedBinary string
 	if strings.HasSuffix(asset.Name, ".zip") {
-		stagedBinary, err = extractZip(ctx, archivePath, tempDir, binaryName)
+		stagedBinary, err = extractZip(ctx, archivePath, tempDir, targetName, candidates)
 	} else {
-		stagedBinary, err = extractTarGz(ctx, archivePath, tempDir, binaryName)
+		stagedBinary, err = extractTarGz(ctx, archivePath, tempDir, targetName, candidates)
 	}
 	if err != nil {
 		// Cleanup is best effort because the extraction error is the actionable failure.

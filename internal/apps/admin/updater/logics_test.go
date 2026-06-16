@@ -4,6 +4,7 @@
 package updater
 
 import (
+	"os"
 	"runtime"
 	"testing"
 	"time"
@@ -126,5 +127,133 @@ func TestExpectedAssetName(t *testing.T) {
 	want := "wavelet_v1.2.3_" + runtime.GOOS + "_" + runtime.GOARCH + "." + extension
 	if got := expectedAssetName("v1.2.3"); got != want {
 		t.Errorf("expectedAssetName(%q) = %q, want %q", "v1.2.3", got, want)
+	}
+}
+
+func TestGetCandidateBinaryNames(t *testing.T) {
+	var execPath string
+	if runtime.GOOS == "windows" {
+		execPath = `C:\bin\PixezSync.exe`
+	} else {
+		execPath = "/usr/local/bin/PixezSync"
+	}
+
+	candidates := getCandidateBinaryNames(execPath, "Rain-kl/PixezSync")
+	expected := []string{"PixezSync", "wavelet"}
+	if runtime.GOOS == "windows" {
+		expected = []string{"PixezSync.exe", "wavelet.exe"}
+	}
+
+	if len(candidates) != len(expected) {
+		t.Fatalf("getCandidateBinaryNames() returned length %d, want %d (got %v)", len(candidates), len(expected), candidates)
+	}
+
+	for i, exp := range expected {
+		if candidates[i] != exp {
+			t.Errorf("getCandidateBinaryNames()[%d] = %q, want %q", i, candidates[i], exp)
+		}
+	}
+}
+
+func TestMatchBinaryName(t *testing.T) {
+	candidates := []string{"PixezSync", "wavelet"}
+	if runtime.GOOS == "windows" {
+		candidates = []string{"PixezSync.exe", "wavelet.exe"}
+	}
+
+	tests := []struct {
+		name      string
+		input     string
+		wantMatch bool
+	}{
+		{
+			name:      "exact match repo name",
+			input:     "PixezSync",
+			wantMatch: runtime.GOOS != "windows",
+		},
+		{
+			name:      "exact match default name",
+			input:     "wavelet",
+			wantMatch: runtime.GOOS != "windows",
+		},
+		{
+			name:      "exact match windows repo name",
+			input:     "PixezSync.exe",
+			wantMatch: runtime.GOOS == "windows",
+		},
+		{
+			name:      "case insensitive match windows",
+			input:     "pixezsync.exe",
+			wantMatch: runtime.GOOS == "windows",
+		},
+		{
+			name:      "unmatched name",
+			input:     "other_binary",
+			wantMatch: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := matchBinaryName(tt.input, candidates)
+			if got != tt.wantMatch {
+				t.Errorf("matchBinaryName(%q) = %t, want %t", tt.input, got, tt.wantMatch)
+			}
+		})
+	}
+}
+
+func TestIsLikelyBinary(t *testing.T) {
+	tests := []struct {
+		name      string
+		filename  string
+		isDir     bool
+		mode      uint32
+		wantMatch bool
+	}{
+		{
+			name:      "markdown file",
+			filename:  "README.md",
+			isDir:     false,
+			mode:      0644,
+			wantMatch: false,
+		},
+		{
+			name:      "license file",
+			filename:  "LICENSE",
+			isDir:     false,
+			mode:      0644,
+			wantMatch: false,
+		},
+		{
+			name:      "directory",
+			filename:  "bin",
+			isDir:     true,
+			mode:      0755,
+			wantMatch: false,
+		},
+		{
+			name:      "windows binary",
+			filename:  "PixezSync.exe",
+			isDir:     false,
+			mode:      0644,
+			wantMatch: runtime.GOOS == "windows",
+		},
+		{
+			name:      "unix binary with no extension",
+			filename:  "PixezSync",
+			isDir:     false,
+			mode:      0755,
+			wantMatch: runtime.GOOS != "windows",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := isLikelyBinary(tt.filename, tt.isDir, os.FileMode(tt.mode))
+			if got != tt.wantMatch {
+				t.Errorf("isLikelyBinary(%q, %t, %o) = %t, want %t", tt.filename, tt.isDir, tt.mode, got, tt.wantMatch)
+			}
+		})
 	}
 }
