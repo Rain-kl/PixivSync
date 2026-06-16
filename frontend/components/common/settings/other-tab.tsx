@@ -1,9 +1,11 @@
 "use client"
 
-import {useMemo} from "react"
+import {ComponentType, useMemo} from "react"
 import {useMutation, useQueryClient} from "@tanstack/react-query"
 import {
   BarChart3,
+  Bell,
+  Code,
   CreditCard,
   Database,
   FileText,
@@ -11,7 +13,6 @@ import {
   Info,
   Layers,
   LayoutList,
-  Palette,
   Settings,
   ShieldCheck,
   Terminal,
@@ -24,7 +25,20 @@ import {AdminService} from "@/lib/services"
 import type {SystemConfig} from "@/lib/services/admin"
 import {toast} from "sonner"
 
-const MENU_GROUPS = [
+interface MenuItem {
+  path: string
+  label: string
+  description: string
+  icon: ComponentType<{ className?: string }>
+  readOnly?: boolean
+}
+
+interface MenuGroup {
+  name: string
+  items: MenuItem[]
+}
+
+const MENU_GROUPS: MenuGroup[] = [
   {
     name: "基础菜单",
     items: [
@@ -35,23 +49,24 @@ const MENU_GROUPS = [
     name: "管理菜单",
     items: [
       { path: "/admin/users", label: "用户管理", description: "查看和管理系统用户列表及其状态", icon: UserRound },
-      { path: "/admin/files", label: "文件管理", description: "查看用户上传文件并清理多余文件", icon: FolderOpen },
       { path: "/admin/tasks", label: "任务管理", description: "查看和调度系统异步及定时任务", icon: Layers },
-      { path: "/admin/system", label: "系统配置", description: "管理和维护系统基础键值对配置", icon: ShieldCheck },
+      { path: "/admin/files", label: "存储管理", description: "管理系统文件存储和清理无用文件", icon: FolderOpen },
       { path: "/admin/database", label: "数据管理", description: "监控物理数据库状态、分页浏览表数据及交互式 SQL 查询", icon: Database },
+      { path: "/admin/push", label: "通知推送", description: "配置和发送系统通知及推送消息", icon: Bell },
       { path: "/admin/logs", label: "系统日志", description: "查看异步任务执行日志和系统运行情况", icon: Terminal },
+      { path: "/admin/system", label: "系统配置", description: "管理和维护系统基础键值对配置", icon: ShieldCheck },
       { path: "/admin/settings", label: "系统设置", description: "配置安全验证、邮箱服务及目录显示", icon: Settings, readOnly: true },
     ]
   },
   {
     name: "文档菜单",
     items: [
-      { path: "/components", label: "组件库", description: "内置 UI 组件的展示、调试与参考", icon: Palette },
+      { path: "/admin/demo", label: "规范示例", description: "内置 UI 组件与设计规范的展示、调试与参考", icon: Code },
       { path: "/docs/api", label: "接口文档", description: "系统 Swagger 交互式 API 接口文档", icon: CreditCard },
       { path: "/docs/how-to-use", label: "使用文档", description: "面向开发与运营的部署使用指南", icon: FileText },
     ]
   }
-] as const
+]
 
 interface OtherTabProps {
   configs: Record<string, SystemConfig>
@@ -120,7 +135,7 @@ export function OtherTab({ configs }: OtherTabProps) {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               {group.items.map((item) => {
                 const Icon = item.icon
-                const isReadOnly = "readOnly" in item && item.readOnly
+                const isReadOnly = !!item.readOnly
                 const checked = menuDisplayConfig[item.path] !== false
 
                 return (

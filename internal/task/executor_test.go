@@ -339,29 +339,6 @@ func TestRetryTaskNotRetryable(t *testing.T) {
 	assert.Contains(t, err.Error(), "不支持重试")
 }
 
-func TestRetryTaskMaxRetryExceeded(t *testing.T) {
-	cleanup := setupTest(t)
-	defer cleanup()
-	ctx := context.Background()
-
-	execution := &model.TaskExecution{
-		TaskID:      "retry_max_001",
-		TaskType:    testTaskType,
-		TaskName:    "测试任务",
-		Status:      model.TaskExecutionStatusFailed,
-		Retryable:   true,
-		MaxRetry:    2,
-		RetryCount:  2,
-		TriggeredBy: "retry",
-	}
-	err := model.CreateTaskExecution(ctx, execution)
-	require.NoError(t, err)
-
-	_, err = RetryTask(ctx, execution.ID)
-	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "已达到最大重试次数")
-}
-
 func TestRetryTaskNonExistent(t *testing.T) {
 	cleanup := setupTest(t)
 	defer cleanup()

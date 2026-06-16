@@ -379,7 +379,7 @@ export function TaskExecutionsManager() {
               {detailLoading ? <Spinner className="size-4" /> : <RefreshCw className="size-4" />}
               刷新详情
             </Button>
-            {selectedExecution && selectedExecution.status !== "pending" && selectedExecution.status !== "running" && selectedExecution.retryable && selectedExecution.retry_count < selectedExecution.max_retry && (
+            {selectedExecution && selectedExecution.status === "failed" && selectedExecution.retryable && (
               <Button onClick={handleRetryExecution} disabled={retrying}>
                 {retrying ? <Spinner className="size-4" /> : <RotateCcw className="size-4" />}
                 重试任务

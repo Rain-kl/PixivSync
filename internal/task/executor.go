@@ -166,10 +166,6 @@ func RetryTask(ctx context.Context, id uint64) (string, error) {
 		return "", errors.New(errTaskNotRetryable)
 	}
 
-	if execution.RetryCount >= execution.MaxRetry {
-		return "", fmt.Errorf(errTaskMaxRetryExceeded, execution.MaxRetry)
-	}
-
 	// 生成新的 TaskID
 	newTaskID := generateRetryTaskID(execution.TaskID, execution.RetryCount+1)
 
