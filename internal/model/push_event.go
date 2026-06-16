@@ -46,6 +46,9 @@ func (pe *PushEvent) Validate() error {
 	if pe.Template == "" {
 		return errors.New("event template is required")
 	}
+	if pe.Enabled && len(pe.Channels) == 0 {
+		return errors.New("cannot enable event without any push channels configured")
+	}
 	return nil
 }
 

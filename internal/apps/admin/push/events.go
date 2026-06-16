@@ -124,39 +124,13 @@ func (t *EventTrigger) Trigger(ctx context.Context, meta EventMetadata, body map
 			return
 		}
 
-		// 2. Read push configs
-		configs, err := t.getPushConfigs(asyncCtx)
-		if err != nil {
-			logger.ErrorF(asyncCtx, "push_event_trigger: getPushConfigs failed: %v", err)
-			return
-		}
-
-		// 3. Build and render notification message
+		// 2. Build and render notification message
 		flatBody := getFlatBody(body)
-		msg, renderedTemplate := t.buildMessage(&event, meta, flatBody, body)
+		msg, _ := t.buildMessage(&event, meta, flatBody, body)
 
-		// 4. Enqueue tasks for each matching channel
-		t.enqueuePushTasks(asyncCtx, meta, &event, configs, msg, renderedTemplate, flatBody)
+		// 3. Enqueue tasks for each matching channel
+		t.enqueuePushTasks(asyncCtx, meta, &event, msg, flatBody)
 	}()
-}
-
-func (t *EventTrigger) getPushConfigs(ctx context.Context) ([]pkgpush.Config, error) {
-	var configVal string
-	var sc model.SystemConfig
-	if err := sc.GetByKey(ctx, model.ConfigKeyPushConfig); err == nil {
-		configVal = sc.Value
-	}
-
-	if configVal == "" || configVal == "[]" {
-		return nil, errors.New("push_config is empty or not configured")
-	}
-
-	var configs []pkgpush.Config
-	if err := json.Unmarshal([]byte(configVal), &configs); err != nil {
-		return nil, fmt.Errorf("unmarshal push_config failed: %w", err)
-	}
-
-	return configs, nil
 }
 
 func (t *EventTrigger) buildMessage(event *model.PushEvent, meta EventMetadata, flatBody map[string]any, body map[string]any) (NotificationMessage, string) {
@@ -244,13 +218,8 @@ func (t *EventTrigger) parseDefaultTemplate(meta EventMetadata, flatBody map[str
 	return msg
 }
 
-func (t *EventTrigger) enqueuePushTasks(ctx context.Context, meta EventMetadata, event *model.PushEvent, configs []pkgpush.Config, msg NotificationMessage, renderedTemplate string, flatBody map[string]any) {
+func (t *EventTrigger) enqueuePushTasks(ctx context.Context, meta EventMetadata, event *model.PushEvent, msg NotificationMessage, flatBody map[string]any) {
 	for _, channelName := range event.Channels {
-		if channelName == channelEmail {
-			t.enqueueEmailPushTasks(ctx, meta, event, configs, msg, renderedTemplate, flatBody)
-			continue
-		}
-
 		// 检查是不是自定义数据库渠道
 		var customChannel model.PushChannel
 		err := db.DB(ctx).Where("name = ? AND enabled = ?", channelName, true).First(&customChannel).Error
@@ -259,74 +228,7 @@ func (t *EventTrigger) enqueuePushTasks(ctx context.Context, meta EventMetadata,
 			continue
 		}
 
-		// 数据库中不存在。我们核对它是不是通过代码内置注册的 Pusher 渠道
-		if _, errPusher := pkgpush.GetPusher(channelName); errPusher == nil {
-			t.enqueueBuiltinPushTasks(ctx, meta, event, channelName, configs, msg, renderedTemplate, flatBody)
-			continue
-		}
-
-		logger.WarnF(ctx, "push_event_trigger: channel %q not found in DB and not registered as built-in: %v", channelName, err)
-	}
-}
-
-func (t *EventTrigger) enqueueEmailPushTasks(ctx context.Context, meta EventMetadata, event *model.PushEvent, configs []pkgpush.Config, msg NotificationMessage, renderedTemplate string, flatBody map[string]any) {
-	var matchedConfigs []pkgpush.Config
-	for _, cfg := range configs {
-		if cfg.Channel == channelEmail {
-			matchedConfigs = append(matchedConfigs, cfg)
-		}
-	}
-
-	if len(matchedConfigs) == 0 {
-		logger.WarnF(ctx, "push_event_trigger: no active settings for channel %q", channelEmail)
-		return
-	}
-
-	for _, cfg := range matchedConfigs {
-		if cfg.URL == "" || cfg.Key == "" {
-			var smtpHost, smtpPort, smtpUser, smtpPass model.SystemConfig
-			_ = smtpHost.GetByKey(ctx, model.ConfigKeySMTPHost)
-			_ = smtpPort.GetByKey(ctx, model.ConfigKeySMTPPort)
-			_ = smtpUser.GetByKey(ctx, model.ConfigKeySMTPUsername)
-			_ = smtpPass.GetByKey(ctx, model.ConfigKeySMTPPassword)
-
-			if smtpHost.Value != "" && smtpUser.Value != "" {
-				port := smtpPort.Value
-				if port == "" {
-					port = "587"
-				}
-				cfg.URL = smtpHost.Value + ":" + port
-				cfg.Key = smtpUser.Value
-				cfg.Secret = smtpPass.Value
-			}
-		}
-
-		if len(event.Targets) > 0 {
-			for _, target := range event.Targets {
-				resolvedTarget := resolveTarget(ctx, target, flatBody, channelEmail)
-				payload := SendPayload{
-					EventKey: meta.Key,
-					Config:   cfg,
-					Target:   resolvedTarget,
-					Body:     msg,
-					Template: renderedTemplate,
-				}
-				if err := enqueuePushTask(ctx, payload); err != nil {
-					logger.ErrorF(ctx, "push_event_trigger: enqueuePushTask failed for %s -> %s: %v", channelEmail, resolvedTarget, err)
-				}
-			}
-		} else {
-			payload := SendPayload{
-				EventKey: meta.Key,
-				Config:   cfg,
-				Target:   "",
-				Body:     msg,
-				Template: renderedTemplate,
-			}
-			if err := enqueuePushTask(ctx, payload); err != nil {
-				logger.ErrorF(ctx, "push_event_trigger: enqueuePushTask failed for %s: %v", channelEmail, err)
-			}
-		}
+		logger.WarnF(ctx, "push_event_trigger: channel %q not found in DB or disabled: %v", channelName, err)
 	}
 }
 
@@ -395,49 +297,6 @@ func (t *EventTrigger) enqueueSingleCustomPushChannelTask(ctx context.Context, m
 	}
 	if err := enqueuePushTask(ctx, payload); err != nil {
 		logger.ErrorF(ctx, "push_event_trigger: enqueuePushTask failed for %s channel %s -> %s: %v", channel.Type, channel.Name, target, err)
-	}
-}
-
-func (t *EventTrigger) enqueueBuiltinPushTasks(ctx context.Context, meta EventMetadata, event *model.PushEvent, channelName string, configs []pkgpush.Config, msg NotificationMessage, renderedTemplate string, flatBody map[string]any) {
-	var matchedConfigs []pkgpush.Config
-	for _, cfg := range configs {
-		if cfg.Channel == channelName {
-			matchedConfigs = append(matchedConfigs, cfg)
-		}
-	}
-
-	if len(matchedConfigs) == 0 {
-		logger.WarnF(ctx, "push_event_trigger: no active settings for built-in channel %q", channelName)
-		return
-	}
-
-	for _, cfg := range matchedConfigs {
-		if len(event.Targets) > 0 {
-			for _, target := range event.Targets {
-				resolvedTarget := resolveTarget(ctx, target, flatBody, channelName)
-				payload := SendPayload{
-					EventKey: meta.Key,
-					Config:   cfg,
-					Target:   resolvedTarget,
-					Body:     msg,
-					Template: renderedTemplate,
-				}
-				if err := enqueuePushTask(ctx, payload); err != nil {
-					logger.ErrorF(ctx, "push_event_trigger: enqueuePushTask failed for builtin %s -> %s: %v", channelName, resolvedTarget, err)
-				}
-			}
-		} else {
-			payload := SendPayload{
-				EventKey: meta.Key,
-				Config:   cfg,
-				Target:   "",
-				Body:     msg,
-				Template: renderedTemplate,
-			}
-			if err := enqueuePushTask(ctx, payload); err != nil {
-				logger.ErrorF(ctx, "push_event_trigger: enqueuePushTask failed for builtin %s: %v", channelName, err)
-			}
-		}
 	}
 }
 

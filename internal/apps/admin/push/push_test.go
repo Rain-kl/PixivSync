@@ -3,7 +3,8 @@
 
 package push
 
-import ("bytes"
+import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"net/http"
@@ -25,7 +26,8 @@ import ("bytes"
 	"github.com/stretchr/testify/require"
 	"gorm.io/gorm"
 
-	"github.com/Rain-kl/Wavelet/internal/common/response")
+	"github.com/Rain-kl/Wavelet/internal/common/response"
+)
 
 var adminLoginEvent = EventMetadata{
 	Key:  "admin_login",
@@ -148,10 +150,6 @@ func TestEventTrigger(t *testing.T) {
 	dbConn, _, cleanup := setupPushTest(t)
 	defer cleanup()
 
-	// Register mock pusher
-	mPusher := &mockPusher{}
-	pkgpush.Register("mock_channel", mPusher)
-
 	// SyncEvents
 	err := SyncEvents(context.Background())
 	require.NoError(t, err)
@@ -173,14 +171,17 @@ func TestEventTrigger(t *testing.T) {
 	})
 
 	t.Run("trigger enabled event enqueues task", func(t *testing.T) {
-		// Set push_config system configuration
-		cfgJson := `[{"channel": "mock_channel", "url": "http://mock"}]`
-		sysConfig := &model.SystemConfig{
-			Key:   model.ConfigKeyPushConfig,
-			Value: cfgJson,
+		// Create an enabled custom channel in GORM
+		customChan := &model.PushChannel{
+			Name:    "mock_channel",
+			Type:    "custom",
+			URL:     "https://webhook.site/trigger",
+			Other:   `{"text": "$content"}`,
+			Enabled: true,
 		}
-		err = dbConn.Create(sysConfig).Error
+		err = dbConn.Create(customChan).Error
 		require.NoError(t, err)
+		defer dbConn.Delete(customChan)
 
 		// Enable the push event in DB using struct to trigger JSON serializer
 		var event model.PushEvent
@@ -216,7 +217,8 @@ func TestEventTrigger(t *testing.T) {
 		err = json.Unmarshal([]byte(execution.Payload), &payload)
 		require.NoError(t, err)
 		assert.Equal(t, "admin_login", payload.EventKey)
-		assert.Equal(t, "mock_channel", payload.Config.Channel)
+		assert.Equal(t, "custom", payload.Config.Channel)
+		assert.Equal(t, "https://webhook.site/trigger", payload.Config.URL)
 		assert.Equal(t, "admin_user", payload.Target)
 		assert.Equal(t, "管理员登录提醒", payload.Body.Title)
 		assert.Contains(t, payload.Body.Content, "super_admin")
@@ -224,15 +226,17 @@ func TestEventTrigger(t *testing.T) {
 	})
 
 	t.Run("trigger without user injects virtual system user", func(t *testing.T) {
-		// Set push_config system configuration
-		dbConn.Where("key = ?", model.ConfigKeyPushConfig).Delete(&model.SystemConfig{})
-		cfgJson := `[{"channel": "mock_channel", "url": "http://mock"}]`
-		sysConfig := &model.SystemConfig{
-			Key:   model.ConfigKeyPushConfig,
-			Value: cfgJson,
+		// Create an enabled custom channel in GORM
+		customChan := &model.PushChannel{
+			Name:    "mock_channel",
+			Type:    "custom",
+			URL:     "https://webhook.site/trigger",
+			Other:   `{"text": "$content"}`,
+			Enabled: true,
 		}
-		err = dbConn.Create(sysConfig).Error
+		err = dbConn.Create(customChan).Error
 		require.NoError(t, err)
+		defer dbConn.Delete(customChan)
 
 		// Enable the push event in DB
 		var event model.PushEvent
@@ -361,11 +365,20 @@ func TestPushRouters(t *testing.T) {
 		var event model.PushEvent
 		dbConn.First(&event)
 
+		// 1. 未配置任何渠道时开启，应该被拒绝
 		req, _ := http.NewRequest("POST", "/api/v1/admin/push/events/"+strconv.FormatUint(event.ID, 10)+"/toggle", nil)
 		w := httptest.NewRecorder()
 		r.ServeHTTP(w, req)
+		assert.Equal(t, http.StatusBadRequest, w.Code)
 
-		assert.Equal(t, http.StatusOK, w.Code)
+		// 2. 为该事件关联渠道后，再切换开启，应当成功
+		event.Channels = []string{"email"}
+		dbConn.Save(&event)
+
+		req2, _ := http.NewRequest("POST", "/api/v1/admin/push/events/"+strconv.FormatUint(event.ID, 10)+"/toggle", nil)
+		w2 := httptest.NewRecorder()
+		r.ServeHTTP(w2, req2)
+		assert.Equal(t, http.StatusOK, w2.Code)
 
 		var updated model.PushEvent
 		dbConn.First(&updated)

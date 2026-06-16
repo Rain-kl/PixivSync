@@ -52,7 +52,6 @@ const (
 	ConfigKeyLoginSessionTTLHours             = "login_session_ttl_hours"                // 登录会话过期时间 (小时，0表示浏览器关闭后自动退出登录，-1表示永不过期)
 	ConfigKeyUpdateUpstreamRepository         = "update_upstream_repository"             // GitHub Actions Release 上游仓库
 	ConfigKeyStorageConfig                    = "storage_config"                         // 文件存储配置 (JSON)
-	ConfigKeyPushConfig                       = "push_config"                            // 通知推送渠道配置 (JSON)
 )
 
 const (
