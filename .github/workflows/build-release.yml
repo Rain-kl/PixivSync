@@ -20,7 +20,7 @@ env:
   FRONTEND_DIR: frontend
   FRONTEND_BUILD_COMMAND: pnpm build:embed
   FRONTEND_OUT_DIR: frontend/out
-  EMBED_DIST_DIR: internal/router/dist
+  EMBED_DIST_DIR: internal/router/root/dist
   EXTRA_FILES: |
     LICENSE
     README.md

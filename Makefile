@@ -19,8 +19,8 @@ build-embedded:
 		NEXT_PUBLIC_APP_VERSION="$(VERSION)" \
 		NEXT_PUBLIC_APP_BUILD_DATE="$(BUILD_DATE)" \
 		pnpm build:embed
-	rm -rf internal/router/dist
-	cp -R frontend/out internal/router/dist
+	rm -rf internal/router/root/dist
+	cp -R frontend/out internal/router/root/dist
 	go build \
 		-tags embed_frontend \
 		-ldflags "-s -w -X '$(MODULE)/internal/buildinfo.Version=$(VERSION)' -X '$(MODULE)/internal/buildinfo.BuildTime=$(BUILD_DATE)'" \
