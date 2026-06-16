@@ -47,7 +47,7 @@ func newTracerProvider(cfg Config) (*sdktrace.TracerProvider, error) {
 	tracerProvider := sdktrace.NewTracerProvider(
 		sdktrace.WithBatcher(traceExporter),
 		sdktrace.WithResource(r),
-		sdktrace.WithSampler(ParentBasedErrorAwareSampler(cfg.SamplingRate)),
+		sdktrace.WithSampler(ParentBasedRatioSampler(cfg.SamplingRate)),
 	)
 	return tracerProvider, nil
 }

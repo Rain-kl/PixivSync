@@ -8,11 +8,11 @@ import (
 	sdktrace "go.opentelemetry.io/otel/sdk/trace"
 )
 
-// ParentBasedErrorAwareSampler 创建父级感知的概率采样器
+// ParentBasedRatioSampler 创建父级感知的概率采样器
 // - 如果父 Span 已采样，则子 Span 也采样
 // - 如果父 Span 未采样，则子 Span 也不采样
 // - 如果是根 Span，按 samplingRate 概率采样
-func ParentBasedErrorAwareSampler(samplingRate float64) sdktrace.Sampler {
+func ParentBasedRatioSampler(samplingRate float64) sdktrace.Sampler {
 	return sdktrace.ParentBased(
 		sdktrace.TraceIDRatioBased(samplingRate),
 	)
