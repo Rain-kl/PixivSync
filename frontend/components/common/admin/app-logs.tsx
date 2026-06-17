@@ -3,14 +3,14 @@
 
 "use client"
 
-import {useCallback, useEffect, useRef, useState} from "react"
+import {memo, useCallback, useEffect, useRef, useState} from "react"
+import {useVirtualizer} from "@tanstack/react-virtual"
 import {toast} from "sonner"
-import {ArrowDown, ChevronUp, Loader2, Pause, Play} from "lucide-react"
+import {ArrowDown, ChevronUp, Loader2} from "lucide-react"
 
-import {AdminService} from "@/lib/services"
+import {AdminService} from "@/lib/services/admin"
 import {ErrorInline} from "@/components/layout/error"
 import {LoadingStateWithBorder} from "@/components/layout/loading"
-import {Badge} from "@/components/ui/badge"
 import {Button} from "@/components/ui/button"
 
 interface LogEntry {
@@ -20,13 +20,32 @@ interface LogEntry {
 
 // Distance (px) from bottom to treat as "at bottom"
 const BOTTOM_THRESHOLD = 40
+const LOG_LINE_ESTIMATE_PX = 20
+const LOG_VIRTUAL_OVERSCAN = 24
+
+const LogLine = memo(function LogLine({data}: {data: string}) {
+  const level = parseLogLevel(data)
+  const color = level === "error"
+    ? "text-red-400"
+    : level === "warn"
+      ? "text-yellow-400"
+      : level === "debug"
+        ? "text-gray-500"
+        : "text-gray-300"
+
+  return (
+    <div className={`${color} whitespace-pre-wrap break-all px-2 py-0.5 rounded hover:bg-white/5`}>
+      {data}
+    </div>
+  )
+})
 
 function getApiBaseUrl(): string {
   if (typeof window !== "undefined") {
     // If NEXT_PUBLIC_WAVELET_BACKEND_URL is set, use it. Otherwise, use origin.
     const base = process.env.NEXT_PUBLIC_WAVELET_BACKEND_URL || ""
     if (base.startsWith("http")) return base
-    
+
     // Relative URL fallback
     const proto = window.location.protocol
     const host = window.location.host
@@ -59,20 +78,23 @@ export function AppLogs() {
   const [nextCursor, setNextCursor] = useState(0)
   const [loadingMore, setLoadingMore] = useState(false)
 
-  const [connected, setConnected] = useState(false)
-  const [paused, setPaused] = useState(false)
-
   // autoScroll = true → new logs auto-scroll to bottom
   const [autoScroll, setAutoScroll] = useState(true)
 
   const containerRef = useRef<HTMLDivElement>(null)
   const wsRef = useRef<WebSocket | null>(null)
-  const pausedRef = useRef(paused)
   const autoScrollRef = useRef(autoScroll)
   const isUserScrolling = useRef(false)
 
-  useEffect(() => { pausedRef.current = paused }, [paused])
   useEffect(() => { autoScrollRef.current = autoScroll }, [autoScroll])
+
+  const rowVirtualizer = useVirtualizer({
+    count: logs.length,
+    getScrollElement: () => containerRef.current,
+    estimateSize: () => LOG_LINE_ESTIMATE_PX,
+    overscan: LOG_VIRTUAL_OVERSCAN,
+    measureElement: (element) => element.getBoundingClientRect().height,
+  })
 
   // ---- Scroll detection ------------------------------------------------
   const handleScroll = useCallback(() => {
@@ -141,15 +163,14 @@ export function AppLogs() {
       if (isInitial) {
         setLogs(data.lines || [])
       } else {
+        const el = containerRef.current
+        const previousScrollHeight = el?.scrollHeight ?? 0
         setLogs(prev => [...(data.lines || []), ...prev])
 
         requestAnimationFrame(() => {
-          const el = containerRef.current
           if (!el) return
-          const newCount = (data.lines || []).length
-          const lineH = 20
           isUserScrolling.current = false
-          el.scrollTop = el.scrollTop + newCount * lineH
+          el.scrollTop = el.scrollHeight - previousScrollHeight
         })
       }
       setHasMore(data.has_more)
@@ -173,10 +194,7 @@ export function AppLogs() {
     const ws = new WebSocket(buildWsUrl())
     wsRef.current = ws
 
-    ws.onopen = () => { setConnected(true) }
-
     ws.onmessage = (event) => {
-      if (pausedRef.current) return
       try {
         const msg = JSON.parse(event.data)
         if (msg.type === "log" && msg.data) {
@@ -189,8 +207,7 @@ export function AppLogs() {
       } catch { /* ignore */ }
     }
 
-    ws.onclose = () => { setConnected(false); wsRef.current = null }
-    ws.onerror = () => { setConnected(false) }
+    ws.onclose = () => { wsRef.current = null }
   }, [])
 
   // ---- Initialize ------------------------------------------------------
@@ -213,8 +230,6 @@ export function AppLogs() {
     })
   }, [])
 
-  const togglePause = useCallback(() => setPaused(p => !p), [])
-  const reconnect = useCallback(() => connectWs(), [connectWs])
   const handleLoadMore = useCallback(() => {
     if (nextCursor > 0) loadHistory(nextCursor)
   }, [nextCursor, loadHistory])
@@ -225,38 +240,13 @@ export function AppLogs() {
 
   return (
     <div className="flex flex-col h-full relative">
-      {/* Sub Header / Control Bar */}
-      <div className="flex items-center justify-between pb-3 border-b border-border/40 mb-3">
-        <div className="text-sm text-muted-foreground font-medium">
-          系统后台实时输出的运行日志 (最多缓存 2000 行)
-        </div>
-        <div className="flex items-center gap-2">
-          <Badge variant={connected ? "secondary" : "destructive"} className="h-6">
-            {connected ? "已连接" : "断开连接"}
-          </Badge>
-          {connected && (
-            <Button variant="outline" size="sm" onClick={togglePause} className="h-8">
-              {paused
-                ? <><Play className="size-3.5 mr-1.5" />恢复</>
-                : <><Pause className="size-3.5 mr-1.5" />暂停</>
-              }
-            </Button>
-          )}
-          {!connected && (
-            <Button variant="outline" size="sm" onClick={reconnect} className="h-8">
-              重新连接
-            </Button>
-          )}
-        </div>
-      </div>
-
       {/* Log viewer — fixed height, scrollable */}
       <div
         ref={containerRef}
         onScroll={handleScroll}
         onWheel={handleWheel}
         onTouchStart={handleTouchStart}
-        className="h-[calc(100vh-270px)] overflow-y-auto overflow-x-hidden rounded-md border border-border/50 bg-[#0d1117] font-mono text-[13px] leading-5 relative"
+        className="h-[calc(100vh-270px)] overflow-y-auto overflow-x-hidden rounded-lg border border-border/40 bg-[#0d1117] font-mono text-[13px] leading-5 relative"
       >
         {/* Load older logs */}
         {hasMore && (
@@ -276,31 +266,31 @@ export function AppLogs() {
           </div>
         )}
 
-        {/* Log lines */}
-        <div className="px-3 py-2">
-          {logs.length === 0 ? (
-            <div className="text-center text-gray-500 py-8">暂无日志</div>
-          ) : (
-            logs.map((entry) => {
-              const level = parseLogLevel(entry.data)
-              const color = level === "error"
-                ? "text-red-400"
-                : level === "warn"
-                  ? "text-yellow-400"
-                  : level === "debug"
-                    ? "text-gray-500"
-                    : "text-gray-300"
+        {logs.length === 0 ? (
+          <div className="px-4 py-8 text-center text-gray-500">暂无日志</div>
+        ) : (
+          <div
+            className="relative px-3 py-3"
+            style={{height: `${rowVirtualizer.getTotalSize()}px`}}
+          >
+            {rowVirtualizer.getVirtualItems().map((virtualRow) => {
+              const entry = logs[virtualRow.index]
+              if (!entry) return null
+
               return (
                 <div
                   key={entry.index}
-                  className={`${color} whitespace-pre-wrap break-all hover:bg-white/5`}
+                  ref={rowVirtualizer.measureElement}
+                  data-index={virtualRow.index}
+                  className="absolute top-0 left-0 w-full"
+                  style={{transform: `translateY(${virtualRow.start}px)`}}
                 >
-                  {entry.data}
+                  <LogLine data={entry.data} />
                 </div>
               )
-            })
-          )}
-        </div>
+            })}
+          </div>
+        )}
       </div>
 
       {/* Floating "back to latest" button */}

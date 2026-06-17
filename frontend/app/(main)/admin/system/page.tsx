@@ -8,7 +8,7 @@ import {Tabs, TabsList, TabsTrigger} from "@/components/ui/tabs"
 import {ShieldCheck} from "lucide-react"
 
 import {formatDateTime} from "@/lib/utils"
-import type {SystemConfig} from "@/lib/services"
+import type {SystemConfig} from "@/lib/services/admin"
 import {AdminProvider, useAdmin} from "@/contexts/admin-context"
 
 

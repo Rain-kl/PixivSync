@@ -58,137 +58,78 @@ type fileStatsResponse struct {
 func GetFileStats(c *gin.Context) {
 	ctx := c.Request.Context()
 
-	// 1. 获取总文件数与总文件大小
-	var summary struct {
-		TotalCount int64 `json:"total_count"`
-		TotalSize  int64 `json:"total_size"`
-	}
-	err := db.DB(ctx).Model(&model.Upload{}).
-		Select("COUNT(*) as total_count, COALESCE(SUM(file_size), 0) as total_size").
-		Where("status != ?", model.UploadStatusDeleted).
-		Scan(&summary).Error
-	if err != nil {
+	var stats []model.UploadStat
+	if err := db.DB(ctx).Find(&stats).Error; err != nil {
 		c.JSON(http.StatusOK, response.Err(err.Error()))
 		return
 	}
 
-	// 2. 获取业务类型分布 (Group By type)
-	type rawDist struct {
-		Key   string `gorm:"column:key"`
-		Count int64  `gorm:"column:count"`
-		Size  int64  `gorm:"column:size"`
-	}
-	var typeRaw []rawDist
-	err = db.DB(ctx).Model(&model.Upload{}).
-		Select("type as key, COUNT(*) as count, COALESCE(SUM(file_size), 0) as size").
-		Where("status != ?", model.UploadStatusDeleted).
-		Group("type").
-		Scan(&typeRaw).Error
-	if err != nil {
-		c.JSON(http.StatusOK, response.Err(err.Error()))
-		return
-	}
-
-	types := make([]distributionItem, 0, len(typeRaw))
-	for _, tr := range typeRaw {
-		name := tr.Key
-		if name == "" {
-			name = "generic"
-		}
-		types = append(types, distributionItem{
-			Name:  name,
-			Count: tr.Count,
-			Size:  tr.Size,
-		})
-	}
-
-	// 3. 获取所有文件的大小、后缀与MIME，用于在 Go 中内存分类统计 (避免数据库中写复杂的 JSON/String 匹配逻辑)
-	type fileCategoryRaw struct {
-		Extension string `gorm:"column:extension"`
-		MimeType  string `gorm:"column:mime_type"`
-		FileSize  int64  `gorm:"column:file_size"`
-	}
-	var fileRaws []fileCategoryRaw
-	err = db.DB(ctx).Model(&model.Upload{}).
-		Select("extension, mime_type, file_size").
-		Where("status != ?", model.UploadStatusDeleted).
-		Scan(&fileRaws).Error
-	if err != nil {
-		c.JSON(http.StatusOK, response.Err(err.Error()))
-		return
-	}
-
-	catCount := make(map[string]int64)
-	catSize := make(map[string]int64)
-	categoriesList := []string{catImage, catVideo, catAudio, catDocument, catArchive, catOther}
-	for _, cat := range categoriesList {
-		catCount[cat] = 0
-		catSize[cat] = 0
-	}
-
-	for _, fr := range fileRaws {
-		cat := getFileCategory(fr.MimeType, fr.Extension)
-		catCount[cat]++
-		catSize[cat] += fr.FileSize
-	}
-
-	categories := make([]distributionItem, 0, len(categoriesList))
-	for _, cat := range categoriesList {
-		categories = append(categories, distributionItem{
-			Name:  cat,
-			Count: catCount[cat],
-			Size:  catSize[cat],
-		})
-	}
-
-	// 4. 获取近 7 天的新增文件趋势 (在 Go 中补全没有新增记录的日期为 0)
-	type fileTrendRaw struct {
-		CreatedAt time.Time `gorm:"column:created_at"`
-		FileSize  int64     `gorm:"column:file_size"`
-	}
-	var trendRaws []fileTrendRaw
-	// 7天前 00:00:00 (即 6 天前 00:00:00 至今天)
 	now := time.Now()
-	startTime := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, now.Location()).AddDate(0, 0, -6)
-	err = db.DB(ctx).Model(&model.Upload{}).
-		Select("created_at, file_size").
-		Where("status != ? AND created_at >= ?", model.UploadStatusDeleted, startTime).
-		Scan(&trendRaws).Error
-	if err != nil {
-		c.JSON(http.StatusOK, response.Err(err.Error()))
-		return
+	trendDates := make([]string, 0, fileStatsTrendDays)
+	trendCountMap := make(map[string]int64, fileStatsTrendDays)
+	trendSizeMap := make(map[string]int64, fileStatsTrendDays)
+	for i := fileStatsTrendDays - 1; i >= 0; i-- {
+		date := now.AddDate(0, 0, -i).Format("2006-01-02")
+		trendDates = append(trendDates, date)
+		trendCountMap[date] = 0
+		trendSizeMap[date] = 0
 	}
 
-	trendCountMap := make(map[string]int64)
-	trendSizeMap := make(map[string]int64)
-	for i := 0; i < 7; i++ {
-		dStr := now.AddDate(0, 0, -i).Format("2006-01-02")
-		trendCountMap[dStr] = 0
-		trendSizeMap[dStr] = 0
+	var (
+		totalCount int64
+		totalSize  int64
+		types      []distributionItem
+		categories []distributionItem
+	)
+
+	categoriesList := []string{catImage, catVideo, catAudio, catDocument, catArchive, catOther}
+	categoryMap := make(map[string]distributionItem, len(categoriesList))
+	for _, cat := range categoriesList {
+		categoryMap[cat] = distributionItem{Name: cat}
 	}
 
-	for _, tr := range trendRaws {
-		dStr := tr.CreatedAt.Format("2006-01-02")
-		if _, exists := trendCountMap[dStr]; exists {
-			trendCountMap[dStr]++
-			trendSizeMap[dStr] += tr.FileSize
+	for _, stat := range stats {
+		switch stat.Dimension {
+		case model.UploadStatDimensionTotal:
+			totalCount = stat.FileCount
+			totalSize = stat.FileSize
+		case model.UploadStatDimensionType:
+			types = append(types, distributionItem{
+				Name:  stat.StatKey,
+				Count: stat.FileCount,
+				Size:  stat.FileSize,
+			})
+		case model.UploadStatDimensionCategory:
+			if item, ok := categoryMap[stat.StatKey]; ok {
+				item.Count = stat.FileCount
+				item.Size = stat.FileSize
+				categoryMap[stat.StatKey] = item
+			}
+		case model.UploadStatDimensionTrend:
+			if _, ok := trendCountMap[stat.StatKey]; ok {
+				trendCountMap[stat.StatKey] = stat.FileCount
+				trendSizeMap[stat.StatKey] = stat.FileSize
+			}
 		}
 	}
 
-	const trendDays = 7
-	trend := make([]trendItem, 0, trendDays)
-	for i := trendDays - 1; i >= 0; i-- {
-		dStr := now.AddDate(0, 0, -i).Format("2006-01-02")
+	categories = make([]distributionItem, 0, len(categoriesList))
+	for _, cat := range categoriesList {
+		categories = append(categories, categoryMap[cat])
+	}
+
+	trend := make([]trendItem, 0, len(trendDates))
+	for _, date := range trendDates {
 		trend = append(trend, trendItem{
-			Date:  dStr,
-			Count: trendCountMap[dStr],
-			Size:  trendSizeMap[dStr],
+			Date:  date,
+			Count: trendCountMap[date],
+			Size:  trendSizeMap[date],
 		})
 	}
 
 	c.JSON(http.StatusOK, response.OK(fileStatsResponse{
-		TotalCount: summary.TotalCount,
-		TotalSize:  summary.TotalSize,
+		TotalCount: totalCount,
+		TotalSize:  totalSize,
 		Trend:      trend,
 		Categories: categories,
 		Types:      types,

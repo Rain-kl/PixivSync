@@ -2,14 +2,14 @@
 
 import {useQuery} from '@tanstack/react-query'
 import {useEffect} from 'react'
-import services from '@/lib/services'
+import {ConfigService} from '@/lib/services/config'
 import {usePathname} from 'next/navigation'
 
 export function SiteTitleUpdater() {
   const pathname = usePathname()
   const publicConfigQuery = useQuery({
     queryKey: ["public-config"],
-    queryFn: () => services.config.getPublicConfig(),
+    queryFn: () => ConfigService.getPublicConfig(),
   })
 
   useEffect(() => {

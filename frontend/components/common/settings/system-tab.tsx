@@ -11,8 +11,8 @@ import {Label} from "@/components/ui/label"
 import {Switch} from "@/components/ui/switch"
 import {Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle} from "@/components/ui/dialog"
 import {Badge} from "@/components/ui/badge"
-import {AdminService} from "@/lib/services"
 import type {SystemConfig} from "@/lib/services/admin"
+import {AdminService} from "@/lib/services/admin"
 import {toast} from "sonner"
 
 interface SystemTabProps {

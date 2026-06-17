@@ -208,12 +208,7 @@ func upsertSystemConfig(ctx context.Context, tx *gorm.DB, key string, value any,
 		FirstOrCreate(&sc).Error; err != nil {
 		return err
 	}
-	if db.Redis != nil {
-		if err := db.HSetJSON(ctx, model.SystemConfigRedisHashKey, key, &sc); err != nil {
-			return err
-		}
-	}
-	return nil
+	return model.InvalidateSystemConfigCache(ctx, key)
 }
 
 // MergeMaskedSecrets restores unchanged secrets from the current configuration.

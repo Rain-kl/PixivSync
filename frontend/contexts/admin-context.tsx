@@ -4,8 +4,8 @@ import * as React from "react"
 import {createContext, useCallback, useContext, useRef, useState} from "react"
 import {useQueryClient} from "@tanstack/react-query"
 
-import type {SystemConfig, UpdateSystemConfigRequest} from "@/lib/services"
-import services from "@/lib/services"
+import type {SystemConfig, UpdateSystemConfigRequest} from "@/lib/services/admin"
+import {AdminService} from "@/lib/services/admin"
 import {handleContextError} from "@/lib/utils/error-handling"
 
 
@@ -49,7 +49,7 @@ export function AdminProvider({ children }: { children: React.ReactNode }) {
     try {
       setSystemConfigsLoading(true)
       setSystemConfigsError(null)
-      const data = await services.admin.listSystemConfigs(type)
+      const data = await AdminService.listSystemConfigs(type)
 
       if (requestId !== systemRequestIdRef.current) {
         return
@@ -71,7 +71,7 @@ export function AdminProvider({ children }: { children: React.ReactNode }) {
   /** 更新系统配置 */
   const updateSystemConfig = useCallback(async (key: string, data: UpdateSystemConfigRequest) => {
     try {
-      await services.admin.updateSystemConfig(key, data)
+      await AdminService.updateSystemConfig(key, data)
       await queryClient.invalidateQueries({ queryKey: ['public-config'] })
       await refetchSystemConfigs(lastConfigTypeRef.current)
     } catch (error) {

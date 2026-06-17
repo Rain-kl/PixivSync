@@ -7,7 +7,7 @@ import {Button} from "@/components/ui/button"
 import {Badge} from "@/components/ui/badge"
 import {Avatar, AvatarFallback, AvatarImage} from "@/components/ui/avatar"
 import {Sheet, SheetContent, SheetTitle} from "@/components/ui/sheet"
-import type {AdminUser} from "@/lib/services"
+import type {AdminUser} from "@/lib/services/admin"
 import {cn, formatDateTime} from "@/lib/utils"
 
 interface UserDetailSheetProps {

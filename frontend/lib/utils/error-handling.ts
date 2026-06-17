@@ -1,5 +1,5 @@
-import { isCancelError } from '@/lib/services'
-import { toast } from 'sonner'
+import {isCancelError} from '@/lib/services/core'
+import {toast} from 'sonner'
 
 /**
  * 错误处理选项
@@ -13,12 +13,12 @@ interface HandleContextErrorOptions {
 
 /**
  * 统一处理 Context 中的错误
- * 
+ *
  * @param error - 捕获的错误对象
  * @param defaultMessage - 默认错误消息
  * @param options - 错误处理选项
  * @returns 标准化的 Error 对象
- * 
+ *
  * @example
  * ```typescript
  * try {

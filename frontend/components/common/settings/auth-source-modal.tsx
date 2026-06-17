@@ -7,8 +7,8 @@ import {Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle} fro
 import {Input} from "@/components/ui/input"
 import {Label} from "@/components/ui/label"
 import {Switch} from "@/components/ui/switch"
-import {AdminService} from "@/lib/services"
 import type {AuthSource, AuthSourceRequest} from "@/lib/services/admin"
+import {AdminService} from "@/lib/services/admin"
 
 const emptyForm: AuthSourceRequest = {
   name: "",

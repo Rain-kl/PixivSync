@@ -3,11 +3,13 @@
 import * as React from "react"
 import {motion} from "motion/react"
 
+import {RequireAuth} from "@/components/auth/require-auth"
 import {UserFileManager} from "@/components/common/user/file-manager"
 import {FolderOpen} from "lucide-react"
 
 export default function UserFilesPage() {
   return (
+    <RequireAuth>
     <motion.div
       initial={{ opacity: 0, y: 15 }}
       animate={{ opacity: 1, y: 0 }}
@@ -26,5 +28,6 @@ export default function UserFilesPage() {
 
       <UserFileManager />
     </motion.div>
+    </RequireAuth>
   )
 }

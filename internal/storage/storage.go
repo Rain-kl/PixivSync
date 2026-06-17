@@ -58,7 +58,8 @@ var (
 	cacheMutex       sync.RWMutex
 )
 
-const configInvalidationChannel = "storage:config_invalidation"
+// ConfigInvalidationChannel is the Redis pub/sub channel used to evict storage caches cluster-wide.
+const ConfigInvalidationChannel = "storage:config_invalidation"
 
 var pubSubOnce sync.Once
 
@@ -75,7 +76,7 @@ func ResetCache() {
 // PublishCacheInvalidation broadcasts cache eviction to all nodes in the cluster via Redis.
 func PublishCacheInvalidation(ctx context.Context) {
 	if db.Redis != nil {
-		_ = db.Redis.Publish(ctx, configInvalidationChannel, "reset").Err()
+		_ = db.Redis.Publish(ctx, ConfigInvalidationChannel, "reset").Err()
 	}
 }
 
@@ -85,7 +86,7 @@ func startPubSubListener() {
 		return
 	}
 	go func() {
-		pubsub := db.Redis.Subscribe(context.Background(), configInvalidationChannel)
+		pubsub := db.Redis.Subscribe(context.Background(), ConfigInvalidationChannel)
 		defer func() {
 			_ = pubsub.Close()
 		}()

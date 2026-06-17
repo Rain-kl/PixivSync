@@ -3,20 +3,21 @@
 
 package cap
 
-import ("bytes"
+import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"testing"
 
-	"github.com/Rain-kl/Wavelet/internal/db"
-	"github.com/Rain-kl/Wavelet/internal/model"
-	"github.com/Rain-kl/Wavelet/internal/testhelper"
-		pkgcap "github.com/Rain-kl/Wavelet/pkg/cap"
 	"github.com/gin-gonic/gin"
 
-	"github.com/Rain-kl/Wavelet/internal/common/response")
+	"github.com/Rain-kl/Wavelet/internal/common/response"
+	"github.com/Rain-kl/Wavelet/internal/model"
+	"github.com/Rain-kl/Wavelet/internal/testhelper"
+	pkgcap "github.com/Rain-kl/Wavelet/pkg/cap"
+)
 
 func TestCapEndpointsAndMiddleware(t *testing.T) {
 	sqliteDB, _, cleanup := testhelper.SetupTestEnvironment(t)
@@ -32,14 +33,7 @@ func TestCapEndpointsAndMiddleware(t *testing.T) {
 		capGroup.POST("/redeem", Redeem)
 	}
 
-	// Login endpoint with CAPTCHA middleware
-	r.POST("/api/v1/user/login", VerifyMiddleware(GetDefaultManager(), "login", func() bool {
-		enabled, err := model.GetBoolByKey(context.Background(), model.ConfigKeyCapLoginEnabled)
-		if err != nil {
-			return false
-		}
-		return enabled
-	}), func(c *gin.Context) {
+	r.POST("/api/v1/user/login", VerifyMiddleware(GetDefaultManager(), "login"), func(c *gin.Context) {
 		c.JSON(http.StatusOK, response.OK("login success"))
 	})
 
@@ -69,15 +63,15 @@ func TestCapEndpointsAndMiddleware(t *testing.T) {
 		t.Fatalf("expected 200 OK when CAPTCHA is disabled, got %d. Body: %s", w.Code, w.Body.String())
 	}
 
-	// 3. Enable CAPTCHA in DB
+	// 3. Enable CAPTCHA in DB and invalidate runtime snapshot
 	err := sqliteDB.Model(&model.SystemConfig{}).Where("key = ?", model.ConfigKeyCapLoginEnabled).Update("value", "true").Error
 	if err != nil {
 		t.Fatalf("failed to enable cap_login_enabled in DB: %v", err)
 	}
-	// Update cache
-	var sysCfg model.SystemConfig
-	sqliteDB.Where("key = ?", model.ConfigKeyCapLoginEnabled).First(&sysCfg)
-	_ = db.HSetJSON(context.Background(), model.SystemConfigRedisHashKey, model.ConfigKeyCapLoginEnabled, &sysCfg)
+	if err := model.InvalidateSystemConfigCache(context.Background(), model.ConfigKeyCapLoginEnabled); err != nil {
+		t.Fatalf("InvalidateSystemConfigCache() error = %v", err)
+	}
+	InvalidateRuntimeSettings()
 
 	// 4. Test login with CAPTCHA enabled but no header (should be blocked)
 	w = httptest.NewRecorder()

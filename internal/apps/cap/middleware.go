@@ -12,10 +12,9 @@ import (
 )
 
 // VerifyMiddleware returns a Gin middleware that checks and consumes the X-Cap-Token header.
-// enabledFunc is an optional callback allowing dynamic check of whether captcha protection is turned on.
-func VerifyMiddleware(mgr *Manager, scope string, enabledFunc func() bool) gin.HandlerFunc {
+func VerifyMiddleware(mgr *Manager, scope string) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		if enabledFunc != nil && !enabledFunc() {
+		if !ProtectionEnabled(c.Request.Context()) {
 			c.Next()
 			return
 		}

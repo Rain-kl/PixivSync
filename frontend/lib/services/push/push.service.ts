@@ -1,7 +1,7 @@
 // Copyright 2026 Arctel.net
 // SPDX-License-Identifier: Apache-2.0
 
-import {BaseService} from '@/lib/services';
+import {BaseService} from '@/lib/services/core';
 import type {
   ChannelDefinition,
   CreateChannelRequest,

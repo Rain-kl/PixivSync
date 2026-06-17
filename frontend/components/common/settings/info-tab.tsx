@@ -4,7 +4,7 @@ import {useMutation, useQuery} from "@tanstack/react-query"
 import {ExternalLink, RefreshCw, Sparkles} from "lucide-react"
 import {toast} from "sonner"
 
-import {AdminService} from "@/lib/services"
+import {AdminService} from "@/lib/services/admin"
 import {
   AlertDialog,
   AlertDialogAction,

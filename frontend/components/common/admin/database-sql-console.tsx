@@ -11,8 +11,8 @@ import {ArrowLeft, Play, RefreshCw, Terminal, Trash2,} from "lucide-react"
 import {Button} from "@/components/ui/button"
 import {Select, SelectContent, SelectItem, SelectTrigger, SelectValue} from "@/components/ui/select"
 import {Table, TableBody, TableCell, TableHead, TableHeader, TableRow} from "@/components/ui/table"
-import type {ExecuteSQLResponse} from "@/lib/services"
-import services from "@/lib/services"
+import type {ExecuteSQLResponse} from "@/lib/services/db-manage"
+import {DbManageService} from "@/lib/services/db-manage"
 
 /**
  * 格式化表格单元格内容
@@ -81,7 +81,7 @@ export function SQLConsole({ dbType, onClose }: SQLConsoleProps) {
     setSqlResult(null)
     setSqlError(null)
     try {
-      const result = await services.dbManage.executeSQL(sqlQuery)
+      const result = await DbManageService.executeSQL(sqlQuery)
       setSqlResult(result)
       toast.success("SQL 执行成功")
     } catch (err) {

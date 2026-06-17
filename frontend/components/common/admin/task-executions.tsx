@@ -1,11 +1,13 @@
 "use client"
 
-import {useCallback, useEffect, useState} from "react"
+import {useMemo, useState} from "react"
+import {useMutation, useQuery, useQueryClient} from "@tanstack/react-query"
 import {toast} from "sonner"
 import {format} from "date-fns"
 import {Activity, ChevronLeft, ChevronRight, RefreshCw, RotateCcw} from "lucide-react"
 
-import {AdminService, TaskExecution, TaskExecutionStatus, TaskMeta} from "@/lib/services"
+import type {TaskExecution, TaskExecutionStatus, TaskMeta} from "@/lib/services/admin"
+import {AdminService} from "@/lib/services/admin"
 import {ErrorInline} from "@/components/layout/error"
 import {LoadingStateWithBorder} from "@/components/layout/loading"
 import {EmptyStateWithBorder} from "@/components/layout/empty"
@@ -31,6 +33,8 @@ const TRIGGER_LABELS: Record<string, string> = {
   schedule: "定时",
 }
 
+const PAGE_SIZE = 10
+
 function formatDateTime(value?: string | null) {
   if (!value) return "-"
   const date = new Date(value)
@@ -51,108 +55,85 @@ function statusVariant(status: TaskExecutionStatus) {
 }
 
 export function TaskExecutionsManager() {
-  const [taskTypes, setTaskTypes] = useState<TaskMeta[]>([])
-  const [executionsLoading, setExecutionsLoading] = useState(false)
-  const [executionsError, setExecutionsError] = useState<Error | null>(null)
-  const [executions, setExecutions] = useState<TaskExecution[]>([])
-  const [executionsTotal, setExecutionsTotal] = useState(0)
+  const queryClient = useQueryClient()
   const [executionsPage, setExecutionsPage] = useState(1)
   const [executionStatus, setExecutionStatus] = useState<TaskExecutionStatus | "all">("all")
   const [executionTaskType, setExecutionTaskType] = useState<string>("all")
-  const [selectedExecution, setSelectedExecution] = useState<TaskExecution | null>(null)
+  const [selectedExecutionId, setSelectedExecutionId] = useState<string | null>(null)
+  const [executionPreview, setExecutionPreview] = useState<TaskExecution | null>(null)
   const [detailOpen, setDetailOpen] = useState(false)
-  const [detailLoading, setDetailLoading] = useState(false)
-  const [retrying, setRetrying] = useState(false)
 
-  const fetchTaskTypes = useCallback(async () => {
-    try {
-      const data = await AdminService.getTaskTypes()
-      setTaskTypes(data)
-    } catch {
-      setTaskTypes([])
-    }
-  }, [])
+  const taskTypesQuery = useQuery({
+    queryKey: ["admin", "task-types"],
+    queryFn: () => AdminService.getTaskTypes(),
+  })
 
-  const fetchTaskExecutions = useCallback(async (overrides?: {
-    page?: number
-    status?: TaskExecutionStatus | "all"
-    taskType?: string
-  }) => {
-    try {
-      setExecutionsLoading(true)
-      setExecutionsError(null)
-      const page = overrides?.page ?? executionsPage
-      const status = overrides?.status ?? executionStatus
-      const taskType = overrides?.taskType ?? executionTaskType
-      const data = await AdminService.listTaskExecutions({
-        page,
-        page_size: 10,
-        status: status === "all" ? undefined : status,
-        task_type: taskType === "all" ? undefined : taskType,
-      })
-      setExecutions(data.items || [])
-      setExecutionsTotal(data.total || 0)
-    } catch (err) {
-      setExecutionsError(err instanceof Error ? err : new Error("加载任务执行记录失败"))
-    } finally {
-      setExecutionsLoading(false)
-    }
-  }, [executionStatus, executionTaskType, executionsPage])
+  const executionsQuery = useQuery({
+    queryKey: ["admin", "task-executions", executionsPage, executionStatus, executionTaskType],
+    queryFn: () => AdminService.listTaskExecutions({
+      page: executionsPage,
+      page_size: PAGE_SIZE,
+      status: executionStatus === "all" ? undefined : executionStatus,
+      task_type: executionTaskType === "all" ? undefined : executionTaskType,
+    }),
+  })
 
-  useEffect(() => {
-    fetchTaskTypes()
-  }, [fetchTaskTypes])
+  const detailQuery = useQuery({
+    queryKey: ["admin", "task-execution", selectedExecutionId],
+    queryFn: () => AdminService.getTaskExecution(selectedExecutionId!),
+    enabled: detailOpen && !!selectedExecutionId,
+  })
 
-  useEffect(() => {
-    fetchTaskExecutions()
-  }, [fetchTaskExecutions])
-
-  useEffect(() => {
-    setExecutionsPage(1)
-  }, [executionStatus, executionTaskType])
-
-  const openExecutionDetail = async (execution: TaskExecution) => {
-    setSelectedExecution(execution)
-    setDetailOpen(true)
-    try {
-      setDetailLoading(true)
-      const detail = await AdminService.getTaskExecution(execution.id)
-      setSelectedExecution(detail)
-    } catch (err) {
-      toast.error("任务详情加载失败", {
-        description: err instanceof Error ? err.message : "未知错误",
-      })
-    } finally {
-      setDetailLoading(false)
-    }
-  }
-
-  const handleRetryExecution = async () => {
-    if (!selectedExecution) return
-    try {
-      setRetrying(true)
-      const taskID = await AdminService.retryTaskExecution(selectedExecution.id)
+  const retryMutation = useMutation({
+    mutationFn: (id: string) => AdminService.retryTaskExecution(id),
+    onSuccess: (taskID) => {
       toast.success("任务已重新下发", {
         description: `新任务 ID：${ taskID }`,
       })
-      await fetchTaskExecutions()
-    } catch (err) {
+      void queryClient.invalidateQueries({ queryKey: ["admin", "task-executions"] })
+    },
+    onError: (err: Error) => {
       toast.error("任务重试失败", {
-        description: err instanceof Error ? err.message : "未知错误",
+        description: err.message || "未知错误",
       })
-    } finally {
-      setRetrying(false)
-    }
+    },
+  })
+
+  const taskTypes: TaskMeta[] = taskTypesQuery.data ?? []
+  const executions = executionsQuery.data?.items ?? []
+  const executionsTotal = executionsQuery.data?.total ?? 0
+  const executionsLoading = executionsQuery.isPending || executionsQuery.isFetching
+  const executionsError = executionsQuery.isError ? executionsQuery.error : null
+  const selectedExecution = detailQuery.data ?? executionPreview
+  const detailLoading = detailQuery.isFetching
+
+  const totalPages = useMemo(
+    () => Math.max(1, Math.ceil(executionsTotal / PAGE_SIZE)),
+    [executionsTotal],
+  )
+
+  const openExecutionDetail = (execution: TaskExecution) => {
+    setExecutionPreview(execution)
+    setSelectedExecutionId(execution.id)
+    setDetailOpen(true)
   }
 
-  const totalPages = Math.max(1, Math.ceil(executionsTotal / 10))
+  const handleStatusChange = (value: TaskExecutionStatus | "all") => {
+    setExecutionStatus(value)
+    setExecutionsPage(1)
+  }
+
+  const handleTaskTypeChange = (value: string) => {
+    setExecutionTaskType(value)
+    setExecutionsPage(1)
+  }
 
   return (
     <div className="space-y-6">
       <br/>
       <div className="flex flex-col gap-3 border-b border-border pb-3 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex flex-wrap items-center gap-2">
-          <Select value={executionStatus} onValueChange={(value) => setExecutionStatus(value as TaskExecutionStatus | "all")}>
+          <Select value={executionStatus} onValueChange={(value) => handleStatusChange(value as TaskExecutionStatus | "all")}>
             <SelectTrigger size="sm" className="w-[120px]">
               <SelectValue placeholder="状态" />
             </SelectTrigger>
@@ -164,7 +145,7 @@ export function TaskExecutionsManager() {
               <SelectItem value="failed">失败</SelectItem>
             </SelectContent>
           </Select>
-          <Select value={executionTaskType} onValueChange={setExecutionTaskType}>
+          <Select value={executionTaskType} onValueChange={handleTaskTypeChange}>
             <SelectTrigger size="sm" className="w-[180px]">
               <SelectValue placeholder="任务类型" />
             </SelectTrigger>
@@ -175,7 +156,7 @@ export function TaskExecutionsManager() {
               ))}
             </SelectContent>
           </Select>
-          <Button variant="outline" size="sm" onClick={() => fetchTaskExecutions()} disabled={executionsLoading}>
+          <Button variant="outline" size="sm" onClick={() => void executionsQuery.refetch()} disabled={executionsLoading}>
             {executionsLoading ? <Spinner className="size-4" /> : <RefreshCw className="size-4" />}
             刷新
           </Button>
@@ -184,7 +165,7 @@ export function TaskExecutionsManager() {
 
       {executionsError ? (
         <div className="p-8 border border-dashed rounded-lg bg-card">
-          <ErrorInline error={executionsError} onRetry={fetchTaskExecutions} className="justify-center" />
+          <ErrorInline error={executionsError} onRetry={() => void executionsQuery.refetch()} className="justify-center" />
         </div>
       ) : executionsLoading && executions.length === 0 ? (
         <LoadingStateWithBorder icon={Activity} description="加载任务执行记录中..." />
@@ -375,13 +356,13 @@ export function TaskExecutionsManager() {
           </div>
 
           <SheetFooter className="border-t">
-            <Button variant="outline" onClick={() => selectedExecution && openExecutionDetail(selectedExecution)} disabled={!selectedExecution || detailLoading}>
+            <Button variant="outline" onClick={() => void detailQuery.refetch()} disabled={!selectedExecutionId || detailLoading}>
               {detailLoading ? <Spinner className="size-4" /> : <RefreshCw className="size-4" />}
               刷新详情
             </Button>
             {selectedExecution && selectedExecution.status === "failed" && selectedExecution.retryable && (
-              <Button onClick={handleRetryExecution} disabled={retrying}>
-                {retrying ? <Spinner className="size-4" /> : <RotateCcw className="size-4" />}
+              <Button onClick={() => retryMutation.mutate(selectedExecution.id)} disabled={retryMutation.isPending}>
+                {retryMutation.isPending ? <Spinner className="size-4" /> : <RotateCcw className="size-4" />}
                 重试任务
               </Button>
             )}

@@ -33,8 +33,9 @@ import {LoadingStateWithBorder} from "@/components/layout/loading"
 import {EmptyStateWithBorder} from "@/components/layout/empty"
 
 
-import services from "@/lib/services"
+import {AdminService} from "@/lib/services/admin"
 import type {CreatePushEventRequest, PushEvent, UpdatePushEventRequest,} from "@/lib/services/push"
+import {PushService} from "@/lib/services/push"
 
 export function EventsTab() {
   const queryClient = useQueryClient()
@@ -42,7 +43,7 @@ export function EventsTab() {
   // --- 获取所有自定义消息通道 ---
   const channelsQuery = useQuery({
     queryKey: ["admin", "push-channels"],
-    queryFn: () => services.push.listChannels(),
+    queryFn: () => PushService.listChannels(),
   })
 
   const availableChannels = React.useMemo(() => {
@@ -55,23 +56,23 @@ export function EventsTab() {
   // --- 获取通知事件 ---
   const eventsQuery = useQuery({
     queryKey: ["admin", "push-events"],
-    queryFn: () => services.push.listEvents(),
+    queryFn: () => PushService.listEvents(),
   })
 
   const builtInEventsQuery = useQuery({
     queryKey: ["admin", "push-builtin-events"],
-    queryFn: () => services.push.listBuiltInEvents(),
+    queryFn: () => PushService.listBuiltInEvents(),
   })
 
   // --- 获取所有系统可调度任务类型 ---
   const taskTypesQuery = useQuery({
     queryKey: ["admin", "task-types"],
-    queryFn: () => services.admin.getTaskTypes(),
+    queryFn: () => AdminService.getTaskTypes(),
   })
 
   // --- 修改保存事件 Mutation ---
   const updateEventMutation = useMutation({
-    mutationFn: ({ id, data }: { id: number; data: UpdatePushEventRequest }) => services.push.updateEvent(id, data),
+    mutationFn: ({ id, data }: { id: number; data: UpdatePushEventRequest }) => PushService.updateEvent(id, data),
     onSuccess: () => {
       toast.success("事件更新成功")
       queryClient.invalidateQueries({ queryKey: ["admin", "push-events"] })
@@ -83,7 +84,7 @@ export function EventsTab() {
   })
 
   const toggleEventMutation = useMutation({
-    mutationFn: (id: number) => services.push.toggleEvent(id),
+    mutationFn: (id: number) => PushService.toggleEvent(id),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["admin", "push-events"] })
     },
@@ -93,7 +94,7 @@ export function EventsTab() {
   })
 
   const createEventMutation = useMutation({
-    mutationFn: (data: CreatePushEventRequest) => services.push.createEvent(data),
+    mutationFn: (data: CreatePushEventRequest) => PushService.createEvent(data),
     onSuccess: () => {
       toast.success("事件创建成功")
       queryClient.invalidateQueries({ queryKey: ["admin", "push-events"] })
@@ -110,7 +111,7 @@ export function EventsTab() {
   })
 
   const deleteEventMutation = useMutation({
-    mutationFn: (id: number) => services.push.deleteEvent(id),
+    mutationFn: (id: number) => PushService.deleteEvent(id),
     onSuccess: () => {
       toast.success("配置删除成功")
       queryClient.invalidateQueries({ queryKey: ["admin", "push-events"] })

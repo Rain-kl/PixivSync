@@ -16,7 +16,8 @@ import {Field, FieldGroup, FieldLabel} from "@/components/ui/field"
 import {CapWidget} from "@/components/auth/cap-widget"
 import {AuthHeading} from "@/components/auth/auth-shell"
 import {OTPForm} from "./otp-form"
-import services from "@/lib/services"
+import {AuthService} from "@/lib/services/auth"
+import {ConfigService} from "@/lib/services/config"
 import type {LoginRequest} from "@/lib/services/auth/types"
 import {safeRedirectTarget} from "@/lib/utils"
 
@@ -64,13 +65,12 @@ export function LoginForm({ onOTPStateChange }: { onOTPStateChange?: (show: bool
 
   const publicConfigQuery = useQuery({
     queryKey: ["public-config"],
-    queryFn: () => services.config.getPublicConfig(),
+    queryFn: () => ConfigService.getPublicConfig(),
   })
 
   const authSourcesQuery = useQuery({
     queryKey: ["auth-sources"],
-    queryFn: () => services.auth.getAuthSources(),
-    enabled: configBool(publicConfigQuery.data?.oidc_login_enabled, true),
+    queryFn: () => AuthService.getAuthSources(),
   })
 
   const capEnabled = configBool(publicConfigQuery.data?.cap_login_enabled, false)
@@ -85,7 +85,7 @@ export function LoginForm({ onOTPStateChange }: { onOTPStateChange?: (show: bool
         capTokenRef.current = null
         setCapReady(false)
       }
-      return services.auth.login(req, Object.keys(headers).length ? headers : undefined)
+      return AuthService.login(req, Object.keys(headers).length ? headers : undefined)
     },
     onSuccess: (user) => {
       setUser(user)
@@ -170,7 +170,7 @@ export function LoginForm({ onOTPStateChange }: { onOTPStateChange?: (show: bool
     try {
       setErrorMessage("")
       persistRedirectTarget(searchParams)
-      const { authorize_url } = await services.auth.getAuthorizeUrl(sourceName)
+      const { authorize_url } = await AuthService.getAuthorizeUrl(sourceName)
       window.location.href = authorize_url
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "第三方登录失败")
@@ -194,7 +194,8 @@ export function LoginForm({ onOTPStateChange }: { onOTPStateChange?: (show: bool
     configBool(publicConfigQuery.data?.password_register_enabled, true)
 
   const passwordLoginEnabled = configBool(publicConfigQuery.data?.password_login_enabled, true)
-  const authSources = authSourcesQuery.data ?? []
+  const oidcLoginEnabled = configBool(publicConfigQuery.data?.oidc_login_enabled, true)
+  const authSources = oidcLoginEnabled ? (authSourcesQuery.data ?? []) : []
 
   const loginDisabled =
     !passwordLoginEnabled ||

@@ -1,13 +1,12 @@
 "use client"
 
 import {motion} from "motion/react"
-import {usePathname, useRouter} from "next/navigation"
-import {useEffect, useState} from "react"
+import {usePathname} from "next/navigation"
+import {useState} from "react"
 import {AppSidebar} from "@/components/layout/sidebar"
 import {SiteHeader} from "@/components/layout/header"
 import {SidebarInset, SidebarProvider} from "@/components/ui/sidebar"
-import {LoadingPage} from "@/components/layout/loading"
-import {useUser} from "@/contexts/user-context"
+import {useAuthRedirect} from "@/hooks/use-auth-redirect"
 
 
 export default function MainLayout({
@@ -15,26 +14,10 @@ export default function MainLayout({
 }: {
   children: React.ReactNode
 }) {
-  const router = useRouter()
   const pathname = usePathname()
-  const {user, loading} = useUser()
   const [isFullWidth, setIsFullWidth] = useState(false)
 
-  useEffect(() => {
-    if (loading || user) return
-
-    const queryString = window.location.search
-    const callbackUrl = queryString ? `${pathname}${queryString}` : pathname
-    const loginUrl = new URL("/login", window.location.origin)
-
-    loginUrl.searchParams.set("callbackUrl", callbackUrl)
-    sessionStorage.setItem("redirect_after_login", callbackUrl)
-    router.replace(loginUrl.toString())
-  }, [loading, pathname, router, user])
-
-  if (loading || !user) {
-    return <LoadingPage text="登录状态" badgeText="Auth" />
-  }
+  useAuthRedirect()
 
   return (
     <SidebarProvider

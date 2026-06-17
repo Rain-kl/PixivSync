@@ -29,8 +29,8 @@ import {Select, SelectContent, SelectItem, SelectTrigger, SelectValue,} from "@/
 import {ErrorInline} from "@/components/layout/error"
 import {LoadingStateWithBorder} from "@/components/layout/loading"
 
-import services from "@/lib/services"
 import type {ChannelDefinition, CreateChannelRequest, PushChannel, UpdateChannelRequest} from "@/lib/services/push"
+import {PushService} from "@/lib/services/push"
 
 export function SettingsTab() {
   const queryClient = useQueryClient()
@@ -38,19 +38,19 @@ export function SettingsTab() {
   // --- 获取所有自定义消息通道 ---
   const channelsQuery = useQuery({
     queryKey: ["admin", "push-channels"],
-    queryFn: () => services.push.listChannels(),
+    queryFn: () => PushService.listChannels(),
   })
 
   // --- 获取动态通道表单字段定义 ---
   const definitionsQuery = useQuery({
     queryKey: ["admin", "push-channels-definitions"],
-    queryFn: () => services.push.listChannelDefinitions(),
+    queryFn: () => PushService.listChannelDefinitions(),
   })
 
 
   // --- 消息通道 CRUD Mutations ---
   const createChannelMutation = useMutation({
-    mutationFn: (data: CreateChannelRequest) => services.push.createChannel(data),
+    mutationFn: (data: CreateChannelRequest) => PushService.createChannel(data),
     onSuccess: () => {
       toast.success("通道创建成功")
       queryClient.invalidateQueries({ queryKey: ["admin", "push-channels"] })
@@ -63,7 +63,7 @@ export function SettingsTab() {
 
   const updateChannelMutation = useMutation({
     mutationFn: ({ id, data }: { id: number; data: UpdateChannelRequest }) =>
-      services.push.updateChannel(id, data),
+      PushService.updateChannel(id, data),
     onSuccess: () => {
       toast.success("通道更新成功")
       queryClient.invalidateQueries({ queryKey: ["admin", "push-channels"] })
@@ -75,7 +75,7 @@ export function SettingsTab() {
   })
 
   const deleteChannelMutation = useMutation({
-    mutationFn: (id: number) => services.push.deleteChannel(id),
+    mutationFn: (id: number) => PushService.deleteChannel(id),
     onSuccess: () => {
       toast.success("通道删除成功")
       queryClient.invalidateQueries({ queryKey: ["admin", "push-channels"] })
@@ -237,7 +237,7 @@ export function SettingsTab() {
     try {
       setIsTestingChannel(true)
       toast.info("正在发送测试推送...")
-      await services.push.testChannel({
+      await PushService.testChannel({
         name: testChannelName,
         target: testChannelTarget || undefined,
       })

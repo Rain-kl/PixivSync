@@ -9,7 +9,6 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"github.com/Rain-kl/Wavelet/internal/db"
 	"github.com/Rain-kl/Wavelet/internal/model"
 	"github.com/Rain-kl/Wavelet/internal/testhelper"
 	"github.com/gin-gonic/gin"
@@ -21,9 +20,10 @@ func TestCORSMiddleware(t *testing.T) {
 
 	gin.SetMode(gin.TestMode)
 
-	// Helper to clear config cache
 	clearConfigCache := func() {
-		_ = db.Redis.Del(context.Background(), db.PrefixedKey(model.SystemConfigRedisHashKey)).Err()
+		if err := model.InvalidateAllSystemConfigCaches(context.Background()); err != nil {
+			t.Fatalf("InvalidateAllSystemConfigCaches() error = %v", err)
+		}
 	}
 
 	t.Run("missing server_address configuration returns no CORS headers", func(t *testing.T) {

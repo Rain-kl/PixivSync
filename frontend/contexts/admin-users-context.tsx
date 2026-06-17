@@ -3,7 +3,7 @@
 import * as React from "react"
 import {createContext, useCallback, useContext, useEffect, useRef, useState} from "react"
 import {toast} from "sonner"
-import {AdminService, AdminUser, CreateUserRequest, ListUsersRequest} from "@/lib/services"
+import {AdminService, AdminUser, CreateUserRequest, ListUsersRequest} from "@/lib/services/admin"
 
 /** 用户列表查询参数 */
 export interface UserQueryParams {

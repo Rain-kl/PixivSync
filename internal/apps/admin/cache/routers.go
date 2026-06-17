@@ -4,7 +4,8 @@
 // Package cache provides HTTP handlers for managing disk cache.
 package cache
 
-import ("context"
+import (
+	"context"
 	"errors"
 	"net/http"
 	"strconv"
@@ -15,7 +16,8 @@ import ("context"
 	"github.com/gin-gonic/gin"
 	"gorm.io/gorm"
 
-	"github.com/Rain-kl/Wavelet/internal/common/response")
+	"github.com/Rain-kl/Wavelet/internal/common/response"
+)
 
 type updateCacheConfigRequest struct {
 	MaxSizeMB  int64 `json:"max_size_mb" binding:"required,min=1"`
@@ -129,9 +131,5 @@ func saveOrUpdateConfig(ctx context.Context, key string, value string) error {
 		}
 	}
 
-	// Sync config value in Redis cache
-	if db.Redis != nil {
-		_ = db.HSetJSON(ctx, model.SystemConfigRedisHashKey, key, &sc)
-	}
-	return nil
+	return model.InvalidateSystemConfigCache(ctx, key)
 }

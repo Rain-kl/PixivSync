@@ -457,8 +457,7 @@ func handleSuccessfulTask(ctx context.Context, execution *model.TaskExecution, t
 
 // generateTaskID 生成任务 ID
 func generateTaskID(taskType string, triggeredBy string) string {
-	uniqueID := idgen.NextUint64ID()
-	return fmt.Sprintf("%s_%s_%d", triggeredBy, taskType, uniqueID)
+	return fmt.Sprintf("%s_%s_%d", triggeredBy, taskType, idgen.NextUint64ID())
 }
 
 // generateRetryTaskID 生成重试任务 ID

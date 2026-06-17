@@ -5,14 +5,11 @@
 package v1
 
 import (
-	"context"
-
 	capApp "github.com/Rain-kl/Wavelet/internal/apps/cap"
 	publicconfig "github.com/Rain-kl/Wavelet/internal/apps/config"
 	"github.com/Rain-kl/Wavelet/internal/apps/oauth"
 	"github.com/Rain-kl/Wavelet/internal/apps/upload"
 	"github.com/Rain-kl/Wavelet/internal/apps/user"
-	"github.com/Rain-kl/Wavelet/internal/model"
 	"github.com/gin-gonic/gin"
 )
 
@@ -64,27 +61,9 @@ func registerOAuthRoutes(apiV1Router *gin.RouterGroup) {
 func registerUserRoutes(apiV1Router *gin.RouterGroup) {
 	userRouter := apiV1Router.Group("/user")
 	{
-		userRouter.POST("/login", capApp.VerifyMiddleware(capApp.GetDefaultManager(), "login", func() bool {
-			enabled, err := model.GetBoolByKey(context.Background(), model.ConfigKeyCapLoginEnabled)
-			if err != nil {
-				return false
-			}
-			return enabled
-		}), user.Login)
-		userRouter.POST("/register", capApp.VerifyMiddleware(capApp.GetDefaultManager(), "register", func() bool {
-			enabled, err := model.GetBoolByKey(context.Background(), model.ConfigKeyCapLoginEnabled)
-			if err != nil {
-				return false
-			}
-			return enabled
-		}), user.Register)
-		userRouter.POST("/send-email-code", capApp.VerifyMiddleware(capApp.GetDefaultManager(), "send_email_code", func() bool {
-			enabled, err := model.GetBoolByKey(context.Background(), model.ConfigKeyCapLoginEnabled)
-			if err != nil {
-				return false
-			}
-			return enabled
-		}), user.SendEmailCode)
+		userRouter.POST("/login", capApp.VerifyMiddleware(capApp.GetDefaultManager(), "login"), user.Login)
+		userRouter.POST("/register", capApp.VerifyMiddleware(capApp.GetDefaultManager(), "register"), user.Register)
+		userRouter.POST("/send-email-code", capApp.VerifyMiddleware(capApp.GetDefaultManager(), "send_email_code"), user.SendEmailCode)
 		userRouter.GET("/logout", user.Logout)
 		userRouter.GET("/self", oauth.LoginRequired(), oauth.UserInfo)
 		userRouter.POST("/change-password", oauth.LoginRequired(), user.ChangePassword)

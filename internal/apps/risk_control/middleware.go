@@ -4,18 +4,19 @@
 // Package risk_control 提供风险控制中间件
 package risk_control
 
-import ("encoding/json"
+import (
+	"encoding/json"
 	"net/http"
 	"time"
 
 	"github.com/Rain-kl/Wavelet/internal/apps/oauth"
+	"github.com/Rain-kl/Wavelet/internal/common/response"
 	"github.com/Rain-kl/Wavelet/internal/config"
 	"github.com/Rain-kl/Wavelet/internal/db/idgen"
 	"github.com/Rain-kl/Wavelet/internal/model"
 	"github.com/Rain-kl/Wavelet/internal/util"
 	"github.com/gin-gonic/gin"
-
-	"github.com/Rain-kl/Wavelet/internal/common/response")
+)
 
 // RiskControlMiddleware 全局日志采集中间件
 func RiskControlMiddleware() gin.HandlerFunc {

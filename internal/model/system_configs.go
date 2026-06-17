@@ -57,6 +57,8 @@ const (
 const (
 	// SystemConfigRedisHashKey Redis Hash key，存储所有系统配置
 	SystemConfigRedisHashKey = "system:system_configs"
+	// SystemConfigVisibleListRedisKey Redis key，缓存所有 visibility=1 的公共配置列表
+	SystemConfigVisibleListRedisKey = "system:visible_configs"
 )
 
 const (
@@ -82,10 +84,18 @@ func (SystemConfig) TableName() string {
 	return "w_system_configs"
 }
 
-// GetByKey 通过 key 查询配置（带 Redis 缓存）
+// GetByKey 通过 key 查询配置（带 RAM + Redis 缓存）
 func (sc *SystemConfig) GetByKey(ctx context.Context, key string) error {
+	ensureSystemConfigCacheListener()
+
+	if cached, ok := systemConfigRAMCache.GetIfPresent(key); ok {
+		*sc = cloneSystemConfig(cached)
+		return nil
+	}
+
 	if db.Redis != nil {
 		if err := db.HGetJSON(ctx, SystemConfigRedisHashKey, key, sc); err == nil {
+			systemConfigRAMCache.Set(key, cloneSystemConfig(*sc))
 			return nil
 		} else if !errors.Is(err, redis.Nil) {
 			// Redis 服务错误，返回错误
@@ -103,16 +113,71 @@ func (sc *SystemConfig) GetByKey(ctx context.Context, key string) error {
 		return err
 	}
 
-	// 更新 Redis Hash 缓存
-	if db.Redis != nil {
-		_ = db.HSetJSON(ctx, SystemConfigRedisHashKey, key, sc)
-	}
+	populateSystemConfigCache(ctx, *sc)
 
 	return nil
 }
 
-// ListVisibleSystemConfigs 查询所有可通过公共配置接口暴露的配置
+// ListSystemConfigsByKeys loads multiple config keys in one database round trip.
+// Keys already present in the process-local RAM cache are returned without querying PostgreSQL.
+func ListSystemConfigsByKeys(ctx context.Context, keys []string) (map[string]SystemConfig, error) {
+	if len(keys) == 0 {
+		return map[string]SystemConfig{}, nil
+	}
+
+	ensureSystemConfigCacheListener()
+
+	result := make(map[string]SystemConfig, len(keys))
+	missing := make([]string, 0, len(keys))
+	for _, key := range keys {
+		if cached, ok := systemConfigRAMCache.GetIfPresent(key); ok {
+			result[key] = cloneSystemConfig(cached)
+			continue
+		}
+		missing = append(missing, key)
+	}
+
+	if len(missing) == 0 {
+		return result, nil
+	}
+
+	database := db.DB(ctx)
+	if database == nil {
+		return nil, errors.New(errDatabaseNotInitialized)
+	}
+
+	var configs []SystemConfig
+	if err := database.Where("key IN ?", missing).Find(&configs).Error; err != nil {
+		return nil, err
+	}
+
+	for i := range configs {
+		populateSystemConfigCache(ctx, configs[i])
+		result[configs[i].Key] = cloneSystemConfig(configs[i])
+	}
+
+	return result, nil
+}
+
+// InvalidateVisibleSystemConfigsCache clears the cached public config list.
+func InvalidateVisibleSystemConfigsCache(ctx context.Context) error {
+	if db.Redis == nil {
+		return nil
+	}
+	return db.Redis.Del(ctx, db.PrefixedKey(SystemConfigVisibleListRedisKey)).Err()
+}
+
+// ListVisibleSystemConfigs 查询所有可通过公共配置接口暴露的配置（带 Redis 列表缓存）
 func ListVisibleSystemConfigs(ctx context.Context) ([]SystemConfig, error) {
+	if db.Redis != nil {
+		var cached []SystemConfig
+		if err := db.GetJSON(ctx, SystemConfigVisibleListRedisKey, &cached); err == nil {
+			return cached, nil
+		} else if !errors.Is(err, redis.Nil) {
+			return nil, err
+		}
+	}
+
 	database := db.DB(ctx)
 	if database == nil {
 		return nil, errors.New(errDatabaseNotInitialized)
@@ -121,6 +186,10 @@ func ListVisibleSystemConfigs(ctx context.Context) ([]SystemConfig, error) {
 	var configs []SystemConfig
 	if err := database.Where("visibility = ?", ConfigVisibilityVisible).Find(&configs).Error; err != nil {
 		return nil, err
+	}
+
+	if db.Redis != nil {
+		_ = db.SetJSON(ctx, SystemConfigVisibleListRedisKey, configs, 0)
 	}
 
 	return configs, nil

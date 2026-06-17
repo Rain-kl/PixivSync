@@ -242,6 +242,8 @@ export function UserFileManager() {
                   <img
                     src={getFileUrl(file.id, "medium") ?? undefined}
                     alt={file.file_name}
+                    loading="lazy"
+                    decoding="async"
                     className="max-h-full max-w-full object-contain rounded-md shadow-xs transition-transform duration-350 group-hover:scale-103"
                     onError={(e) => {
                       ;(e.currentTarget as HTMLImageElement).style.display = "none"

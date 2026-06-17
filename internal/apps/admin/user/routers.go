@@ -4,7 +4,8 @@
 
 package user
 
-import ("net/http"
+import (
+	"net/http"
 	"strconv"
 	"strings"
 	"time"
@@ -17,7 +18,8 @@ import ("net/http"
 	"github.com/gin-gonic/gin"
 	"gorm.io/gorm"
 
-	"github.com/Rain-kl/Wavelet/internal/common/response")
+	"github.com/Rain-kl/Wavelet/internal/common/response"
+)
 
 // minPasswordLength 密码最小长度
 const minPasswordLength = 8
@@ -31,7 +33,7 @@ type listUsersRequest struct {
 }
 
 type user struct {
-	ID          uint64    `json:"id"`
+	ID          uint64    `json:"id,string"`
 	Username    string    `json:"username"`
 	Nickname    string    `json:"nickname"`
 	Email       string    `json:"email"`
@@ -104,7 +106,7 @@ func ListUsers(c *gin.Context) {
 		return
 	}
 
-	var users []user
+	var modelUsers []model.User
 	var total int64
 
 	query := db.DB(c.Request.Context()).Model(&model.User{})
@@ -131,9 +133,14 @@ func ListUsers(c *gin.Context) {
 		Order("id DESC").
 		Offset(offset).
 		Limit(req.PageSize).
-		Find(&users).Error; err != nil {
+		Find(&modelUsers).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, response.Err(err.Error()))
 		return
+	}
+
+	users := make([]user, 0, len(modelUsers))
+	for _, modelUser := range modelUsers {
+		users = append(users, toUser(modelUser))
 	}
 
 	c.JSON(http.StatusOK, response.OK(listUsersResponse{

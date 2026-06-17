@@ -19,7 +19,7 @@ import {
   AlertDialogTitle
 } from "@/components/ui/alert-dialog"
 
-import {AdminUser} from "@/lib/services"
+import type {AdminUser} from "@/lib/services/admin"
 import {formatDateTime} from "@/lib/utils"
 import {EmptyStateWithBorder} from "@/components/layout/empty"
 import {LoadingStateWithBorder} from "@/components/layout/loading"
@@ -120,6 +120,7 @@ export default function UsersPage() {
         <EmptyStateWithBorder icon={UserX} description="暂无用户数据" />
       ) : (
         <div className="border border-dashed shadow-none rounded-lg overflow-hidden">
+          <TooltipProvider delayDuration={0}>
           <Table className="w-full caption-bottom text-sm min-w-full">
             <TableHeader className="sticky top-0 z-20 bg-background">
               <TableRow className="border-b border-dashed hover:bg-transparent">
@@ -174,7 +175,6 @@ export default function UsersPage() {
                   </TableCell>
                   <TableCell className="sticky right-0 text-center bg-background z-10 py-1" onClick={(e) => e.stopPropagation()}>
                     <div className="flex items-center justify-center gap-0.5">
-                      <TooltipProvider delayDuration={0}>
                         <Tooltip>
                           <TooltipTrigger asChild>
                             <div>
@@ -190,9 +190,7 @@ export default function UsersPage() {
                             {user.is_admin ? '管理员账户' : user.is_active ? '禁用账户' : '启用账户'}
                           </TooltipContent>
                         </Tooltip>
-                      </TooltipProvider>
 
-                      <TooltipProvider delayDuration={0}>
                         <Tooltip>
                           <TooltipTrigger asChild>
                             <Button variant="ghost" size="icon" className="h-6 w-6 text-muted-foreground hover:text-foreground" onClick={() => handleShowDetail(user)}>
@@ -203,10 +201,8 @@ export default function UsersPage() {
                             查看详情
                           </TooltipContent>
                         </Tooltip>
-                      </TooltipProvider>
 
                       {!user.is_admin && (
-                        <TooltipProvider delayDuration={0}>
                           <Tooltip>
                             <TooltipTrigger asChild>
                               <Button
@@ -222,7 +218,6 @@ export default function UsersPage() {
                               删除用户
                             </TooltipContent>
                           </Tooltip>
-                        </TooltipProvider>
                       )}
                     </div>
                   </TableCell>
@@ -230,6 +225,7 @@ export default function UsersPage() {
               ))}
             </TableBody>
           </Table>
+          </TooltipProvider>
         </div>
       )}
 

@@ -806,6 +806,9 @@ func TestGetFileStats(t *testing.T) {
 			t.Fatalf("failed to create upload: %v", err)
 		}
 	}
+	if err := RebuildUploadStats(context.Background()); err != nil {
+		t.Fatalf("failed to rebuild upload stats: %v", err)
+	}
 
 	req, _ := http.NewRequest("GET", "/api/v1/admin/uploads/stats", nil)
 	w := httptest.NewRecorder()

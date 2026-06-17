@@ -1,5 +1,5 @@
 import {useQuery} from '@tanstack/react-query'
-import {ConfigService} from '@/lib/services'
+import {ConfigService} from '@/lib/services/config'
 
 /**
  * 获取公共配置（使用 React Query 进行统一缓存与自动同步）

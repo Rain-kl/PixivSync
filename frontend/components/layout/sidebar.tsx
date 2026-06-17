@@ -122,7 +122,7 @@ function parseMenuDisplayConfig(raw: string | undefined): Record<string, boolean
  */
 export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
   const { toggleSidebar, state, isMobile, setOpenMobile } = useSidebar()
-  const { user, logout } = useUser()
+  const {user, logout, loading: userLoading} = useUser()
   const { config } = usePublicConfig()
   const [showLogoutDialog, setShowLogoutDialog] = React.useState(false)
   const [isLoggingOut, setIsLoggingOut] = React.useState(false)
@@ -269,10 +269,12 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
                     </div>
                   </div>
                   <span className="text-base font-semibold truncate mt-2">
-                    {user?.nickname || user?.username || "Unknown User"}
+                    {userLoading
+                      ? "加载中..."
+                      : user?.nickname || user?.username || "未登录"}
                   </span>
                   <span className="text-xs font-base text-muted-foreground">
-                    {user?.is_admin ? "系统管理员" : "普通用户"}
+                    {userLoading ? "正在同步账户" : user?.is_admin ? "系统管理员" : "普通用户"}
                   </span>
                 </div>
               </DropdownMenuLabel>

@@ -28,8 +28,8 @@ import {
   BreadcrumbPage,
   BreadcrumbSeparator,
 } from "@/components/ui/breadcrumb"
-import {UserService} from "@/lib/services"
 import type {CreateTokenResponse} from "@/lib/services/user"
+import {UserService} from "@/lib/services/user"
 import {useAuth} from "@/components/providers/auth-provider"
 import {toast} from "sonner"
 

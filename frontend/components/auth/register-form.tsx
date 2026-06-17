@@ -13,7 +13,8 @@ import {Spinner} from "@/components/ui/spinner"
 import {Field, FieldGroup, FieldLabel} from "@/components/ui/field"
 import {AuthHeading} from "@/components/auth/auth-shell"
 import {CapWidget} from "@/components/auth/cap-widget"
-import services from "@/lib/services"
+import {AuthService} from "@/lib/services/auth"
+import {ConfigService} from "@/lib/services/config"
 import type {RegisterRequest} from "@/lib/services/auth/types"
 import {safeRedirectTarget} from "@/lib/utils"
 
@@ -53,7 +54,7 @@ export function RegisterForm() {
 
   const publicConfigQuery = useQuery({
     queryKey: ["public-config"],
-    queryFn: () => services.config.getPublicConfig(),
+    queryFn: () => ConfigService.getPublicConfig(),
   })
 
   const redirectTarget = useMemo(
@@ -110,7 +111,7 @@ export function RegisterForm() {
         capTokenRef.current = null
         setCapReady(false)
       }
-      return services.auth.register(req, Object.keys(headers).length ? headers : undefined)
+      return AuthService.register(req, Object.keys(headers).length ? headers : undefined)
     },
     onSuccess: (user) => {
       setUser(user)
@@ -135,7 +136,7 @@ export function RegisterForm() {
         capTokenRef.current = null
         setCapReady(false)
       }
-      return services.auth.sendEmailCode(targetEmail, "register", Object.keys(headers).length ? headers : undefined)
+      return AuthService.sendEmailCode(targetEmail, "register", Object.keys(headers).length ? headers : undefined)
     },
     onSuccess: () => {
       setRegisterCooldown(60)

@@ -147,6 +147,55 @@ func (c *Cache) Set(key string, value []byte, ttl time.Duration) error {
 
 // Get retrieves a key's value from the cache.
 func (c *Cache) Get(key string) ([]byte, error) {
+	c.mu.RLock()
+	elem, ok := c.items[key]
+	if !ok {
+		c.mu.RUnlock()
+		return nil, ErrCacheMiss
+	}
+
+	item := elem.Value.(*cacheItem)
+	if !item.expiredAt.IsZero() && time.Now().After(item.expiredAt) {
+		c.mu.RUnlock()
+		return c.getAndDeleteIfExpired(key)
+	}
+	c.mu.RUnlock()
+
+	// Read from disk outside the lock so concurrent cache hits do not serialize on I/O.
+	data, err := c.d.Read(key)
+	if err != nil {
+		c.mu.Lock()
+		defer c.mu.Unlock()
+		if _, stillExists := c.items[key]; stillExists {
+			_ = c.deleteUnlocked(key)
+		}
+		return nil, ErrCacheMiss
+	}
+
+	if len(data) < headerSize {
+		c.mu.Lock()
+		defer c.mu.Unlock()
+		if _, stillExists := c.items[key]; stillExists {
+			_ = c.deleteUnlocked(key)
+		}
+		return nil, ErrCacheMiss
+	}
+
+	payload := data[headerSize:]
+
+	// Brief write lock only for LRU bookkeeping.
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	elem, ok = c.items[key]
+	if !ok {
+		return nil, ErrCacheMiss
+	}
+	c.evictList.MoveToFront(elem)
+
+	return payload, nil
+}
+
+func (c *Cache) getAndDeleteIfExpired(key string) ([]byte, error) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
@@ -156,18 +205,13 @@ func (c *Cache) Get(key string) ([]byte, error) {
 	}
 
 	item := elem.Value.(*cacheItem)
-
-	// Check expiration
 	if !item.expiredAt.IsZero() && time.Now().After(item.expiredAt) {
-		// Lazily delete expired item
 		_ = c.deleteUnlocked(key)
 		return nil, ErrCacheMiss
 	}
 
-	// Read from diskv
 	data, err := c.d.Read(key)
 	if err != nil {
-		// Key exists in memory but not on disk, sync state
 		_ = c.deleteUnlocked(key)
 		return nil, ErrCacheMiss
 	}
@@ -177,10 +221,7 @@ func (c *Cache) Get(key string) ([]byte, error) {
 		return nil, ErrCacheMiss
 	}
 
-	// Update LRU access order
 	c.evictList.MoveToFront(elem)
-
-	// Slice off the metadata header
 	return data[headerSize:], nil
 }
 

@@ -361,16 +361,7 @@ func migrateSingleObject(
 	source, err := sourceBackend.Get(ctx, obj.FilePath)
 	if err != nil {
 		if isNotFoundError(err) {
-			task.AppendLog(ctx, "警告: 源存储中物理文件不存在，标记为已删除并跳过: %s (错误: %v)", obj.FilePath, err)
-			if updateErr := db.DB(ctx).Model(&model.Upload{}).
-				Where("storage_driver = ? AND file_path = ?", sourceDriver, obj.FilePath).
-				Updates(map[string]any{
-					"status":         model.UploadStatusDeleted,
-					colStorageDriver: targetDriver,
-				}).Error; updateErr != nil {
-				return fmt.Errorf("update missing object %q: %w", obj.FilePath, updateErr)
-			}
-			return nil
+			return markMissingMigrationObjectDeleted(ctx, sourceDriver, targetDriver, obj.FilePath, err)
 		}
 		return fmt.Errorf("open source object %q: %w", obj.FilePath, err)
 	}
@@ -439,6 +430,35 @@ func shouldSkipMigration(
 	}()
 
 	return targetObj.ContentLength == obj.FileSize
+}
+
+func markMissingMigrationObjectDeleted(
+	ctx context.Context,
+	sourceDriver storage.Driver,
+	targetDriver storage.Driver,
+	filePath string,
+	sourceErr error,
+) error {
+	task.AppendLog(ctx, "警告: 源存储中物理文件不存在，标记为已删除并跳过: %s (错误: %v)", filePath, sourceErr)
+
+	var affectedUploads []model.Upload
+	if err := db.DB(ctx).
+		Where("storage_driver = ? AND file_path = ? AND status != ?", sourceDriver, filePath, model.UploadStatusDeleted).
+		Find(&affectedUploads).Error; err != nil {
+		return fmt.Errorf("load missing object uploads %q: %w", filePath, err)
+	}
+	if err := db.DB(ctx).Model(&model.Upload{}).
+		Where("storage_driver = ? AND file_path = ?", sourceDriver, filePath).
+		Updates(map[string]any{
+			"status":         model.UploadStatusDeleted,
+			colStorageDriver: targetDriver,
+		}).Error; err != nil {
+		return fmt.Errorf("update missing object %q: %w", filePath, err)
+	}
+	for i := range affectedUploads {
+		recordUploadStatsRemove(ctx, &affectedUploads[i])
+	}
+	return nil
 }
 
 func isNotFoundError(err error) bool {

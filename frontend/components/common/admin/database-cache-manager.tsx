@@ -19,8 +19,8 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog"
-import type {CacheStatus} from "@/lib/services"
-import {AdminService} from "@/lib/services"
+import type {CacheStatus} from "@/lib/services/admin"
+import {AdminService} from "@/lib/services/admin"
 
 /**
  * 格式化字节大小

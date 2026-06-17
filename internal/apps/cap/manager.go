@@ -15,73 +15,47 @@ import (
 
 	"github.com/Rain-kl/Wavelet/internal/config"
 	"github.com/Rain-kl/Wavelet/internal/db"
-	"github.com/Rain-kl/Wavelet/internal/model"
 	pkgcap "github.com/Rain-kl/Wavelet/pkg/cap"
 )
 
 const (
-	managerDefaultChallengeCount = 1
-	managerDefaultChallengeSize  = 32
-	defaultChallengeDifficulty   = 4
-	defaultChallengeTTL          = 10 * time.Minute
-	defaultTokenTTL              = 20 * time.Minute
-	redeemTokenIDLength          = 8  // 兑换 Token ID 字节长度
-	redeemVerTokenLength         = 15 // 兑换验证 Token 字节长度
-	tokenPartsCount              = 2  // 兑换 Token 由两部分组成
-	valuePartsCount              = 2  // 存储值由 scope 和过期时间组成
+	redeemTokenIDLength  = 8  // 兑换 Token ID 字节长度
+	redeemVerTokenLength = 15 // 兑换验证 Token 字节长度
+	tokenPartsCount      = 2  // 兑换 Token 由两部分组成
+	valuePartsCount      = 2  // 存储值由 scope 和过期时间组成
 )
 
-// Config holds settings for the CAPTCHA manager
-type Config struct {
-	Secret              []byte        // HMAC signing key
-	ChallengeCount      int           // Number of PoW puzzles
-	ChallengeSize       int           // Size of the salt string
-	ChallengeDifficulty int           // Length of difficulty target prefix
-	ChallengeTTL        time.Duration // Lifespan of the challenge JWT
-	TokenTTL            time.Duration // Lifespan of the redeem token
-}
-
-// Manager orchestrates challenge generation and solution validation
+// Manager orchestrates challenge generation and solution validation.
 type Manager struct {
-	conf  Config
-	store pkgcap.Store
+	secret []byte
+	store  pkgcap.Store
 }
 
-// NewManager creates a new CAPTCHA Manager
-func NewManager(conf Config, store pkgcap.Store) *Manager {
-	if conf.ChallengeCount <= 0 {
-		conf.ChallengeCount = managerDefaultChallengeCount
-	}
-	if conf.ChallengeSize <= 0 {
-		conf.ChallengeSize = managerDefaultChallengeSize
-	}
-	if conf.ChallengeDifficulty <= 0 {
-		conf.ChallengeDifficulty = defaultChallengeDifficulty
-	}
-	if conf.ChallengeTTL <= 0 {
-		conf.ChallengeTTL = defaultChallengeTTL
-	}
-	if conf.TokenTTL <= 0 {
-		conf.TokenTTL = defaultTokenTTL
-	}
+// NewManager creates a new CAPTCHA Manager.
+func NewManager(secret []byte, store pkgcap.Store) *Manager {
 	return &Manager{
-		conf:  conf,
-		store: store,
+		secret: secret,
+		store:  store,
 	}
 }
 
-// Generate creates a challenge response
+// Generate creates a challenge response.
 func (m *Manager) Generate(ctx context.Context, scope string) (*pkgcap.ChallengeResponse, error) {
-	c := pkgcap.ChallengeConfig{
-		Count:      m.getChallengeCount(ctx),
-		Size:       m.getChallengeSize(ctx),
-		Difficulty: m.getChallengeDifficulty(ctx),
-		Expires:    m.getChallengeTTL(ctx),
+	settings, err := CurrentSettings(ctx)
+	if err != nil {
+		return nil, err
 	}
-	return pkgcap.GenerateChallenge(m.conf.Secret, c, scope)
+
+	challengeConfig := pkgcap.ChallengeConfig{
+		Count:      settings.ChallengeCount,
+		Size:       settings.ChallengeSize,
+		Difficulty: settings.ChallengeDifficulty,
+		Expires:    settings.ChallengeTTL,
+	}
+	return pkgcap.GenerateChallenge(m.secret, challengeConfig, scope)
 }
 
-// RedeemResponse is returned to the client on redeem
+// RedeemResponse is returned to the client on redeem.
 type RedeemResponse struct {
 	Success bool   `json:"success"`
 	Token   string `json:"token,omitempty"`
@@ -89,7 +63,7 @@ type RedeemResponse struct {
 	Error   string `json:"error,omitempty"`
 }
 
-// Redeem verifies PoW solutions and returns a one-time redeem token
+// Redeem verifies PoW solutions and returns a one-time redeem token.
 func (m *Manager) Redeem(ctx context.Context, token string, solutions []int, scope string) (*RedeemResponse, error) {
 	sigHex := pkgcap.JwtSigHex(token)
 	if sigHex == "" {
@@ -98,21 +72,17 @@ func (m *Manager) Redeem(ctx context.Context, token string, solutions []int, sco
 
 	nonceKey := "cap:nonce:" + sigHex
 
-	// Atomically claim the nonce slot BEFORE verifying solutions.
-	payload, err := pkgcap.VerifyChallengeSolutions(token, solutions, m.conf.Secret, scope)
+	payload, err := pkgcap.VerifyChallengeSolutions(token, solutions, m.secret, scope)
 	if err != nil {
-		return &RedeemResponse{Success: false, Error: err.Error()}, nil //nolint:nilerr // expected behavior: validation error is returned as response, not system error
+		return &RedeemResponse{Success: false, Error: err.Error()}, nil //nolint:nilerr // validation errors are returned as response, not system errors
 	}
 
-	// Calculate remaining lifetime of the challenge JWT for the nonce TTL.
 	now := time.Now().UnixNano() / int64(time.Millisecond)
 	nonceTTL := time.Duration(payload.Expires-now) * time.Millisecond
 	if nonceTTL < time.Second {
 		nonceTTL = time.Second
 	}
 
-	// Atomic claim: if another goroutine already redeemed this JWT the SetNX
-	// will return false and we reject the request without issuing a token.
 	set, err := m.store.SetNX(ctx, nonceKey, "1", nonceTTL)
 	if err != nil {
 		return &RedeemResponse{Success: false, Error: "nonce_store_error"}, err
@@ -121,20 +91,21 @@ func (m *Manager) Redeem(ctx context.Context, token string, solutions []int, sco
 		return &RedeemResponse{Success: false, Error: "already_redeemed"}, nil
 	}
 
-	// Generate a redeem token formatted as "id:verToken"
+	settings, err := CurrentSettings(ctx)
+	if err != nil {
+		return &RedeemResponse{Success: false, Error: "settings_load_error"}, err
+	}
+
 	id := pkgcap.RandomHex(redeemTokenIDLength)
 	verToken := pkgcap.RandomHex(redeemVerTokenLength)
 	verHashBytes := sha256.Sum256([]byte(verToken))
 	verHashHex := hex.EncodeToString(verHashBytes[:])
 
 	tokenKey := "cap:token:" + id + ":" + verHashHex
-	tokenTTL := m.getTokenTTL(ctx)
-	tokenExpires := time.Now().Add(tokenTTL)
-
-	// Value stored is "expiresNano|scope"
+	tokenExpires := time.Now().Add(settings.TokenTTL)
 	storeVal := strconv.FormatInt(tokenExpires.UnixNano(), 10) + "|" + scope
 
-	if err := m.store.Set(ctx, tokenKey, storeVal, tokenTTL); err != nil {
+	if err := m.store.Set(ctx, tokenKey, storeVal, settings.TokenTTL); err != nil {
 		return &RedeemResponse{Success: false, Error: "token_store_error"}, err
 	}
 
@@ -162,7 +133,6 @@ func (m *Manager) VerifyToken(ctx context.Context, token string, expectedScope s
 
 	tokenKey := "cap:token:" + id + ":" + verHashHex
 
-	// Atomically retrieve-and-delete
 	val, exists, err := sGetAndDelete(ctx, m.store, tokenKey)
 	if err != nil {
 		return false, err
@@ -178,7 +148,7 @@ func (m *Manager) VerifyToken(ctx context.Context, token string, expectedScope s
 
 	expNano, err := strconv.ParseInt(valParts[0], 10, 64)
 	if err != nil {
-		return false, nil //nolint:nilerr // expected behavior: invalid format is treated as validation failure, not system error
+		return false, nil //nolint:nilerr // invalid format is treated as validation failure
 	}
 	tokenScope := valParts[1]
 
@@ -187,13 +157,12 @@ func (m *Manager) VerifyToken(ctx context.Context, token string, expectedScope s
 	}
 
 	if time.Now().UnixNano() > expNano {
-		return false, nil // Expired
+		return false, nil
 	}
 
 	return true, nil
 }
 
-// sGetAndDelete safely calls store.GetAndDelete, treating a nil store as a miss.
 func sGetAndDelete(ctx context.Context, store pkgcap.Store, key string) (string, bool, error) {
 	if store == nil {
 		return "", false, nil
@@ -201,66 +170,18 @@ func sGetAndDelete(ctx context.Context, store pkgcap.Store, key string) (string,
 	return store.GetAndDelete(ctx, key)
 }
 
-func (m *Manager) getChallengeCount(ctx context.Context) int {
-	val, err := model.GetIntByKey(ctx, model.ConfigKeyCapChallengeCount)
-	if err != nil || val <= 0 {
-		return m.conf.ChallengeCount
-	}
-	return val
-}
-
-func (m *Manager) getChallengeSize(ctx context.Context) int {
-	val, err := model.GetIntByKey(ctx, model.ConfigKeyCapChallengeSize)
-	if err != nil || val <= 0 {
-		return m.conf.ChallengeSize
-	}
-	return val
-}
-
-func (m *Manager) getChallengeDifficulty(ctx context.Context) int {
-	val, err := model.GetIntByKey(ctx, model.ConfigKeyCapChallengeDifficulty)
-	if err != nil || val <= 0 {
-		return m.conf.ChallengeDifficulty
-	}
-	return val
-}
-
-func (m *Manager) getChallengeTTL(ctx context.Context) time.Duration {
-	val, err := model.GetIntByKey(ctx, model.ConfigKeyCapChallengeTTL)
-	if err != nil || val <= 0 {
-		return m.conf.ChallengeTTL
-	}
-	return time.Duration(val) * time.Second
-}
-
-func (m *Manager) getTokenTTL(ctx context.Context) time.Duration {
-	val, err := model.GetIntByKey(ctx, model.ConfigKeyCapTokenTTL)
-	if err != nil || val <= 0 {
-		return m.conf.TokenTTL
-	}
-	return time.Duration(val) * time.Second
-}
-
 var (
 	defaultManager *Manager
 	once           sync.Once
 )
 
-// GetDefaultManager yields the global singleton CAPTCHA manager
+// GetDefaultManager yields the global singleton CAPTCHA manager.
 func GetDefaultManager() *Manager {
 	once.Do(func() {
-		var secret []byte
+		secret := []byte("default-captcha-secret-key-at-least-16-bytes")
 		if config.Config != nil && config.Config.App.SessionSecret != "" {
 			secret = []byte(config.Config.App.SessionSecret)
-		} else {
-			secret = []byte("default-captcha-secret-key-at-least-16-bytes")
 		}
-
-		challengeCount := managerDefaultChallengeCount
-		challengeSize := managerDefaultChallengeSize
-		challengeDifficulty := defaultChallengeDifficulty
-		challengeTTL := defaultChallengeTTL
-		tokenTTL := defaultTokenTTL
 
 		var store pkgcap.Store
 		if config.Config != nil && config.Config.Redis.Enabled && db.Redis != nil {
@@ -269,14 +190,7 @@ func GetDefaultManager() *Manager {
 			store = pkgcap.NewMemoryStore(1 * time.Minute)
 		}
 
-		defaultManager = NewManager(Config{
-			Secret:              secret,
-			ChallengeCount:      challengeCount,
-			ChallengeSize:       challengeSize,
-			ChallengeDifficulty: challengeDifficulty,
-			ChallengeTTL:        challengeTTL,
-			TokenTTL:            tokenTTL,
-		}, store)
+		defaultManager = NewManager(secret, store)
 	})
 	return defaultManager
 }

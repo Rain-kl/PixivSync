@@ -3,12 +3,13 @@
 
 "use client"
 
-import {useCallback, useEffect, useState} from "react"
+import {useMemo, useState} from "react"
+import {useQuery} from "@tanstack/react-query"
 import {toast} from "sonner"
 import {format} from "date-fns"
 import {Activity, ChevronLeft, ChevronRight, Copy, Eye, RotateCcw, Search, XCircle} from "lucide-react"
 
-import {AdminService} from "@/lib/services"
+import {AdminService} from "@/lib/services/admin"
 import {ErrorInline} from "@/components/layout/error"
 import {LoadingStateWithBorder} from "@/components/layout/loading"
 import {EmptyStateWithBorder} from "@/components/layout/empty"
@@ -34,6 +35,8 @@ interface AccessLog {
 	created_at: string
 }
 
+const PAGE_SIZE = 15
+
 function formatDateTime(value?: string | null) {
 	if (!value) return "-"
 	const date = new Date(value)
@@ -53,15 +56,13 @@ function statusVariant(status: number) {
 	return "secondary"
 }
 
-export function AccessLogs() {
-	const [loading, setLoading] = useState(true)
-	const [error, setError] = useState<Error | null>(null)
-	const [clickhouseDisabled, setClickhouseDisabled] = useState(false)
+function isClickhouseDisabledError(error: Error) {
+	const errMsg = error.message || ""
+	return errMsg.includes("ClickHouse") || errMsg.includes("未启用")
+}
 
-	const [logs, setLogs] = useState<AccessLog[]>([])
-	const [total, setTotal] = useState(0)
+export function AccessLogs() {
 	const [page, setPage] = useState(1)
-	const pageSize = 15
 
 	// 搜索过滤条件
 	const [usernameFilter, setUsernameFilter] = useState("")
@@ -80,12 +81,9 @@ export function AccessLogs() {
 	const [selectedLog, setSelectedLog] = useState<AccessLog | null>(null)
 	const [detailOpen, setDetailOpen] = useState(false)
 
-	const fetchAccessLogs = useCallback(async (currentPage: number = page) => {
-		try {
-			setLoading(true)
-			setError(null)
-
-			// 转换起止时间格式
+	const logsQuery = useQuery({
+		queryKey: ["admin", "access-logs", page, searchParams],
+		queryFn: async () => {
 			let startISO = ""
 			if (searchParams.start_time) {
 				startISO = new Date(searchParams.start_time).toISOString()
@@ -95,34 +93,25 @@ export function AccessLogs() {
 				endISO = new Date(searchParams.end_time).toISOString()
 			}
 
-			const data = await AdminService.getAccessLogs({
-				page: currentPage,
-				page_size: pageSize,
+			return AdminService.getAccessLogs({
+				page,
+				page_size: PAGE_SIZE,
 				username: searchParams.username || undefined,
 				path: searchParams.path || undefined,
 				start_time: startISO || undefined,
 				end_time: endISO || undefined,
 			})
+		},
+		retry: false,
+	})
 
-			setLogs(data.list || [])
-			setTotal(data.total || 0)
-			setClickhouseDisabled(false)
-		} catch (err) {
-			const errorInstance = err instanceof Error ? err : new Error("获取访问日志失败")
-			const errMsg = errorInstance.message || ""
-			if (errMsg.includes("ClickHouse") || errMsg.includes("未启用")) {
-				setClickhouseDisabled(true)
-			} else {
-				setError(errorInstance)
-			}
-		} finally {
-			setLoading(false)
-		}
-	}, [page, searchParams])
+	const logs = logsQuery.data?.list ?? []
+	const total = logsQuery.data?.total ?? 0
+	const loading = logsQuery.isPending || logsQuery.isFetching
+	const clickhouseDisabled = logsQuery.isError && isClickhouseDisabledError(logsQuery.error)
+	const error = logsQuery.isError && !clickhouseDisabled ? logsQuery.error : null
 
-	useEffect(() => {
-		fetchAccessLogs()
-	}, [fetchAccessLogs])
+	const totalPages = useMemo(() => Math.max(1, Math.ceil(total / PAGE_SIZE)), [total])
 
 	const handleSearch = (e: React.FormEvent) => {
 		e.preventDefault()
@@ -151,15 +140,12 @@ export function AccessLogs() {
 
 	const handlePageChange = (newPage: number) => {
 		setPage(newPage)
-		fetchAccessLogs(newPage)
 	}
 
 	const copyToClipboard = (text: string, subject: string) => {
 		navigator.clipboard.writeText(text)
 		toast.success(`${subject}已复制到剪贴板`)
 	}
-
-	const totalPages = Math.max(1, Math.ceil(total / pageSize))
 
 	// Prettify Headers JSON string
 	const getPrettyHeaders = (headersRaw?: string) => {
@@ -185,7 +171,7 @@ export function AccessLogs() {
 	}
 
 	if (error) {
-		return <ErrorInline error={error} onRetry={() => fetchAccessLogs(1)} />
+		return <ErrorInline error={error} onRetry={() => void logsQuery.refetch()} />
 	}
 
 	return (

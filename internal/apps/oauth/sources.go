@@ -3,7 +3,8 @@
 
 package oauth
 
-import ("context"
+import (
+	"context"
 	"crypto/sha256"
 	"encoding/hex"
 	"errors"
@@ -15,6 +16,7 @@ import ("context"
 
 	"github.com/Rain-kl/Wavelet/internal/apps/admin/push/custom_events"
 	"github.com/Rain-kl/Wavelet/internal/common"
+	"github.com/Rain-kl/Wavelet/internal/common/response"
 	"github.com/Rain-kl/Wavelet/internal/config"
 	"github.com/Rain-kl/Wavelet/internal/db"
 	"github.com/Rain-kl/Wavelet/internal/model"
@@ -25,7 +27,6 @@ import ("context"
 	"github.com/google/uuid"
 	"golang.org/x/oauth2"
 	"gorm.io/gorm"
-	"github.com/Rain-kl/Wavelet/internal/common/response"
 )
 
 // AuthSourceView 登录源展示信息
@@ -161,7 +162,9 @@ func buildOAuthConfig(ctx context.Context, source *model.AuthSource, redirectURL
 	issuer = strings.TrimSuffix(issuer, "/.well-known/openid-configuration")
 	issuer = strings.TrimSuffix(issuer, "/.well-known/oauth-authorization-server")
 
-	provider, err := oidc.NewProvider(ctx, issuer)
+	// 使用进程级缓存获取 provider，避免每次调用都向 issuer 发起
+	// /.well-known/openid-configuration HTTP 请求。
+	provider, err := globalOIDCProviderCache.get(ctx, issuer)
 	if err != nil {
 		return nil, nil, err
 	}

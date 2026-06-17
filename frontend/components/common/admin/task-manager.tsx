@@ -11,7 +11,7 @@ import {Spinner} from "@/components/ui/spinner"
 import {Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle} from "@/components/ui/dialog"
 import {Calendar as CalendarIcon, Clock, Info, Layers, Play} from "lucide-react"
 
-import {AdminService, DispatchTaskRequest, TaskMeta} from "@/lib/services"
+import {AdminService, DispatchTaskRequest, TaskMeta} from "@/lib/services/admin"
 import {buildTaskPayload} from "@/lib/task-param-utils"
 import {ErrorInline} from "@/components/layout/error"
 import {LoadingStateWithBorder} from "@/components/layout/loading"

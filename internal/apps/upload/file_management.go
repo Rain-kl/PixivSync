@@ -140,6 +140,7 @@ func DeleteFile(c *gin.Context) {
 		c.JSON(http.StatusOK, response.Err(ErrDeleteFileFailed))
 		return
 	}
+	recordUploadStatsRemove(ctx, &upload)
 	c.JSON(http.StatusOK, response.OKNil())
 }
 
@@ -290,6 +291,7 @@ func DeleteMyFile(c *gin.Context) {
 		c.JSON(http.StatusOK, response.Err(ErrDeleteFileFailed))
 		return
 	}
+	recordUploadStatsRemove(ctx, &upload)
 	c.JSON(http.StatusOK, response.OKNil())
 }
 

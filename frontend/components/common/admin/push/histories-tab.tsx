@@ -26,8 +26,8 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog"
 
-import services from "@/lib/services"
 import type {PushHistory} from "@/lib/services/push"
+import {PushService} from "@/lib/services/push"
 
 function getLevelBadgeVariant(level: string): "outline" | "secondary" | "destructive" | "default" {
   switch (level) {
@@ -56,7 +56,7 @@ export function HistoriesTab() {
   const historiesQuery = useQuery({
     queryKey: ["admin", "push-histories", historyPage, historySearch, historyStatus],
     queryFn: () =>
-      services.push.listHistories({
+      PushService.listHistories({
         page: historyPage,
         page_size: 10,
         event_key: historySearch || undefined,

@@ -10,8 +10,8 @@ import {Skeleton} from "@/components/ui/skeleton"
 import {Select, SelectContent, SelectItem, SelectTrigger, SelectValue} from "@/components/ui/select"
 import {Table, TableBody, TableCell, TableHead, TableHeader, TableRow} from "@/components/ui/table"
 import {Button} from "@/components/ui/button"
-import type {TableDataResponse} from "@/lib/services"
-import services from "@/lib/services"
+import type {TableDataResponse} from "@/lib/services/db-manage"
+import {DbManageService} from "@/lib/services/db-manage"
 
 /**
  * 格式化数字，每3位加逗号
@@ -55,7 +55,7 @@ export function TableBrowser({ tables, loadingTables, refreshTrigger }: TableBro
     if (!tableName) return
     setLoadingData(true)
     try {
-      const data = await services.dbManage.getTableData({
+      const data = await DbManageService.getTableData({
         table: tableName,
         page: targetPage,
         pageSize: size,

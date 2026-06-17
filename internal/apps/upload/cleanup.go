@@ -110,6 +110,7 @@ func (h *SystemCleanupHandler) Execute(ctx context.Context, _ []byte) (*task.Tas
 				continue
 			}
 
+			recordUploadStatsRemove(ctx, &u)
 			totalDeleted++
 			lastID = u.ID
 		}

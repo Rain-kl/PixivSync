@@ -4,7 +4,8 @@
 
 package system_config
 
-import ("bufio"
+import (
+	"bufio"
 	"bytes"
 	"context"
 	"encoding/json"
@@ -22,7 +23,8 @@ import ("bufio"
 	"github.com/Rain-kl/Wavelet/internal/util"
 	"github.com/gin-gonic/gin"
 
-	"github.com/Rain-kl/Wavelet/internal/common/response")
+	"github.com/Rain-kl/Wavelet/internal/common/response"
+)
 
 func setupTestRouter(authUser *model.User) *gin.Engine {
 	gin.SetMode(gin.TestMode)
@@ -81,17 +83,25 @@ func TestCreateSystemConfig(t *testing.T) {
 			t.Fatalf("failed to find system config in DB: %v", err)
 		}
 
-		// Verify Redis Cache
-		var redisConfig model.SystemConfig
-		err = db.HGetJSON(context.Background(), model.SystemConfigRedisHashKey, "custom_key", &redisConfig)
-		if err != nil {
-			t.Fatalf("failed to find system config in Redis: %v", err)
+		// Verify caches are invalidated after create and repopulate on read
+		_, err = db.Redis.HGet(
+			context.Background(),
+			db.PrefixedKey(model.SystemConfigRedisHashKey),
+			"custom_key",
+		).Result()
+		if err == nil {
+			t.Fatal("expected redis cache miss immediately after create")
 		}
-		if redisConfig.Value != "custom_value" {
-			t.Errorf("CreateSystemConfig(custom_key).Value = %q, want %q", redisConfig.Value, "custom_value")
+
+		var loaded model.SystemConfig
+		if err := loaded.GetByKey(context.Background(), "custom_key"); err != nil {
+			t.Fatalf("GetByKey(custom_key) error = %v", err)
 		}
-		if redisConfig.Visibility != model.ConfigVisibilityVisible {
-			t.Errorf("CreateSystemConfig(custom_key).Visibility = %d, want %d", redisConfig.Visibility, model.ConfigVisibilityVisible)
+		if loaded.Value != "custom_value" {
+			t.Errorf("GetByKey(custom_key).Value = %q, want %q", loaded.Value, "custom_value")
+		}
+		if loaded.Visibility != model.ConfigVisibilityVisible {
+			t.Errorf("GetByKey(custom_key).Visibility = %d, want %d", loaded.Visibility, model.ConfigVisibilityVisible)
 		}
 	})
 
@@ -245,14 +255,25 @@ func TestUpdateSystemConfig(t *testing.T) {
 			t.Errorf("database values not updated: %+v", cfg)
 		}
 
-		// Verify Redis
-		var redisConfig model.SystemConfig
-		_ = db.HGetJSON(context.Background(), model.SystemConfigRedisHashKey, model.ConfigKeySiteName, &redisConfig)
-		if redisConfig.Value != "Super Site Name" {
-			t.Errorf("redis cache value not updated, got '%s'", redisConfig.Value)
+		// Verify caches are invalidated after update and repopulate on read
+		_, err := db.Redis.HGet(
+			context.Background(),
+			db.PrefixedKey(model.SystemConfigRedisHashKey),
+			model.ConfigKeySiteName,
+		).Result()
+		if err == nil {
+			t.Fatal("expected redis cache miss immediately after update")
 		}
-		if redisConfig.Visibility != model.ConfigVisibilityHidden {
-			t.Errorf("redis cache visibility = %d, want %d", redisConfig.Visibility, model.ConfigVisibilityHidden)
+
+		var loaded model.SystemConfig
+		if err := loaded.GetByKey(context.Background(), model.ConfigKeySiteName); err != nil {
+			t.Fatalf("GetByKey(site_name) error = %v", err)
+		}
+		if loaded.Value != "Super Site Name" {
+			t.Errorf("GetByKey(site_name).Value = %q, want %q", loaded.Value, "Super Site Name")
+		}
+		if loaded.Visibility != model.ConfigVisibilityHidden {
+			t.Errorf("GetByKey(site_name).Visibility = %d, want %d", loaded.Visibility, model.ConfigVisibilityHidden)
 		}
 	})
 

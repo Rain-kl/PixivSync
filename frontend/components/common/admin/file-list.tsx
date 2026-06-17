@@ -292,6 +292,8 @@ export function FileList() {
                           <img
                             src={getFileUrl(file.id, "low") ?? undefined}
                             alt={file.file_name}
+                            loading="lazy"
+                            decoding="async"
                             className="size-full object-cover"
                             onError={(e) => {
                               ;(e.currentTarget as HTMLImageElement).style.display = "none"
@@ -408,6 +410,8 @@ export function FileList() {
                   <img
                     src={getFileUrl(detailTarget.id, "low") ?? undefined}
                     alt={detailTarget.file_name}
+                    loading="lazy"
+                    decoding="async"
                     className="max-h-full max-w-full object-contain rounded-lg shadow-sm"
                   />
                 ) : (

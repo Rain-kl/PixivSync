@@ -14,15 +14,12 @@ import (
 
 // StorageReadOnly checks if the storage system is in read-only maintenance mode.
 func StorageReadOnly(ctx context.Context) bool {
-	execution, ok, err := latestStorageMigrationExecution(ctx)
-	if err != nil {
-		logger.ErrorF(ctx, "读取存储维护状态失败: %v", err)
+	state := loadMigrationAccessState(ctx)
+	if state.loadErr != nil {
+		logger.ErrorF(ctx, "读取存储维护状态失败: %v", state.loadErr)
 		return true
 	}
-	if !ok {
-		return false
-	}
-	return execution.Status != model.TaskExecutionStatusSucceeded
+	return state.readOnly
 }
 
 func openStoredObject(ctx context.Context, upload *model.Upload) (*storage.Object, error) {
@@ -54,16 +51,15 @@ func backendForStoredDriver(ctx context.Context, driver storage.Driver) (storage
 }
 
 func currentMigrationTargetConfig(ctx context.Context) (storage.Config, bool, error) {
-	execution, ok, err := latestStorageMigrationExecution(ctx)
-	if err != nil || !ok {
-		return storage.Config{}, false, err
+	state := loadMigrationAccessState(ctx)
+	if state.loadErr != nil {
+		return storage.Config{}, false, state.loadErr
 	}
-	if execution.Status == model.TaskExecutionStatusSucceeded {
+	if state.targetErr != nil {
+		return storage.Config{}, false, state.targetErr
+	}
+	if !state.hasTarget {
 		return storage.Config{}, false, nil
 	}
-	target, err := parseMigrationTargetConfig(ctx, []byte(execution.Payload))
-	if err != nil {
-		return storage.Config{}, false, err
-	}
-	return target, true, nil
+	return state.target, true, nil
 }

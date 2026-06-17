@@ -4,15 +4,19 @@
 // Package auth_source 提供认证源管理功能
 package auth_source
 
-import ("errors"
+import (
+	"errors"
 	"fmt"
 	"net/http"
+	"strings"
 
 	"github.com/Rain-kl/Wavelet/internal/apps/admin"
+	"github.com/Rain-kl/Wavelet/internal/apps/oauth"
 	"github.com/Rain-kl/Wavelet/internal/model"
 	"github.com/gin-gonic/gin"
 
-	"github.com/Rain-kl/Wavelet/internal/common/response")
+	"github.com/Rain-kl/Wavelet/internal/common/response"
+)
 
 // AuthSourceRequest 创建或更新认证源的请求参数
 type AuthSourceRequest struct {
@@ -119,6 +123,9 @@ func UpdateAuthSource(c *gin.Context) {
 		return
 	}
 
+	// 记录更新前的 Discovery URL，以便更新成功后清除旧缓存条目。
+	existing, _ := model.GetAuthSourceByID(c.Request.Context(), id)
+
 	source := model.AuthSource{
 		ID:                 id,
 		Name:               req.Name,
@@ -136,6 +143,14 @@ func UpdateAuthSource(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, response.Err(err.Error()))
 		return
 	}
+
+	// Discovery URL 可能已变更，清除旧、新 issuer 的 provider 缓存，
+	// 确保下次登录时重新拉取最新 OIDC 元数据。
+	if existing != nil {
+		oauth.InvalidateOIDCProviderCache(normalizeIssuer(existing.OpenIDDiscoveryURL))
+	}
+	oauth.InvalidateOIDCProviderCache(normalizeIssuer(req.OpenIDDiscoveryURL))
+
 	updated, err := model.GetAuthSourceByID(c.Request.Context(), id)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, response.Err(err.Error()))
@@ -218,4 +233,13 @@ func parseSourceID(c *gin.Context) (uint64, error) {
 		return 0, errors.New(admin.InvalidAuthSourceID)
 	}
 	return id, nil
+}
+
+// normalizeIssuer 将 Discovery URL 规范化为 issuer 基础 URL，
+// 与 oauth.buildOAuthConfig 中的规范化逻辑保持一致。
+func normalizeIssuer(discoveryURL string) string {
+	issuer := strings.TrimSuffix(strings.TrimSpace(discoveryURL), "/")
+	issuer = strings.TrimSuffix(issuer, "/.well-known/openid-configuration")
+	issuer = strings.TrimSuffix(issuer, "/.well-known/oauth-authorization-server")
+	return issuer
 }

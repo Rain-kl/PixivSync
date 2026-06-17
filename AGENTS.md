@@ -32,12 +32,12 @@
 
 ## 严格遵循事项 (Guardrails)
 
-- 切勿删除 `frontend/node_modules`；如果需要刷新依赖，请使用 `pnpm install` 重新安装。
+- 切勿删除 `frontend/node_modules`
 - 保持 `internal/util/` 绝对纯净且不引入任何框架。禁止从 `internal/util/` 及其子包中导入 Gin、GORM、sessions 等 HTTP/Web/数据库相关框架包（例如，Web 会话选项已收敛至 `internal/apps/oauth/session.go`）。
 - 编写测试用例时，禁止使用硬编码的相对路径（如 `"uploads/test_cache"`）在源码目录下创建临时测试目录，必须统一使用 Go 内置的 `t.TempDir()` 以避免污染源码目录。
 - 所有 HTTP 路由仅在 `internal/router/router.go` 中注册。
 - 当 API Handler 发生变化时，更新 Swagger 文档（运行 `make swagger`）。
-- 在提交更改前运行 `make code-check`。
+- 在完成代码开发后必须运行 `make code-check`, 并修复报错。
 - 需要缓存或文件管理能力时，必须复用现有平台实现，禁止在业务包中自行创建缓存目录、直接管理缓存文件或重复封装存储后端。
 
 ## 项目介绍
@@ -160,16 +160,6 @@ Handler 规范：
 - 在 `internal/db/migrator/goose/` 下使用 goose SQL 迁移；不要添加基于 GORM AutoMigrate 的 Schema 升级。
 - 不要创建物理数据库外键。改为关系字段添加显式索引。
 - 数据库默认值必须与 Go 模型零值（`nil`、`0`、`false`、`""`）匹配，以避免意外的插入。
-
-严格依赖防线：
-
-- `internal/util/` 及其子包必须保持无框架依赖。
-- 不要从 `internal/util/` 中导入 `github.com/gin-gonic/gin`、`gorm.io/gorm`、`github.com/gin-contrib/sessions` 或 HTTP 中间件/框架包。
-- 如果实用工具逻辑需要 web 胶水，请将纯验证/计算保留在 `internal/util/` 中，并将 Gin 中间件/响应处理放在 `internal/apps/` 中。
-
-新增接口与模块开发工作流：
-
-- 关于自定义业务接口（如 Admin/User/Custom 模块等）的详细包职责、文件结构和核心开发步骤，请直接阅读并严格遵循 [new-api](file:///Users/ryan/DEV/Go/Wavelet/.agent/skills/new-api/SKILL.md) 技能。
 
 ### 前端规则
 

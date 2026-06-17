@@ -4,9 +4,9 @@
 
 package upload
 
-import ("bytes"
+import (
+	"bytes"
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -22,8 +22,17 @@ import ("bytes"
 	"github.com/Rain-kl/Wavelet/internal/util"
 	"github.com/Rain-kl/Wavelet/pkg/logger"
 	"github.com/gin-gonic/gin"
+	"golang.org/x/sync/singleflight"
 	"gorm.io/gorm"
 )
+
+var compressedImageFlight singleflight.Group
+
+type compressedImageCacheResult struct {
+	bytes  []byte
+	cached bool
+	err    error
+}
 
 // ServeFileByID 根据 ID 获取并提供已上传的文件
 // @Summary 获取已上传文件
@@ -194,21 +203,51 @@ func ensureCompressedImageCache(
 		return nil, false, fmt.Errorf("read compressed image cache: %w", err)
 	}
 
+	result, err, _ := compressedImageFlight.Do(cacheKey, func() (any, error) {
+		return generateCompressedImageCache(ctx, upload, quality, cacheKey)
+	})
+	if err != nil {
+		return nil, false, err
+	}
+
+	res := result.(compressedImageCacheResult)
+	return res.bytes, res.cached, res.err
+}
+
+func generateCompressedImageCache(
+	ctx context.Context,
+	upload *model.Upload,
+	quality string,
+	cacheKey string,
+) (compressedImageCacheResult, error) {
+	cache := diskcache.GetGlobalCache()
+
+	webpBytes, err := cache.Get(cacheKey)
+	if err == nil {
+		return compressedImageCacheResult{bytes: webpBytes, cached: true}, nil
+	}
+	if !errors.Is(err, diskcache.ErrCacheMiss) {
+		return compressedImageCacheResult{}, fmt.Errorf("read compressed image cache: %w", err)
+	}
+
 	origBytes, err := getOriginalFileBytes(ctx, upload)
 	if err != nil {
-		return nil, false, fmt.Errorf("read original image: %w", err)
+		return compressedImageCacheResult{}, fmt.Errorf("read original image: %w", err)
 	}
 
 	webpBytes, err = CompressImageToWebP(bytes.NewReader(origBytes), quality)
 	if err != nil {
-		return nil, false, fmt.Errorf("compress image to WebP: %w", err)
+		return compressedImageCacheResult{}, fmt.Errorf("compress image to WebP: %w", err)
 	}
 
 	if err := cache.Set(cacheKey, webpBytes, diskcache.NoExpiration); err != nil {
-		return webpBytes, false, fmt.Errorf("write compressed image cache: %w", err)
+		return compressedImageCacheResult{
+			bytes: webpBytes,
+			err:   fmt.Errorf("write compressed image cache: %w", err),
+		}, nil
 	}
 
-	return webpBytes, false, nil
+	return compressedImageCacheResult{bytes: webpBytes}, nil
 }
 
 func imageCompressionCacheKey(upload *model.Upload, quality string) string {
@@ -254,30 +293,9 @@ func getOriginalFileBytes(ctx context.Context, upload *model.Upload) ([]byte, er
 
 // isFilePublic 校验文件类型是否在公开访问白名单中
 func isFilePublic(ctx context.Context, uploadType string) bool {
-	var sc model.SystemConfig
-	var whitelist []string
-	if err := sc.GetByKey(ctx, model.ConfigKeyFileAccessWhitelist); err == nil && sc.Value != "" {
-		if err := json.Unmarshal([]byte(sc.Value), &whitelist); err != nil {
-			// 降级使用逗号分隔解析
-			parts := strings.Split(sc.Value, ",")
-			for _, p := range parts {
-				p = strings.TrimSpace(p)
-				if p != "" {
-					whitelist = append(whitelist, p)
-				}
-			}
-		}
-	} else {
-		// 默认兜底白名单为 avatar
-		whitelist = []string{"avatar"}
-	}
-
-	for _, w := range whitelist {
-		if strings.EqualFold(w, uploadType) {
-			return true
-		}
-	}
-	return false
+	whitelist := loadFileAccessWhitelist(ctx)
+	_, ok := whitelist[strings.ToLower(uploadType)]
+	return ok
 }
 
 func checkPrivateFileOwner(c *gin.Context, ownerID uint64) error {

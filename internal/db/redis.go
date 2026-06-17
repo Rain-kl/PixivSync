@@ -124,6 +124,17 @@ func HSetJSON[T any](ctx context.Context, hashKey, fieldKey string, data T) erro
 	return nil
 }
 
+// HDel removes one or more fields from a Redis Hash.
+func HDel(ctx context.Context, hashKey string, fieldKeys ...string) error {
+	if Redis == nil || len(fieldKeys) == 0 {
+		return nil
+	}
+	if err := Redis.HDel(ctx, PrefixedKey(hashKey), fieldKeys...).Err(); err != nil {
+		return fmt.Errorf(errRedisHashDeleteFailed, err)
+	}
+	return nil
+}
+
 // HGetJSON 从 Redis Hash 获取数据并反序列化为泛型类型
 // ctx: 上下文
 // hashKey: Redis Hash key

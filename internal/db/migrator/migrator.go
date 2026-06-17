@@ -69,10 +69,7 @@ func Migrate() {
 }
 
 func clearSystemConfigCache() {
-	if db.Redis == nil {
-		return
-	}
-	if err := db.Redis.Del(context.Background(), db.PrefixedKey(model.SystemConfigRedisHashKey)).Err(); err != nil {
+	if err := model.InvalidateAllSystemConfigCaches(context.Background()); err != nil {
 		log.Printf("[%s] clear system config cache failed: %v\n", dbType(), err)
 	}
 }

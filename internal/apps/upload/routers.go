@@ -4,7 +4,8 @@
 
 package upload
 
-import ("archive/zip"
+import (
+	"archive/zip"
 	"bytes"
 	"context"
 	"crypto/sha256"
@@ -23,6 +24,7 @@ import ("archive/zip"
 
 	"github.com/Rain-kl/Wavelet/internal/apps/oauth"
 	"github.com/Rain-kl/Wavelet/internal/common"
+	"github.com/Rain-kl/Wavelet/internal/common/response"
 	"github.com/Rain-kl/Wavelet/internal/db"
 	"github.com/Rain-kl/Wavelet/internal/db/idgen"
 	"github.com/Rain-kl/Wavelet/internal/model"
@@ -31,7 +33,6 @@ import ("archive/zip"
 	"github.com/Rain-kl/Wavelet/pkg/logger"
 	"github.com/gin-gonic/gin"
 	"gorm.io/gorm"
-	"github.com/Rain-kl/Wavelet/internal/common/response"
 )
 
 type batchDownloadRequest struct {
@@ -117,21 +118,10 @@ func UploadFile(c *gin.Context) {
 
 	uploadType := c.DefaultPostForm("type", "generic")
 
-	accessModeStr := c.PostForm("access_mode")
-	var accessMode int
-	if accessModeStr == "" {
-		if uploadType == "avatar" {
-			accessMode = 1
-		} else {
-			accessMode = 0
-		}
-	} else {
-		var err error
-		accessMode, err = strconv.Atoi(accessModeStr)
-		if err != nil || (accessMode != 0 && accessMode != 1) {
-			c.JSON(http.StatusOK, response.Err("无效的 access_mode 参数"))
-			return
-		}
+	accessMode, errMsg := resolveUploadAccessMode(c, uploadType)
+	if errMsg != "" {
+		c.JSON(http.StatusOK, response.Err(errMsg))
+		return
 	}
 
 	// 6. 秒传匹配校验：校验数据库中是否存在相同 Hash 且大小一致的可用文件
@@ -336,6 +326,22 @@ func BatchDownloadFiles(c *gin.Context) {
 	}
 }
 
+func resolveUploadAccessMode(c *gin.Context, uploadType string) (int, string) {
+	accessModeStr := c.PostForm("access_mode")
+	if accessModeStr == "" {
+		if uploadType == defaultPublicUploadType {
+			return 1, ""
+		}
+		return 0, ""
+	}
+
+	accessMode, err := strconv.Atoi(accessModeStr)
+	if err != nil || (accessMode != 0 && accessMode != 1) {
+		return 0, "无效的 access_mode 参数"
+	}
+	return accessMode, ""
+}
+
 // validateUploadExtension 校验文件后缀是否在系统允许的上传扩展名列表中
 func validateUploadExtension(ctx context.Context, ext string) string {
 	var sc model.SystemConfig
@@ -388,6 +394,7 @@ func tryInstantUpload(ctx context.Context, c *gin.Context, currUser *model.User,
 		c.JSON(http.StatusOK, response.Err(ErrSaveUploadRecordFailed))
 		return true, err
 	}
+	recordUploadStatsAdd(ctx, &newUpload)
 
 	logger.InfoF(ctx, "文件触发秒传成功! ID: %d, Path: %s", id, existing.FilePath)
 	c.JSON(http.StatusOK, response.OK(newUpload))
@@ -458,5 +465,6 @@ func saveUploadRecord(ctx context.Context, upload *model.Upload, storageDriver, 
 		}
 		return ErrSaveUploadRecordFailed
 	}
+	recordUploadStatsAdd(ctx, upload)
 	return ""
 }

@@ -6,6 +6,7 @@
 package idgen
 
 import (
+	"fmt"
 	"log"
 
 	"github.com/Rain-kl/Wavelet/internal/config"
@@ -14,6 +15,8 @@ import (
 
 // 2025-12-01 00:00:00 UTC 的毫秒时间戳
 const epoch int64 = 1764547200000
+
+const maxNegativeIDRetries = 3
 
 var node *snowflake.Node
 
@@ -29,11 +32,15 @@ func init() {
 	log.Printf("[Snowflake] initialized with node ID: %d, epoch: 2025-12-01\n", nodeID)
 }
 
-// NextUint64ID 生成下一个分布式唯一 ID
+// NextUint64ID 生成下一个分布式唯一 ID。
+// 理论上不应出现负值；若出现则最多重试 maxNegativeIDRetries 次，仍失败则 panic。
 func NextUint64ID() uint64 {
-	val := node.Generate().Int64()
-	if val < 0 {
-		return 0
+	for attempt := 1; attempt <= maxNegativeIDRetries; attempt++ {
+		id := node.Generate().Int64()
+		if id >= 0 {
+			return uint64(id)
+		}
+		log.Printf("[Snowflake] generated negative ID: %d (attempt %d/%d)", id, attempt, maxNegativeIDRetries)
 	}
-	return uint64(val)
+	panic(fmt.Sprintf("[Snowflake] generated negative ID after %d attempts", maxNegativeIDRetries))
 }

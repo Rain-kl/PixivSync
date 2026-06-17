@@ -12,7 +12,7 @@ import {Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, Di
 import {Table, TableBody, TableCell, TableHead, TableHeader, TableRow} from "@/components/ui/table"
 import {Clock, Edit2, Info, Plus, RefreshCw, Trash2} from "lucide-react"
 
-import {AdminService, CreateScheduleRequest, Schedule, TaskMeta, UpdateScheduleRequest} from "@/lib/services"
+import {AdminService, CreateScheduleRequest, Schedule, TaskMeta, UpdateScheduleRequest} from "@/lib/services/admin"
 import {buildTaskPayload} from "@/lib/task-param-utils"
 import {ErrorInline} from "@/components/layout/error"
 import {LoadingStateWithBorder} from "@/components/layout/loading"

@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/Rain-kl/Wavelet/internal/common"
+	"github.com/Rain-kl/Wavelet/internal/db/idgen"
 	"github.com/Rain-kl/Wavelet/pkg/util"
 	"gorm.io/gorm"
 )
@@ -44,7 +45,7 @@ func (u *OAuthUserInfo) GetID() uint64 {
 
 // User 用户表实体
 type User struct {
-	ID          uint64    `json:"id" gorm:"primaryKey"`
+	ID          uint64    `json:"id,string" gorm:"primaryKey;not null"`
 	Username    string    `json:"username" gorm:"size:64;uniqueIndex"`
 	Password    string    `json:"password,omitempty" gorm:"size:255"`
 	Nickname    string    `json:"nickname" gorm:"size:255"`
@@ -129,6 +130,14 @@ func (u *User) CheckActive() error {
 	return nil
 }
 
+func (u *User) assignIDIfMissing() error {
+	if u.ID != 0 {
+		return nil
+	}
+	u.ID = idgen.NextUint64ID()
+	return nil
+}
+
 // CreateUser 创建新用户（用于 OAuth/OIDC 自动注册，含底层权限校验）
 func (u *User) CreateUser(ctx context.Context, tx *gorm.DB, oauthInfo *OAuthUserInfo) error {
 	enabled, err := GetBoolByKey(ctx, ConfigKeyRegistrationEnabled)
@@ -137,8 +146,9 @@ func (u *User) CreateUser(ctx context.Context, tx *gorm.DB, oauthInfo *OAuthUser
 	}
 
 	now := time.Now()
+	userID := oauthInfo.GetID()
 	newUser := User{
-		ID:          oauthInfo.GetID(),
+		ID:          userID,
 		Username:    oauthInfo.Username,
 		Nickname:    oauthInfo.Name,
 		Email:       oauthInfo.Email,
@@ -146,6 +156,9 @@ func (u *User) CreateUser(ctx context.Context, tx *gorm.DB, oauthInfo *OAuthUser
 		IsActive:    oauthInfo.Active,
 		LastLoginAt: now,
 		IsAdmin:     false,
+	}
+	if err := newUser.assignIDIfMissing(); err != nil {
+		return err
 	}
 	if err := tx.Create(&newUser).Error; err != nil {
 		return err
@@ -182,6 +195,9 @@ func (u *User) RegisterUser(ctx context.Context, tx *gorm.DB) error {
 		}
 	}
 
+	if err := u.assignIDIfMissing(); err != nil {
+		return err
+	}
 	if err := tx.Create(u).Error; err != nil {
 		return err
 	}

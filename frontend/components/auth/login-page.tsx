@@ -9,7 +9,7 @@ import {LoginForm} from "@/components/auth/login-form"
 import {AuthShell} from "@/components/auth/auth-shell"
 import {Check} from "lucide-react"
 
-import services from "@/lib/services"
+import {AuthService} from "@/lib/services/auth"
 import {useAuth} from "@/components/providers/auth-provider"
 import {safeRedirectTarget} from "@/lib/utils"
 
@@ -84,7 +84,7 @@ export function LoginPage() {
 
         setIsProcessingCallback(true)
         try {
-          const result = await services.auth.handleCallback({ state, code })
+          const result = await AuthService.handleCallback({ state, code })
           if (result.status === "need_bind") {
             toast.info("您的第三方账号未绑定本地账号，系统已关闭注册。请登录已有本地账号进行绑定。")
             setIsProcessingCallback(false)
