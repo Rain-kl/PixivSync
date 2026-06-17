@@ -53,6 +53,12 @@ type TaskExecution struct {
 	UpdatedAt    time.Time           `json:"updated_at" gorm:"autoUpdateTime"`
 }
 
+// TaskExecutionCleanupStats describes task execution log cleanup results.
+type TaskExecutionCleanupStats struct {
+	HighFrequencyDeleted int64
+	LowFrequencyDeleted  int64
+}
+
 // TableName 表名
 func (TaskExecution) TableName() string {
 	return "w_task_executions"
@@ -188,6 +194,59 @@ func ListTaskExecutions(ctx context.Context, req ListTaskExecutionsRequest) ([]T
 	}
 
 	return executions, total, nil
+}
+
+// CleanupTaskExecutionLogs removes finished task execution logs according to frequency-based retention.
+func CleanupTaskExecutionLogs(ctx context.Context, now time.Time) (TaskExecutionCleanupStats, error) {
+	const (
+		frequencyWindowDays    = 30
+		highFrequencyThreshold = frequencyWindowDays
+	)
+
+	frequencyWindowStart := now.AddDate(0, 0, -frequencyWindowDays)
+	highFrequencyCutoff := now.AddDate(0, 0, -3)
+	lowFrequencyCutoff := now.AddDate(0, 0, -30)
+	terminalStatuses := []TaskExecutionStatus{TaskExecutionStatusSucceeded, TaskExecutionStatusFailed}
+
+	var highFrequencyTaskTypes []string
+	if err := db.DB(ctx).
+		Model(&TaskExecution{}).
+		Select("task_type").
+		Where("created_at >= ?", frequencyWindowStart).
+		Group("task_type").
+		Having("COUNT(*) > ?", highFrequencyThreshold).
+		Pluck("task_type", &highFrequencyTaskTypes).Error; err != nil {
+		return TaskExecutionCleanupStats{}, fmt.Errorf("query high-frequency task types: %w", err)
+	}
+
+	var highFrequencyDeleted int64
+	if len(highFrequencyTaskTypes) > 0 {
+		highFrequencyResult := db.DB(ctx).
+			Where("status IN ?", terminalStatuses).
+			Where("created_at < ?", highFrequencyCutoff).
+			Where("task_type IN ?", highFrequencyTaskTypes).
+			Delete(&TaskExecution{})
+		if highFrequencyResult.Error != nil {
+			return TaskExecutionCleanupStats{}, fmt.Errorf("delete high-frequency task execution logs: %w", highFrequencyResult.Error)
+		}
+		highFrequencyDeleted = highFrequencyResult.RowsAffected
+	}
+
+	lowFrequencyQuery := db.DB(ctx).
+		Where("status IN ?", terminalStatuses).
+		Where("created_at < ?", lowFrequencyCutoff)
+	if len(highFrequencyTaskTypes) > 0 {
+		lowFrequencyQuery = lowFrequencyQuery.Where("task_type NOT IN ?", highFrequencyTaskTypes)
+	}
+	lowFrequencyResult := lowFrequencyQuery.Delete(&TaskExecution{})
+	if lowFrequencyResult.Error != nil {
+		return TaskExecutionCleanupStats{}, fmt.Errorf("delete low-frequency task execution logs: %w", lowFrequencyResult.Error)
+	}
+
+	return TaskExecutionCleanupStats{
+		HighFrequencyDeleted: highFrequencyDeleted,
+		LowFrequencyDeleted:  lowFrequencyResult.RowsAffected,
+	}, nil
 }
 
 func taskExecutionLogRedisKey(taskID string) string {

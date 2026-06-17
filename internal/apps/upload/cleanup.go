@@ -35,7 +35,7 @@ var SystemCleanupMeta = task.TaskMeta{
 	Type:         TaskTypeSystemCleanup,
 	AsynqTask:    SystemCleanupTask,
 	Name:         "系统垃圾清理",
-	Description:  "定期清理超过1小时的未使用上传文件和超过7天的历史推送记录",
+	Description:  "定期清理未使用上传文件、历史推送记录和过期任务执行日志",
 	SupportsTime: false,
 	MaxRetry:     task.DefaultMaxRetry,
 	Queue:        task.QueueDefault,
@@ -45,7 +45,7 @@ var SystemCleanupMeta = task.TaskMeta{
 // SystemCleanupHandler 系统定期垃圾清理异步任务处理器
 type SystemCleanupHandler struct{}
 
-// Execute 执行系统清理（包含文件清理和历史消息推送日志清理）
+// Execute 执行系统清理（包含文件清理、历史推送日志和任务执行日志清理）
 func (h *SystemCleanupHandler) Execute(ctx context.Context, _ []byte) (*task.TaskResult, error) {
 	if storageReadOnly(ctx) {
 		return nil, errors.New(errStorageReadOnly)
@@ -132,7 +132,26 @@ func (h *SystemCleanupHandler) Execute(ctx context.Context, _ []byte) (*task.Tas
 		task.AppendLog(ctx, "没有需要清理的历史推送记录 (截止时间: %s)", cutoff.Format("2006-01-02 15:04:05"))
 	}
 
-	msg := fmt.Sprintf("系统清理完成。成功清理未使用的上传文件 %d/%d 个；清理历史推送审计日志 %d 条。", totalDeleted, totalProcessed, pushHistoryCount)
+	// 3. 清理任务执行日志：高频任务保留3天，低频任务保留30天。
+	task.AppendLog(ctx, "开始清理任务执行日志：高频任务保留最近3天，低频任务保留最近30天...")
+	taskLogStats, err := model.CleanupTaskExecutionLogs(ctx, time.Now())
+	if err != nil {
+		task.AppendLog(ctx, "清理任务执行日志失败: %v", err)
+		logger.ErrorF(ctx, "清理任务执行日志失败: %v", err)
+	} else {
+		task.AppendLog(ctx, "成功清理任务执行日志 %d 条（高频 %d 条，低频 %d 条）",
+			taskLogStats.HighFrequencyDeleted+taskLogStats.LowFrequencyDeleted,
+			taskLogStats.HighFrequencyDeleted,
+			taskLogStats.LowFrequencyDeleted,
+		)
+	}
+
+	msg := fmt.Sprintf("系统清理完成。成功清理未使用的上传文件 %d/%d 个；清理历史推送审计日志 %d 条；清理任务执行日志 %d 条。",
+		totalDeleted,
+		totalProcessed,
+		pushHistoryCount,
+		taskLogStats.HighFrequencyDeleted+taskLogStats.LowFrequencyDeleted,
+	)
 	task.AppendLog(ctx, "%s", msg)
 	return &task.TaskResult{Message: msg}, nil
 }

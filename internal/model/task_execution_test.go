@@ -427,7 +427,58 @@ func TestListTaskExecutionsDefaultPaging(t *testing.T) {
 	assert.Len(t, items, 0)
 }
 
+func TestCleanupTaskExecutionLogs(t *testing.T) {
+	cleanup := setupTaskExecutionTestEnvironment(t)
+	defer cleanup()
+	ctx := context.Background()
+
+	now := time.Date(2026, 6, 17, 12, 0, 0, 0, time.UTC)
+	for i := 0; i < 31; i++ {
+		createTaskExecutionForCleanup(t, ctx, fmt.Sprintf("high_recent_%02d", i), "high:task", TaskExecutionStatusSucceeded, now.Add(-2*time.Hour))
+	}
+	createTaskExecutionForCleanup(t, ctx, "high_old_4d", "high:task", TaskExecutionStatusSucceeded, now.AddDate(0, 0, -4))
+	createTaskExecutionForCleanup(t, ctx, "high_old_40d", "high:task", TaskExecutionStatusFailed, now.AddDate(0, 0, -40))
+	createTaskExecutionForCleanup(t, ctx, "high_running_old", "high:task", TaskExecutionStatusRunning, now.AddDate(0, 0, -10))
+	createTaskExecutionForCleanup(t, ctx, "low_old_31d", "low:task", TaskExecutionStatusSucceeded, now.AddDate(0, 0, -31))
+	createTaskExecutionForCleanup(t, ctx, "low_recent_29d", "low:task", TaskExecutionStatusSucceeded, now.AddDate(0, 0, -29))
+	createTaskExecutionForCleanup(t, ctx, "low_pending_old", "low:task", TaskExecutionStatusPending, now.AddDate(0, 0, -45))
+
+	stats, err := CleanupTaskExecutionLogs(ctx, now)
+	require.NoError(t, err)
+	assert.Equal(t, int64(2), stats.HighFrequencyDeleted)
+	assert.Equal(t, int64(1), stats.LowFrequencyDeleted)
+
+	for _, taskID := range []string{"high_old_4d", "high_old_40d", "low_old_31d"} {
+		var count int64
+		err := db.DB(ctx).Model(&TaskExecution{}).Where("task_id = ?", taskID).Count(&count).Error
+		require.NoError(t, err)
+		assert.Equal(t, int64(0), count, "CleanupTaskExecutionLogs(%s) should delete expired log", taskID)
+	}
+	for _, taskID := range []string{"high_recent_00", "high_running_old", "low_recent_29d", "low_pending_old"} {
+		var count int64
+		err := db.DB(ctx).Model(&TaskExecution{}).Where("task_id = ?", taskID).Count(&count).Error
+		require.NoError(t, err)
+		assert.Equal(t, int64(1), count, "CleanupTaskExecutionLogs(%s) should keep retained log", taskID)
+	}
+}
+
 func TestTaskExecutionTableName(t *testing.T) {
 	execution := TaskExecution{}
 	assert.Equal(t, "w_task_executions", execution.TableName())
+}
+
+func createTaskExecutionForCleanup(t *testing.T, ctx context.Context, taskID string, taskType string, status TaskExecutionStatus, createdAt time.Time) {
+	t.Helper()
+
+	execution := &TaskExecution{
+		TaskID:      taskID,
+		TaskType:    taskType,
+		TaskName:    taskType,
+		Status:      status,
+		CreatedAt:   createdAt,
+		UpdatedAt:   createdAt,
+		TriggeredBy: "system",
+	}
+	err := CreateTaskExecution(ctx, execution)
+	require.NoError(t, err)
 }

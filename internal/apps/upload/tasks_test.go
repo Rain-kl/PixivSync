@@ -109,6 +109,18 @@ func TestSystemCleanupHandler_Execute(t *testing.T) {
 	err = db.DB(ctx).Create(newPush).Error
 	require.NoError(t, err)
 
+	oldTaskLog := &model.TaskExecution{
+		TaskID:      "old_low_frequency_task_log",
+		TaskType:    "low:frequency",
+		TaskName:    "低频任务",
+		Status:      model.TaskExecutionStatusSucceeded,
+		CreatedAt:   now.AddDate(0, 0, -31),
+		UpdatedAt:   now.AddDate(0, 0, -31),
+		TriggeredBy: "system",
+	}
+	err = model.CreateTaskExecution(ctx, oldTaskLog)
+	require.NoError(t, err)
+
 	// 执行 handler
 	handler := &SystemCleanupHandler{}
 	result, err := handler.Execute(ctx, nil)
@@ -116,7 +128,7 @@ func TestSystemCleanupHandler_Execute(t *testing.T) {
 	// 验证结果
 	require.NoError(t, err)
 	require.NotNil(t, result)
-	assert.Contains(t, result.Message, "系统清理完成。成功清理未使用的上传文件 2/2 个；清理历史推送审计日志 1 条。")
+	assert.Contains(t, result.Message, "系统清理完成。成功清理未使用的上传文件 2/2 个；清理历史推送审计日志 1 条；清理任务执行日志 1 条。")
 
 	// 验证数据库状态：pending 且超过1小时的应被标记为 deleted
 	var pendingCount int64
@@ -140,6 +152,11 @@ func TestSystemCleanupHandler_Execute(t *testing.T) {
 	err = db.DB(ctx).First(&remainingPush).Error
 	require.NoError(t, err)
 	assert.Equal(t, "New Login", remainingPush.Title)
+
+	var taskLogCount int64
+	err = db.DB(ctx).Model(&model.TaskExecution{}).Where("task_id = ?", "old_low_frequency_task_log").Count(&taskLogCount).Error
+	require.NoError(t, err)
+	assert.Equal(t, int64(0), taskLogCount, "过期低频任务日志应被清理")
 }
 
 func TestSystemCleanupHandler_ExecuteNoFiles(t *testing.T) {
@@ -166,7 +183,7 @@ func TestSystemCleanupHandler_ExecuteNoFiles(t *testing.T) {
 
 	require.NoError(t, err)
 	require.NotNil(t, result)
-	assert.Contains(t, result.Message, "系统清理完成。成功清理未使用的上传文件 0/0 个；清理历史推送审计日志 0 条。")
+	assert.Contains(t, result.Message, "系统清理完成。成功清理未使用的上传文件 0/0 个；清理历史推送审计日志 0 条；清理任务执行日志 0 条。")
 }
 
 func TestSystemCleanupHandler_ImplementsTaskHandler(t *testing.T) {
