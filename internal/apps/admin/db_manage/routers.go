@@ -213,7 +213,7 @@ func getPostgresOverview(gormDB *gorm.DB) (DBOverviewResponse, error) {
 func GetDBOverview(c *gin.Context) {
 	gormDB := db.DB(c.Request.Context())
 	if gormDB == nil {
-		c.JSON(http.StatusInternalServerError, response.Err("数据库未初始化"))
+		response.AbortInternal(c, "数据库未初始化")
 		return
 	}
 
@@ -227,7 +227,7 @@ func GetDBOverview(c *gin.Context) {
 	}
 
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, response.Err(err.Error()))
+		response.AbortInternal(c, err.Error())
 		return
 	}
 
@@ -248,7 +248,7 @@ func GetDBOverview(c *gin.Context) {
 func ListDBTables(c *gin.Context) {
 	gormDB := db.DB(c.Request.Context())
 	if gormDB == nil {
-		c.JSON(http.StatusInternalServerError, response.Err("数据库未初始化"))
+		response.AbortInternal(c, "数据库未初始化")
 		return
 	}
 
@@ -262,7 +262,7 @@ func ListDBTables(c *gin.Context) {
 	}
 
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, response.Err(err.Error()))
+		response.AbortInternal(c, err.Error())
 		return
 	}
 
@@ -273,13 +273,13 @@ func ListDBTables(c *gin.Context) {
 func GetDBTableData(c *gin.Context) {
 	var req GetTableDataRequest
 	if err := c.ShouldBindQuery(&req); err != nil {
-		c.JSON(http.StatusBadRequest, response.Err(err.Error()))
+		response.AbortBadRequest(c, err.Error())
 		return
 	}
 
 	gormDB := db.DB(c.Request.Context())
 	if gormDB == nil {
-		c.JSON(http.StatusInternalServerError, response.Err("数据库未初始化"))
+		response.AbortInternal(c, "数据库未初始化")
 		return
 	}
 
@@ -288,7 +288,7 @@ func GetDBTableData(c *gin.Context) {
 
 	var total int64
 	if err := gormDB.Raw("SELECT count(*) FROM " + quotedTable).Scan(&total).Error; err != nil {
-		c.JSON(http.StatusBadRequest, response.Err(err.Error()))
+		response.AbortBadRequest(c, err.Error())
 		return
 	}
 
@@ -303,7 +303,7 @@ func GetDBTableData(c *gin.Context) {
 
 	rows, err := gormDB.Raw("SELECT * FROM "+quotedTable+" LIMIT ? OFFSET ?", limit, offset).Rows()
 	if err != nil {
-		c.JSON(http.StatusBadRequest, response.Err(err.Error()))
+		response.AbortBadRequest(c, err.Error())
 		return
 	}
 	defer func() {
@@ -312,13 +312,13 @@ func GetDBTableData(c *gin.Context) {
 
 	cols, err := rows.Columns()
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, response.Err(err.Error()))
+		response.AbortInternal(c, err.Error())
 		return
 	}
 
 	results, err := scanTableRows(rows, cols)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, response.Err(err.Error()))
+		response.AbortInternal(c, err.Error())
 		return
 	}
 
@@ -449,19 +449,19 @@ func executeSQLMutation(gormDB *gorm.DB, sqlStr string, startTime time.Time) (Ex
 func ExecuteSQL(c *gin.Context) {
 	var req ExecuteSQLRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, response.Err(err.Error()))
+		response.AbortBadRequest(c, err.Error())
 		return
 	}
 
 	gormDB := db.DB(c.Request.Context())
 	if gormDB == nil {
-		c.JSON(http.StatusInternalServerError, response.Err("数据库未初始化"))
+		response.AbortInternal(c, "数据库未初始化")
 		return
 	}
 
 	trimmedSQL := strings.TrimSpace(req.SQL)
 	if trimmedSQL == "" {
-		c.JSON(http.StatusBadRequest, response.Err("SQL 语句不能为空"))
+		response.AbortBadRequest(c, "SQL 语句不能为空")
 		return
 	}
 
@@ -488,7 +488,7 @@ func ExecuteSQL(c *gin.Context) {
 	}
 
 	if err != nil {
-		c.JSON(http.StatusBadRequest, response.Err(err.Error()))
+		response.AbortBadRequest(c, err.Error())
 		return
 	}
 

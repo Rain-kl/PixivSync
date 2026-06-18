@@ -1,5 +1,5 @@
 // Copyright 2026 Arctel.net
-// SPDX-License-Identifier: AGPL-3.0-only
+// SPDX-License-Identifier: Apache-2.0
 
 // Package push defines push notification HTTP routes, background tasks, and events.
 package push
@@ -9,12 +9,9 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"strconv"
 	"strings"
-	"sync"
-
-	"github.com/Rain-kl/Wavelet/internal/db"
 	"github.com/Rain-kl/Wavelet/internal/model"
+	"github.com/Rain-kl/Wavelet/internal/repository"
 	"github.com/Rain-kl/Wavelet/internal/task"
 	"github.com/Rain-kl/Wavelet/pkg/logger"
 	pkgpush "github.com/Rain-kl/Wavelet/pkg/push"
@@ -73,30 +70,7 @@ type EventTrigger struct{}
 // DefaultTrigger is the singleton instance of EventTrigger.
 var DefaultTrigger = &EventTrigger{}
 
-var (
-	systemUser *model.User
-	systemOnce sync.Once
-)
-
-func getSystemUser(ctx context.Context) *model.User {
-	systemOnce.Do(func() {
-		var u model.User
-		if err := db.DB(ctx).Where("username = ?", "system").First(&u).Error; err == nil {
-			systemUser = &u
-		} else {
-			systemUser = &model.User{
-				ID:       999,
-				Username: "system",
-				Nickname: "系统",
-				Email:    "",
-			}
-		}
-	})
-	return systemUser
-}
-
 // Trigger receives event metadata and processes the event notification dispatch asynchronously.
-// It automatically enqueues tasks using a background goroutine and avoids blocking the calling thread.
 //
 //nolint:contextcheck
 func (t *EventTrigger) Trigger(ctx context.Context, meta EventMetadata, body map[string]any) {
@@ -109,8 +83,7 @@ func (t *EventTrigger) Trigger(ctx context.Context, meta EventMetadata, body map
 			body["user"] = getSystemUser(asyncCtx)
 		}
 
-		// 1. Check if the event is enabled (try Redis cache first)
-		eventPtr, err := model.GetActivePushEventByKey(asyncCtx, meta.Key)
+		eventPtr, err := repository.GetActivePushEventByKey(asyncCtx, meta.Key)
 		if err != nil {
 			if errors.Is(err, gorm.ErrRecordNotFound) {
 				return
@@ -119,16 +92,12 @@ func (t *EventTrigger) Trigger(ctx context.Context, meta EventMetadata, body map
 			return
 		}
 		event := *eventPtr
-
 		if len(event.Channels) == 0 {
 			return
 		}
 
-		// 2. Build and render notification message
 		flatBody := getFlatBody(body)
 		msg, _ := t.buildMessage(&event, meta, flatBody, body)
-
-		// 3. Enqueue tasks for each matching channel
 		t.enqueuePushTasks(asyncCtx, meta, &event, msg, flatBody)
 	}()
 }
@@ -220,13 +189,11 @@ func (t *EventTrigger) parseDefaultTemplate(meta EventMetadata, flatBody map[str
 
 func (t *EventTrigger) enqueuePushTasks(ctx context.Context, meta EventMetadata, event *model.PushEvent, msg NotificationMessage, flatBody map[string]any) {
 	for _, channelName := range event.Channels {
-		// 检查是不是自定义数据库渠道 (使用 Redis 缓存优先)
-		customChannel, err := model.GetActivePushChannelByName(ctx, channelName)
+		customChannel, err := repository.GetActivePushChannelByName(ctx, channelName)
 		if err == nil {
 			t.enqueueCustomPushChannelTasks(ctx, meta, event, customChannel, msg, flatBody)
 			continue
 		}
-
 		logger.WarnF(ctx, "push_event_trigger: channel %q not found in DB or disabled: %v", channelName, err)
 	}
 }
@@ -249,32 +216,15 @@ func (t *EventTrigger) enqueueSingleCustomPushChannelTask(ctx context.Context, m
 
 	switch channel.Type {
 	case channelLark:
-		config = pkgpush.Config{
-			Channel: channelLark,
-			URL:     channel.URL,
-			Secret:  channel.Token, // Feishu Bot Sign Secret
-		}
-		renderedTemplate = channel.Other // Optional custom template/card for lark
+		config = pkgpush.Config{Channel: channelLark, URL: channel.URL, Secret: channel.Token}
+		renderedTemplate = channel.Other
 	case channelEmail:
 		url, token, other := resolveSMTPConfig(ctx, channel.URL, channel.Token, channel.Other)
-		config = pkgpush.Config{
-			Channel: channelEmail,
-			URL:     url,   // SMTP host:port
-			Key:     token, // SMTP Username
-			Secret:  other, // SMTP Password
-		}
+		config = pkgpush.Config{Channel: channelEmail, URL: url, Key: token, Secret: other}
 	case channelTelegram:
-		config = pkgpush.Config{
-			Channel: channelTelegram,
-			URL:     channel.URL,
-			Secret:  channel.Token, // Telegram Bot Token
-			Key:     channel.Other, // Default Chat ID
-		}
-	default: // custom
-		config = pkgpush.Config{
-			Channel: channelCustom,
-			URL:     channel.URL,
-		}
+		config = pkgpush.Config{Channel: channelTelegram, URL: channel.URL, Secret: channel.Token, Key: channel.Other}
+	default:
+		config = pkgpush.Config{Channel: channelCustom, URL: channel.URL}
 		customPushReq := CustomPushRequest{
 			Title:       msg.Title,
 			Content:     msg.Content,
@@ -344,48 +294,23 @@ func resolveTarget(ctx context.Context, target string, flatBody map[string]any, 
 	}
 
 	resolved := resolveDynamicKeyword(target, flatBody)
-
-	// 2. 如果包含 @，说明已经是个邮箱，直接返回
 	if strings.Contains(resolved, "@") {
 		return resolved
 	}
-
-	// 2.5 如果为特殊的系统虚拟用户，自动映射为首位管理员
 	if val, matched := resolveSystemTarget(ctx, resolved, channel); matched {
 		return val
 	}
 
-	// 3. 不包含 @，说明可能是用户 ID 或用户名。我们需要从数据库中查询对应用户
-	var user model.User
-	found := false
-
-	// 尝试作为用户 ID 查询（纯数字）
-	if id, err := strconv.ParseUint(resolved, 10, 64); err == nil {
-		if err := db.DB(ctx).Where("id = ?", id).First(&user).Error; err == nil {
-			found = true
-		}
-	}
-
-	// 如果没有按 ID 查到，尝试作为用户名查询
-	if !found {
-		if err := db.DB(ctx).Where("username = ?", resolved).First(&user).Error; err == nil {
-			found = true
-		}
-	}
-
-	// 4. 根据查询结果 and 推送渠道进行转换
+	user, found := resolveTargetUser(ctx, resolved, channel)
 	if !found {
 		return resolved
 	}
-
 	if channel == channelEmail && user.Email != "" {
 		return user.Email
 	}
-
 	if channel != channelEmail && user.Username != "" {
 		return user.Username
 	}
-
 	return resolved
 }
 
@@ -414,51 +339,4 @@ func resolveDynamicKeyword(target string, flatBody map[string]any) string {
 		}
 	}
 	return target
-}
-
-func resolveSystemTarget(ctx context.Context, resolved string, channel string) (string, bool) {
-	if resolved != "系统" && resolved != "system" && resolved != "0" {
-		return "", false
-	}
-	var adminUser model.User
-	if err := db.DB(ctx).Where("is_admin = ?", true).Order("id asc").First(&adminUser).Error; err != nil {
-		return resolved, true
-	}
-	if channel == channelEmail && adminUser.Email != "" {
-		return adminUser.Email, true
-	}
-	if channel != channelEmail && adminUser.Username != "" {
-		return adminUser.Username, true
-	}
-	return resolved, true
-}
-
-// resolveSMTPConfig resolves SMTP configuration by falling back to system-wide global configuration if any inputs are blank.
-func resolveSMTPConfig(ctx context.Context, url, token, other string) (string, string, string) {
-	if url != "" && token != "" {
-		return url, token, other
-	}
-	var smtpHost, smtpPort, smtpUser, smtpPass model.SystemConfig
-	_ = smtpHost.GetByKey(ctx, model.ConfigKeySMTPHost)
-	_ = smtpPort.GetByKey(ctx, model.ConfigKeySMTPPort)
-	_ = smtpUser.GetByKey(ctx, model.ConfigKeySMTPUsername)
-	_ = smtpPass.GetByKey(ctx, model.ConfigKeySMTPPassword)
-
-	if smtpHost.Value == "" || smtpUser.Value == "" {
-		return url, token, other
-	}
-	port := smtpPort.Value
-	if port == "" {
-		port = "587"
-	}
-	if url == "" {
-		url = smtpHost.Value + ":" + port
-	}
-	if token == "" {
-		token = smtpUser.Value
-	}
-	if other == "" {
-		other = smtpPass.Value
-	}
-	return url, token, other
 }

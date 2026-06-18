@@ -24,7 +24,6 @@ export interface Upload {
   mime_type: string
   extension: string
   hash: string
-  storage_driver: string
   type: string
   status: string
   access_mode: number

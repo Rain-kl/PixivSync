@@ -27,7 +27,7 @@ func GetUpdateStatus(c *gin.Context) {
 	status, _, err := defaultManager.status(c.Request.Context())
 	if err != nil {
 		logger.ErrorF(c.Request.Context(), "[Updater] check release failed: %v", err)
-		c.JSON(http.StatusInternalServerError, response.Err(err.Error()))
+		response.AbortInternal(c, err.Error())
 		return
 	}
 	c.JSON(http.StatusOK, response.OK(status))
@@ -49,7 +49,7 @@ func ApplyUpdate(c *gin.Context) {
 	executable, stagedBinary, err := defaultManager.prepareUpgrade(c.Request.Context())
 	if err != nil {
 		logger.ErrorF(c.Request.Context(), "[Updater] prepare upgrade failed: %v", err)
-		c.JSON(http.StatusBadRequest, response.Err(err.Error()))
+		response.AbortBadRequest(c, err.Error())
 		return
 	}
 

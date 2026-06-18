@@ -70,16 +70,7 @@ func TestStorageCache(t *testing.T) {
 		t.Errorf("Active returned driver %v, backend %v; expected %v, %v", drv, bnd, DriverLocal, mockBnd)
 	}
 
-	// 5. Test ForDriver returns cached backend
-	bnd2, err := ForDriver(ctx, DriverLocal)
-	if err != nil {
-		t.Fatalf("ForDriver failed: %v", err)
-	}
-	if bnd2 != mockBnd {
-		t.Errorf("ForDriver returned backend %v, expected %v", bnd2, mockBnd)
-	}
-
-	// 6. Test ResetCache again
+	// 5. Test ResetCache again
 	ResetCache()
 	if activeConfigJSON != "" || activeDriver != "" || activeBackend != nil || !lastChecked.IsZero() {
 		t.Fatal("ResetCache did not clear cache variables after setting them")

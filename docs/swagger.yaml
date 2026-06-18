@@ -143,6 +143,90 @@ definitions:
       token:
         type: string
     type: object
+  handler.batchDownloadRequest:
+    properties:
+      ids:
+        items:
+          type: string
+        minItems: 1
+        type: array
+    required:
+    - ids
+    type: object
+  handler.distributionItem:
+    properties:
+      count:
+        type: integer
+      name:
+        type: string
+      size:
+        type: integer
+    type: object
+  handler.fileStatsResponse:
+    properties:
+      categories:
+        items:
+          $ref: '#/definitions/handler.distributionItem'
+        type: array
+      total_count:
+        type: integer
+      total_size:
+        type: integer
+      trend:
+        items:
+          $ref: '#/definitions/handler.trendItem'
+        type: array
+      types:
+        items:
+          $ref: '#/definitions/handler.distributionItem'
+        type: array
+    type: object
+  handler.listFilesResponse:
+    properties:
+      items:
+        items:
+          $ref: '#/definitions/model.Upload'
+        type: array
+      page:
+        type: integer
+      page_size:
+        type: integer
+      total:
+        type: integer
+    type: object
+  handler.listMyFilesResponse:
+    properties:
+      items:
+        items:
+          $ref: '#/definitions/model.Upload'
+        type: array
+      page:
+        type: integer
+      page_size:
+        type: integer
+      total:
+        type: integer
+    type: object
+  handler.trendItem:
+    properties:
+      count:
+        type: integer
+      date:
+        type: string
+      size:
+        type: integer
+    type: object
+  handler.updateMyFileRequest:
+    properties:
+      access_mode:
+        enum:
+        - 0
+        - 1
+        type: integer
+      file_name:
+        maxLength: 255
+        type: string
+    type: object
   logger.LogEntry:
     properties:
       data:
@@ -691,9 +775,6 @@ definitions:
         allOf:
         - $ref: '#/definitions/model.UploadStatus'
         description: 状态
-      storage_driver:
-        description: 存储引擎驱动 (如 local, s3, oss)
-        type: string
       type:
         description: 业务标识类型 (如 avatar, doc, attachment)
         type: string
@@ -1334,90 +1415,6 @@ definitions:
       update_available:
         type: boolean
       upstream_repository:
-        type: string
-    type: object
-  upload.batchDownloadRequest:
-    properties:
-      ids:
-        items:
-          type: string
-        minItems: 1
-        type: array
-    required:
-    - ids
-    type: object
-  upload.distributionItem:
-    properties:
-      count:
-        type: integer
-      name:
-        type: string
-      size:
-        type: integer
-    type: object
-  upload.fileStatsResponse:
-    properties:
-      categories:
-        items:
-          $ref: '#/definitions/upload.distributionItem'
-        type: array
-      total_count:
-        type: integer
-      total_size:
-        type: integer
-      trend:
-        items:
-          $ref: '#/definitions/upload.trendItem'
-        type: array
-      types:
-        items:
-          $ref: '#/definitions/upload.distributionItem'
-        type: array
-    type: object
-  upload.listFilesResponse:
-    properties:
-      items:
-        items:
-          $ref: '#/definitions/model.Upload'
-        type: array
-      page:
-        type: integer
-      page_size:
-        type: integer
-      total:
-        type: integer
-    type: object
-  upload.listMyFilesResponse:
-    properties:
-      items:
-        items:
-          $ref: '#/definitions/model.Upload'
-        type: array
-      page:
-        type: integer
-      page_size:
-        type: integer
-      total:
-        type: integer
-    type: object
-  upload.trendItem:
-    properties:
-      count:
-        type: integer
-      date:
-        type: string
-      size:
-        type: integer
-    type: object
-  upload.updateMyFileRequest:
-    properties:
-      access_mode:
-        enum:
-        - 0
-        - 1
-        type: integer
-      file_name:
-        maxLength: 255
         type: string
     type: object
   user.changePasswordRequest:
@@ -4212,7 +4209,7 @@ paths:
             - $ref: '#/definitions/response.Any'
             - properties:
                 data:
-                  $ref: '#/definitions/upload.listFilesResponse'
+                  $ref: '#/definitions/handler.listFilesResponse'
               type: object
         "401":
           description: 未登录
@@ -4304,7 +4301,7 @@ paths:
         name: request
         required: true
         schema:
-          $ref: '#/definitions/upload.batchDownloadRequest'
+          $ref: '#/definitions/handler.batchDownloadRequest'
       produces:
       - application/octet-stream
       responses:
@@ -4338,7 +4335,7 @@ paths:
             - $ref: '#/definitions/response.Any'
             - properties:
                 data:
-                  $ref: '#/definitions/upload.fileStatsResponse'
+                  $ref: '#/definitions/handler.fileStatsResponse'
               type: object
         "401":
           description: 未登录
@@ -4996,7 +4993,7 @@ paths:
         name: request
         required: true
         schema:
-          $ref: '#/definitions/upload.updateMyFileRequest'
+          $ref: '#/definitions/handler.updateMyFileRequest'
       produces:
       - application/json
       responses:
@@ -5056,7 +5053,7 @@ paths:
             - $ref: '#/definitions/response.Any'
             - properties:
                 data:
-                  $ref: '#/definitions/upload.listMyFilesResponse'
+                  $ref: '#/definitions/handler.listMyFilesResponse'
               type: object
         "401":
           description: 未登录

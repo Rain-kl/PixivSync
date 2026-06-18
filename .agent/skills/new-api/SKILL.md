@@ -119,8 +119,9 @@ internal/
 
 ### 步骤 2：在模块内实现业务逻辑 (`logics.go` / `service.go`)
 业务逻辑逻辑应当实现于 `internal/apps/custom/` 目录下：
-- **优先使用纯函数（`logics.go`）**：定义接收 `context.Context` 且不依赖 `*gin.Context` 的函数，易于单元测试。
+- **优先使用纯函数（`logics.go`）**：定义接收 `context.Context` 且不依赖 `*gin.Context` 的函数，易于单元测试与 Worker 复用。参考 `internal/apps/user/logics.go`。
 - **有状态服务（`service.go`）**：若需注入依赖（如 DB 连接、外部客户端等），可定义 Service 结构体和构造函数。
+- **跨模块副作用（推送、任务监听等）**：核心业务代码通过 `internal/listener` 发射域事件，禁止直接 `import` push 模块；装配在 `internal/bootstrap` 完成（参见 `push-notification` skill）。
 
 ### 步骤 3：编写 HTTP Handler (`routers.go`)
 在 `internal/apps/custom/routers.go` 中编写 Handler：

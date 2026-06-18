@@ -17,7 +17,6 @@ import (
 	"github.com/Rain-kl/Wavelet/internal/model"
 	"github.com/Rain-kl/Wavelet/internal/task"
 	"github.com/Rain-kl/Wavelet/internal/testhelper"
-	"github.com/Rain-kl/Wavelet/internal/util"
 	pkgpush "github.com/Rain-kl/Wavelet/pkg/push"
 	"github.com/alicebob/miniredis/v2"
 	"github.com/gin-gonic/gin"
@@ -100,13 +99,12 @@ func setupPushTest(t *testing.T) (*gorm.DB, *miniredis.Miniredis, func()) {
 }
 
 func setupTestRouter(authUser *model.User) *gin.Engine {
-	gin.SetMode(gin.TestMode)
-	r := gin.New()
+	r := testhelper.NewTestGinEngine()
 	adminGroup := r.Group("/api/v1/admin/push")
 
 	adminGroup.Use(func(c *gin.Context) {
 		if authUser != nil {
-			util.SetToContext(c, "user_obj", authUser)
+			oauth.SetToContext(c, "user_obj", authUser)
 		}
 		c.Next()
 	})
@@ -658,7 +656,7 @@ func TestPushChannelAPI(t *testing.T) {
 	defer cleanup()
 
 	// 构建路由以进行 HTTP 模拟请求
-	r := gin.New()
+	r := testhelper.NewTestGinEngine()
 	adminGroup := r.Group("/api/v1/admin")
 	{
 		adminGroup.GET("/push/channels", ListChannels)

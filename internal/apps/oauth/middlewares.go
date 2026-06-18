@@ -7,12 +7,12 @@ package oauth
 import (
 	"context"
 	"errors"
-	"net/http"
 
 	"github.com/Rain-kl/Wavelet/internal/common"
+	"github.com/Rain-kl/Wavelet/internal/common/response"
 	"github.com/Rain-kl/Wavelet/internal/db"
 	"github.com/Rain-kl/Wavelet/internal/model"
-	"github.com/Rain-kl/Wavelet/internal/util"
+
 	otel_trace "github.com/Rain-kl/Wavelet/pkg/trace"
 	"github.com/gin-contrib/sessions"
 	"github.com/gin-gonic/gin"
@@ -62,8 +62,8 @@ func GetUserFromRequest(c *gin.Context) (*model.User, error) {
 			if user.Username == "system" {
 				return nil, errors.New("system user is not allowed to login")
 			}
-			util.SetToContext(c, TokenAuthKey, true)
-			util.SetToContext(c, TokenAdminKey, tokenRecord.IsAdmin)
+			SetToContext(c, TokenAuthKey, true)
+			SetToContext(c, TokenAdminKey, tokenRecord.IsAdmin)
 			return user, nil
 		}
 	}
@@ -91,8 +91,8 @@ func GetUserFromRequest(c *gin.Context) (*model.User, error) {
 	}
 
 	// set keys in context for session auth
-	util.SetToContext(c, TokenAuthKey, false)
-	util.SetToContext(c, TokenAdminKey, false)
+	SetToContext(c, TokenAuthKey, false)
+	SetToContext(c, TokenAdminKey, false)
 
 	// 强行阻止 system 用户任何会话/Token 鉴权通过
 	if user.Username == "system" {
@@ -111,7 +111,7 @@ func LoginRequired() gin.HandlerFunc {
 
 		user, err := GetUserFromRequest(c)
 		if err != nil {
-			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error_msg": common.UnAuthorized, "data": nil})
+			response.AbortUnauthorized(c, common.UnAuthorized)
 			return
 		}
 
@@ -119,7 +119,7 @@ func LoginRequired() gin.HandlerFunc {
 		LogForAudit(ctx, user, c)
 
 		// set user info
-		util.SetToContext(c, UserObjKey, user)
+		SetToContext(c, UserObjKey, user)
 
 		// next
 		c.Next()
@@ -129,8 +129,8 @@ func LoginRequired() gin.HandlerFunc {
 // DisallowTokenAuth 拒绝使用 Access Token 进行身份验证的请求访问该端点
 func DisallowTokenAuth() gin.HandlerFunc {
 	return func(c *gin.Context) {
-		if tokenAuth, _ := util.GetFromContext[bool](c, TokenAuthKey); tokenAuth {
-			c.AbortWithStatusJSON(http.StatusForbidden, gin.H{"error_msg": ErrTokenAuthNotAllowed, "data": nil})
+		if tokenAuth, _ := GetFromContext[bool](c, TokenAuthKey); tokenAuth {
+			response.AbortForbidden(c, ErrTokenAuthNotAllowed)
 			return
 		}
 		c.Next()

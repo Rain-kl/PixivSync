@@ -9,6 +9,5 @@ import (
 )
 
 // RegisterCustomRoutes registers custom business routes to keep routing clean and stable.
-func RegisterCustomRoutes(apiV1Router *gin.RouterGroup) {
-
+func RegisterCustomRoutes(_ *gin.RouterGroup) {
 }

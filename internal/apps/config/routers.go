@@ -5,12 +5,15 @@
 // Package config 提供公开配置查询接口
 package config
 
-import ("net/http"
+import (
+	"net/http"
 
 	"github.com/Rain-kl/Wavelet/internal/model"
+	"github.com/Rain-kl/Wavelet/internal/repository"
 	"github.com/gin-gonic/gin"
 
-	"github.com/Rain-kl/Wavelet/internal/common/response")
+	"github.com/Rain-kl/Wavelet/internal/common/response"
+)
 
 // GetPublicConfig 获取公共配置
 // @Summary 获取公共配置
@@ -22,9 +25,9 @@ import ("net/http"
 // @Router /api/v1/config/public [get]
 func GetPublicConfig(c *gin.Context) {
 	ctx := c.Request.Context()
-	configs, err := model.ListVisibleSystemConfigs(ctx)
+	configs, err := repository.ListVisibleSystemConfigs(ctx)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, response.Err(err.Error()))
+		response.AbortInternal(c, err.Error())
 		return
 	}
 
@@ -45,7 +48,7 @@ func GetPublicConfig(c *gin.Context) {
 // @Router /robots.txt [get]
 func GetRobotsTXT(c *gin.Context) {
 	ctx := c.Request.Context()
-	enabled, err := model.GetBoolByKey(ctx, model.ConfigKeySearchEngineIndexingEnabled)
+	enabled, err := repository.GetBoolByKey(ctx, model.ConfigKeySearchEngineIndexingEnabled)
 	content := "User-Agent: *\nDisallow: /\n"
 	if err == nil && enabled {
 		content = "User-Agent: *\nAllow: /\n"

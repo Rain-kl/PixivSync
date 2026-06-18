@@ -4408,7 +4408,7 @@ const docTemplate = `{
                                     "type": "object",
                                     "properties": {
                                         "data": {
-                                            "$ref": "#/definitions/upload.listFilesResponse"
+                                            "$ref": "#/definitions/handler.listFilesResponse"
                                         }
                                     }
                                 }
@@ -4455,7 +4455,7 @@ const docTemplate = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/upload.batchDownloadRequest"
+                            "$ref": "#/definitions/handler.batchDownloadRequest"
                         }
                     }
                 ],
@@ -4566,7 +4566,7 @@ const docTemplate = `{
                                     "type": "object",
                                     "properties": {
                                         "data": {
-                                            "$ref": "#/definitions/upload.fileStatsResponse"
+                                            "$ref": "#/definitions/handler.fileStatsResponse"
                                         }
                                     }
                                 }
@@ -5695,7 +5695,7 @@ const docTemplate = `{
                                     "type": "object",
                                     "properties": {
                                         "data": {
-                                            "$ref": "#/definitions/upload.listMyFilesResponse"
+                                            "$ref": "#/definitions/handler.listMyFilesResponse"
                                         }
                                     }
                                 }
@@ -5743,7 +5743,7 @@ const docTemplate = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/upload.updateMyFileRequest"
+                            "$ref": "#/definitions/handler.updateMyFileRequest"
                         }
                     }
                 ],
@@ -6775,6 +6775,134 @@ const docTemplate = `{
                 }
             }
         },
+        "handler.batchDownloadRequest": {
+            "type": "object",
+            "required": [
+                "ids"
+            ],
+            "properties": {
+                "ids": {
+                    "type": "array",
+                    "minItems": 1,
+                    "items": {
+                        "type": "string"
+                    }
+                }
+            }
+        },
+        "handler.distributionItem": {
+            "type": "object",
+            "properties": {
+                "count": {
+                    "type": "integer"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "size": {
+                    "type": "integer"
+                }
+            }
+        },
+        "handler.fileStatsResponse": {
+            "type": "object",
+            "properties": {
+                "categories": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/handler.distributionItem"
+                    }
+                },
+                "total_count": {
+                    "type": "integer"
+                },
+                "total_size": {
+                    "type": "integer"
+                },
+                "trend": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/handler.trendItem"
+                    }
+                },
+                "types": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/handler.distributionItem"
+                    }
+                }
+            }
+        },
+        "handler.listFilesResponse": {
+            "type": "object",
+            "properties": {
+                "items": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/model.Upload"
+                    }
+                },
+                "page": {
+                    "type": "integer"
+                },
+                "page_size": {
+                    "type": "integer"
+                },
+                "total": {
+                    "type": "integer"
+                }
+            }
+        },
+        "handler.listMyFilesResponse": {
+            "type": "object",
+            "properties": {
+                "items": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/model.Upload"
+                    }
+                },
+                "page": {
+                    "type": "integer"
+                },
+                "page_size": {
+                    "type": "integer"
+                },
+                "total": {
+                    "type": "integer"
+                }
+            }
+        },
+        "handler.trendItem": {
+            "type": "object",
+            "properties": {
+                "count": {
+                    "type": "integer"
+                },
+                "date": {
+                    "type": "string"
+                },
+                "size": {
+                    "type": "integer"
+                }
+            }
+        },
+        "handler.updateMyFileRequest": {
+            "type": "object",
+            "properties": {
+                "access_mode": {
+                    "type": "integer",
+                    "enum": [
+                        0,
+                        1
+                    ]
+                },
+                "file_name": {
+                    "type": "string",
+                    "maxLength": 255
+                }
+            }
+        },
         "logger.LogEntry": {
             "type": "object",
             "properties": {
@@ -7596,10 +7724,6 @@ const docTemplate = `{
                             "$ref": "#/definitions/model.UploadStatus"
                         }
                     ]
-                },
-                "storage_driver": {
-                    "description": "存储引擎驱动 (如 local, s3, oss)",
-                    "type": "string"
                 },
                 "type": {
                     "description": "业务标识类型 (如 avatar, doc, attachment)",
@@ -8537,134 +8661,6 @@ const docTemplate = `{
                 },
                 "upstream_repository": {
                     "type": "string"
-                }
-            }
-        },
-        "upload.batchDownloadRequest": {
-            "type": "object",
-            "required": [
-                "ids"
-            ],
-            "properties": {
-                "ids": {
-                    "type": "array",
-                    "minItems": 1,
-                    "items": {
-                        "type": "string"
-                    }
-                }
-            }
-        },
-        "upload.distributionItem": {
-            "type": "object",
-            "properties": {
-                "count": {
-                    "type": "integer"
-                },
-                "name": {
-                    "type": "string"
-                },
-                "size": {
-                    "type": "integer"
-                }
-            }
-        },
-        "upload.fileStatsResponse": {
-            "type": "object",
-            "properties": {
-                "categories": {
-                    "type": "array",
-                    "items": {
-                        "$ref": "#/definitions/upload.distributionItem"
-                    }
-                },
-                "total_count": {
-                    "type": "integer"
-                },
-                "total_size": {
-                    "type": "integer"
-                },
-                "trend": {
-                    "type": "array",
-                    "items": {
-                        "$ref": "#/definitions/upload.trendItem"
-                    }
-                },
-                "types": {
-                    "type": "array",
-                    "items": {
-                        "$ref": "#/definitions/upload.distributionItem"
-                    }
-                }
-            }
-        },
-        "upload.listFilesResponse": {
-            "type": "object",
-            "properties": {
-                "items": {
-                    "type": "array",
-                    "items": {
-                        "$ref": "#/definitions/model.Upload"
-                    }
-                },
-                "page": {
-                    "type": "integer"
-                },
-                "page_size": {
-                    "type": "integer"
-                },
-                "total": {
-                    "type": "integer"
-                }
-            }
-        },
-        "upload.listMyFilesResponse": {
-            "type": "object",
-            "properties": {
-                "items": {
-                    "type": "array",
-                    "items": {
-                        "$ref": "#/definitions/model.Upload"
-                    }
-                },
-                "page": {
-                    "type": "integer"
-                },
-                "page_size": {
-                    "type": "integer"
-                },
-                "total": {
-                    "type": "integer"
-                }
-            }
-        },
-        "upload.trendItem": {
-            "type": "object",
-            "properties": {
-                "count": {
-                    "type": "integer"
-                },
-                "date": {
-                    "type": "string"
-                },
-                "size": {
-                    "type": "integer"
-                }
-            }
-        },
-        "upload.updateMyFileRequest": {
-            "type": "object",
-            "properties": {
-                "access_mode": {
-                    "type": "integer",
-                    "enum": [
-                        0,
-                        1
-                    ]
-                },
-                "file_name": {
-                    "type": "string",
-                    "maxLength": 255
                 }
             }
         },

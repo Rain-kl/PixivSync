@@ -13,7 +13,7 @@ import (
 	"github.com/Rain-kl/Wavelet/internal/apps/oauth"
 	"github.com/Rain-kl/Wavelet/internal/config"
 	"github.com/Rain-kl/Wavelet/internal/model"
-	"github.com/Rain-kl/Wavelet/internal/util"
+	"github.com/Rain-kl/Wavelet/internal/testhelper"
 	"github.com/gin-gonic/gin"
 	"github.com/stretchr/testify/assert"
 )
@@ -25,8 +25,7 @@ func TestRiskControlMiddleware(t *testing.T) {
 		config.Config.ClickHouse.Enabled = false
 		defer func() { config.Config.ClickHouse.Enabled = false }()
 
-		r := gin.New()
-		r.Use(RiskControlMiddleware())
+		r := testhelper.NewTestGinEngine(RiskControlMiddleware())
 		r.GET("/test", func(c *gin.Context) {
 			c.String(http.StatusOK, "ok")
 		})
@@ -51,7 +50,7 @@ func TestRiskControlMiddleware(t *testing.T) {
 		r.Use(func(c *gin.Context) {
 			// Mock authentication middleware placing user in context
 			user := &model.User{ID: 12345}
-			util.SetToContext(c, oauth.UserObjKey, user)
+			oauth.SetToContext(c, oauth.UserObjKey, user)
 			c.Next()
 		})
 		r.Use(RiskControlMiddleware())
@@ -91,8 +90,7 @@ func TestRiskControlMiddleware(t *testing.T) {
 			logChan = nil
 		}()
 
-		r := gin.New()
-		r.Use(RiskControlMiddleware())
+		r := testhelper.NewTestGinEngine(RiskControlMiddleware())
 		r.GET("/test", func(c *gin.Context) {
 			c.String(http.StatusOK, "ok")
 		})
@@ -126,8 +124,7 @@ func TestRiskControlMiddleware(t *testing.T) {
 			logChan <- &UserAccessLog{}
 		}
 
-		r := gin.New()
-		r.Use(RiskControlMiddleware())
+		r := testhelper.NewTestGinEngine(RiskControlMiddleware())
 		r.GET("/test", func(c *gin.Context) {
 			c.String(http.StatusOK, "ok")
 		})

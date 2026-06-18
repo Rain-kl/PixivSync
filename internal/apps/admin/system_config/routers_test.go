@@ -1,6 +1,6 @@
 // Copyright 2025 linux.do
 // Copyright 2026 Arctel.net
-// SPDX-License-Identifier: AGPL-3.0-only
+// SPDX-License-Identifier: Apache-2.0
 
 package system_config
 
@@ -13,28 +13,30 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"net/textproto"
+	"strings"
 	"testing"
 
 	"github.com/Rain-kl/Wavelet/internal/apps/oauth"
 	"github.com/Rain-kl/Wavelet/internal/db"
 	"github.com/Rain-kl/Wavelet/internal/model"
+	"github.com/Rain-kl/Wavelet/internal/repository"
 	"github.com/Rain-kl/Wavelet/internal/storage"
 	"github.com/Rain-kl/Wavelet/internal/testhelper"
-	"github.com/Rain-kl/Wavelet/internal/util"
 	"github.com/gin-gonic/gin"
 
 	"github.com/Rain-kl/Wavelet/internal/common/response"
 )
 
+const expectedDefaultConfigsCount = 30
+
 func setupTestRouter(authUser *model.User) *gin.Engine {
-	gin.SetMode(gin.TestMode)
-	r := gin.New()
+	r := testhelper.NewTestGinEngine()
 	adminGroup := r.Group("/api/v1/admin")
 
 	// Mock authentication middleware
 	adminGroup.Use(func(c *gin.Context) {
 		if authUser != nil {
-			util.SetToContext(c, oauth.UserObjKey, authUser)
+			oauth.SetToContext(c, oauth.UserObjKey, authUser)
 		}
 		c.Next()
 	})
@@ -86,22 +88,22 @@ func TestCreateSystemConfig(t *testing.T) {
 		// Verify caches are invalidated after create and repopulate on read
 		_, err = db.Redis.HGet(
 			context.Background(),
-			db.PrefixedKey(model.SystemConfigRedisHashKey),
+			db.PrefixedKey(repository.SystemConfigRedisHashKey),
 			"custom_key",
 		).Result()
 		if err == nil {
 			t.Fatal("expected redis cache miss immediately after create")
 		}
 
-		var loaded model.SystemConfig
-		if err := loaded.GetByKey(context.Background(), "custom_key"); err != nil {
-			t.Fatalf("GetByKey(custom_key) error = %v", err)
+		loaded, err := repository.GetSystemConfigByKey(context.Background(), "custom_key")
+		if err != nil {
+			t.Fatalf("GetSystemConfigByKey(custom_key) error = %v", err)
 		}
 		if loaded.Value != "custom_value" {
-			t.Errorf("GetByKey(custom_key).Value = %q, want %q", loaded.Value, "custom_value")
+			t.Errorf("GetSystemConfigByKey(custom_key).Value = %q, want %q", loaded.Value, "custom_value")
 		}
 		if loaded.Visibility != model.ConfigVisibilityVisible {
-			t.Errorf("GetByKey(custom_key).Visibility = %d, want %d", loaded.Visibility, model.ConfigVisibilityVisible)
+			t.Errorf("GetSystemConfigByKey(custom_key).Visibility = %d, want %d", loaded.Visibility, model.ConfigVisibilityVisible)
 		}
 	})
 
@@ -148,9 +150,9 @@ func TestListSystemConfigs(t *testing.T) {
 		var configs []model.SystemConfig
 		_ = json.Unmarshal(dataBytes, &configs)
 
-		const expectedDefaultConfigCount = 33
-		if len(configs) != expectedDefaultConfigCount {
-			t.Errorf("expected %d default configs, got %d", expectedDefaultConfigCount, len(configs))
+		// Defaults seed configurations
+		if len(configs) != expectedDefaultConfigsCount {
+			t.Errorf("expected %d default configs, got %d", expectedDefaultConfigsCount, len(configs))
 		}
 	})
 
@@ -166,21 +168,8 @@ func TestListSystemConfigs(t *testing.T) {
 		var configs []model.SystemConfig
 		_ = json.Unmarshal(dataBytes, &configs)
 
-		expectedKeys := map[string]bool{
-			model.ConfigKeyMaxAPIKeysPerUser:            true,
-			model.ConfigKeyPixezMirrorDownloadInterval:  true,
-			model.ConfigKeyPixezMirrorIllustConcurrency: true,
-			model.ConfigKeyPixezMirrorNovelConcurrency:  true,
-		}
-		for _, config := range configs {
-			delete(expectedKeys, config.Key)
-		}
-		if len(expectedKeys) != 0 {
-			t.Errorf("missing business configs: %v; got %v", expectedKeys, configs)
-		}
-		const expectedBusinessConfigCount = 4
-		if len(configs) != expectedBusinessConfigCount {
-			t.Errorf("expected %d business configs, got %d: %v", expectedBusinessConfigCount, len(configs), configs)
+		if len(configs) != 1 || configs[0].Key != model.ConfigKeyMaxAPIKeysPerUser {
+			t.Errorf("expected 1 business config (max_api_keys_per_user), got %d: %v", len(configs), configs)
 		}
 	})
 }
@@ -258,22 +247,22 @@ func TestUpdateSystemConfig(t *testing.T) {
 		// Verify caches are invalidated after update and repopulate on read
 		_, err := db.Redis.HGet(
 			context.Background(),
-			db.PrefixedKey(model.SystemConfigRedisHashKey),
+			db.PrefixedKey(repository.SystemConfigRedisHashKey),
 			model.ConfigKeySiteName,
 		).Result()
 		if err == nil {
 			t.Fatal("expected redis cache miss immediately after update")
 		}
 
-		var loaded model.SystemConfig
-		if err := loaded.GetByKey(context.Background(), model.ConfigKeySiteName); err != nil {
-			t.Fatalf("GetByKey(site_name) error = %v", err)
+		loaded, err := repository.GetSystemConfigByKey(context.Background(), model.ConfigKeySiteName)
+		if err != nil {
+			t.Fatalf("GetSystemConfigByKey(site_name) error = %v", err)
 		}
 		if loaded.Value != "Super Site Name" {
-			t.Errorf("GetByKey(site_name).Value = %q, want %q", loaded.Value, "Super Site Name")
+			t.Errorf("GetSystemConfigByKey(site_name).Value = %q, want %q", loaded.Value, "Super Site Name")
 		}
 		if loaded.Visibility != model.ConfigVisibilityHidden {
-			t.Errorf("GetByKey(site_name).Visibility = %d, want %d", loaded.Visibility, model.ConfigVisibilityHidden)
+			t.Errorf("GetSystemConfigByKey(site_name).Visibility = %d, want %d", loaded.Visibility, model.ConfigVisibilityHidden)
 		}
 	})
 
@@ -450,6 +439,105 @@ func TestUpdateStorageConfigValidation(t *testing.T) {
 
 		if w.Code != http.StatusBadRequest {
 			t.Errorf("expected 400 Bad Request, got %d. Body: %s", w.Code, w.Body.String())
+		}
+	})
+
+	t.Run("reject driver switch when uploads exist", func(t *testing.T) {
+		upload := model.Upload{
+			ID:        88001,
+			UserID:    1,
+			FileName:  "keep.txt",
+			FilePath:  "uploads/keep.txt",
+			FileSize:  4,
+			MimeType:  "text/plain",
+			Extension: "txt",
+			Type:      "attachment",
+			Status:    model.UploadStatusUsed,
+		}
+		if err := dbConn.Create(&upload).Error; err != nil {
+			t.Fatalf("seed upload failed: %v", err)
+		}
+
+		tempDir := t.TempDir()
+		cfg := storage.DefaultConfig()
+		cfg.Driver = storage.DriverS3
+		cfg.S3.Endpoint = "http://127.0.0.1:19998"
+		cfg.S3.Region = "us-east-1"
+		cfg.S3.Bucket = "wavelet"
+		cfg.S3.AccessKeyID = "test"
+		cfg.S3.SecretAccessKey = "test"
+		cfg.Local.Root = tempDir
+
+		cfgBytes, _ := json.Marshal(cfg)
+		payload := UpdateSystemConfigRequest{Value: string(cfgBytes)}
+		body, _ := json.Marshal(payload)
+		req, _ := http.NewRequest("PUT", "/api/v1/admin/system-configs/storage_config", bytes.NewBuffer(body))
+		req.Header.Set("Content-Type", "application/json")
+		w := httptest.NewRecorder()
+		router.ServeHTTP(w, req)
+
+		if w.Code != http.StatusBadRequest {
+			t.Fatalf("expected 400 Bad Request, got %d. Body: %s", w.Code, w.Body.String())
+		}
+		if !strings.Contains(w.Body.String(), StorageDriverSwitchRequiresMigration) {
+			t.Fatalf("expected migration-required error, got: %s", w.Body.String())
+		}
+	})
+
+	t.Run("switch to local while active s3 is unreachable", func(t *testing.T) {
+		if err := dbConn.Where("1 = 1").Delete(&model.Upload{}).Error; err != nil {
+			t.Fatalf("clear uploads failed: %v", err)
+		}
+
+		activeCfg := storage.DefaultConfig()
+		activeCfg.Driver = storage.DriverS3
+		activeCfg.S3.Endpoint = "http://127.0.0.1:9999"
+		activeCfg.S3.Region = "us-east-1"
+		activeCfg.S3.Bucket = "wavelet"
+		activeCfg.S3.AccessKeyID = "test"
+		activeCfg.S3.SecretAccessKey = "test"
+		activeBytes, _ := json.Marshal(activeCfg)
+		seedCfg := model.SystemConfig{
+			Key:   "storage_config",
+			Value: string(activeBytes),
+			Type:  "system",
+		}
+		if err := dbConn.Where("key = ?", "storage_config").
+			Assign(map[string]any{"value": seedCfg.Value, "type": seedCfg.Type}).
+			FirstOrCreate(&seedCfg).Error; err != nil {
+			t.Fatalf("seed active storage config failed: %v", err)
+		}
+
+		tempDir := t.TempDir()
+		stagedCfg := activeCfg
+		stagedCfg.Driver = storage.DriverLocal
+		stagedCfg.Local.Root = tempDir
+
+		cfgBytes, _ := json.Marshal(stagedCfg)
+		payload := UpdateSystemConfigRequest{Value: string(cfgBytes)}
+		body, _ := json.Marshal(payload)
+		req, _ := http.NewRequest("PUT", "/api/v1/admin/system-configs/storage_config", bytes.NewBuffer(body))
+		req.Header.Set("Content-Type", "application/json")
+		w := httptest.NewRecorder()
+		router.ServeHTTP(w, req)
+
+		if w.Code != http.StatusOK {
+			t.Fatalf("expected 200 OK, got %d. Body: %s", w.Code, w.Body.String())
+		}
+
+		var dbCfg model.SystemConfig
+		if err := dbConn.Where("key = ?", "storage_config").First(&dbCfg).Error; err != nil {
+			t.Fatalf("load saved storage config failed: %v", err)
+		}
+		var savedCfg storage.Config
+		if err := json.Unmarshal([]byte(dbCfg.Value), &savedCfg); err != nil {
+			t.Fatalf("parse saved storage config failed: %v", err)
+		}
+		if savedCfg.Driver != storage.DriverLocal {
+			t.Fatalf("active driver = %q, want %q after save", savedCfg.Driver, storage.DriverLocal)
+		}
+		if savedCfg.Local.Root != tempDir {
+			t.Fatalf("staged local root = %q, want %q", savedCfg.Local.Root, tempDir)
 		}
 	})
 }

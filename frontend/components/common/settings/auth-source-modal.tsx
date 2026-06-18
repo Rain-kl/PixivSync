@@ -7,8 +7,8 @@ import {Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle} fro
 import {Input} from "@/components/ui/input"
 import {Label} from "@/components/ui/label"
 import {Switch} from "@/components/ui/switch"
+import services from "@/lib/services"
 import type {AuthSource, AuthSourceRequest} from "@/lib/services/admin"
-import {AdminService} from "@/lib/services/admin"
 
 const emptyForm: AuthSourceRequest = {
   name: "",
@@ -63,9 +63,9 @@ export function AuthSourceModal({
     setSaving(true)
     try {
       if (source) {
-        await AdminService.updateAuthSource(source.id, form)
+        await services.adminAuthSource.updateAuthSource(source.id, form)
       } else {
-        await AdminService.createAuthSource(form)
+        await services.adminAuthSource.createAuthSource(form)
       }
       await onChanged()
       toast.success("认证源已保存")

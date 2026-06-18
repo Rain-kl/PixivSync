@@ -3,23 +3,24 @@
 
 package user
 
-import ("context"
+import (
+	"context"
 	"net/http"
 	"strings"
 	"time"
 
-	"github.com/Rain-kl/Wavelet/internal/apps/admin/push/custom_events"
 	"github.com/Rain-kl/Wavelet/internal/apps/oauth"
 	"github.com/Rain-kl/Wavelet/internal/common"
+	"github.com/Rain-kl/Wavelet/internal/common/response"
 	"github.com/Rain-kl/Wavelet/internal/config"
 	"github.com/Rain-kl/Wavelet/internal/db"
 	"github.com/Rain-kl/Wavelet/internal/db/idgen"
+	"github.com/Rain-kl/Wavelet/internal/listener"
 	"github.com/Rain-kl/Wavelet/internal/model"
-	"github.com/Rain-kl/Wavelet/internal/util"
+	"github.com/Rain-kl/Wavelet/internal/repository"
 	"github.com/Rain-kl/Wavelet/pkg/logger"
 	"github.com/gin-contrib/sessions"
 	"github.com/gin-gonic/gin"
-	"github.com/Rain-kl/Wavelet/internal/common/response"
 )
 
 type loginRequest struct {
@@ -37,28 +38,20 @@ type registerRequest struct {
 	Code        string `json:"code"`
 }
 
-func isPasswordLoginEnabled() bool {
-	enabled, err := model.GetBoolByKey(context.Background(), model.ConfigKeyPasswordLoginEnabled)
-	if err != nil {
-		return true
-	}
-	return enabled
+type sendEmailCodeRequest struct {
+	Email string `json:"email" binding:"required,email"`
+	Scene string `json:"scene" binding:"required"`
 }
 
-func isPasswordRegisterEnabled() bool {
-	enabled, err := model.GetBoolByKey(context.Background(), model.ConfigKeyPasswordRegisterEnabled)
-	if err != nil {
-		return true
-	}
-	return enabled
-}
-
-func isRegistrationEnabled() bool {
-	enabled, err := model.GetBoolByKey(context.Background(), model.ConfigKeyRegistrationEnabled)
-	if err != nil {
-		return true
-	}
-	return enabled
+type updateProfileRequest struct {
+	Nickname  string `json:"nickname"`
+	Email     string `json:"email"`
+	AvatarURL string `json:"avatar_url"`
+	Bio       string `json:"bio"`
+	Phone     string `json:"phone"`
+	Gender    string `json:"gender"`
+	Website   string `json:"website"`
+	Location  string `json:"location"`
 }
 
 func setLoginSession(ctx context.Context, c *gin.Context, user *model.User) error {
@@ -71,7 +64,7 @@ func setLoginSession(ctx context.Context, c *gin.Context, user *model.User) erro
 	maxAge := config.Config.App.SessionAge
 	isSessionCookie := false
 
-	ttlHours, err := model.GetIntByKey(ctx, model.ConfigKeyLoginSessionTTLHours)
+	ttlHours, err := repository.GetIntByKey(ctx, model.ConfigKeyLoginSessionTTLHours)
 	if err == nil {
 		switch {
 		case ttlHours == -1:
@@ -108,31 +101,31 @@ func setLoginSession(ctx context.Context, c *gin.Context, user *model.User) erro
 // @Failure 500 {object} response.Any "服务内部错误"
 // @Router /api/v1/user/login [post]
 func Login(c *gin.Context) {
-	if !isPasswordLoginEnabled() {
-		c.JSON(http.StatusOK, response.Err(errPasswordLoginDisabled))
+	ctx := c.Request.Context()
+	if !isPasswordLoginEnabled(ctx) {
+		response.AbortBadRequest(c, errPasswordLoginDisabled)
 		return
 	}
 	var req loginRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, response.Err(err.Error()))
+		response.AbortBadRequest(c, err.Error())
 		return
 	}
 	req.Username = strings.TrimSpace(req.Username)
 	if req.Username == "" || req.Password == "" {
-		c.JSON(http.StatusOK, response.Err(errInvalidParams))
+		response.AbortBadRequest(c, errInvalidParams)
 		return
 	}
 
 	var user model.User
-	ctx := c.Request.Context()
 	if err := db.DB(ctx).Where("username = ? OR email = ?", req.Username, req.Username).First(&user).Error; err != nil {
 		logger.WarnF(ctx, "[LoginAudit] failed login attempt (username not found) for input: %s, IP: %s", req.Username, c.ClientIP())
-		c.JSON(http.StatusOK, response.Err(errUsernameOrPasswordWrong))
+		response.AbortBadRequest(c, errUsernameOrPasswordWrong)
 		return
 	}
 	if !user.IsActive {
 		logger.WarnF(ctx, "[LoginAudit] banned user login attempt for username: %s, ID: %d, IP: %s", user.Username, user.ID, c.ClientIP())
-		c.JSON(http.StatusOK, response.Err(common.BannedAccount))
+		response.AbortBadRequest(c, common.BannedAccount)
 		return
 	}
 
@@ -141,12 +134,18 @@ func Login(c *gin.Context) {
 
 	if !user.CheckPassword(req.Password) {
 		logger.WarnF(ctx, "[LoginAudit] failed login attempt (incorrect password) for username: %s, ID: %d, IP: %s", user.Username, user.ID, c.ClientIP())
-		c.JSON(http.StatusOK, response.Err(errUsernameOrPasswordWrong))
+		response.AbortBadRequest(c, errUsernameOrPasswordWrong)
 		return
 	}
 
 	if isEmailLoginVerificationEnabled(ctx) {
-		if emailErr := handleLoginEmailVerification(ctx, c, &req, &user); emailErr != nil {
+		result, err := processLoginEmailVerification(ctx, req.Code, &user)
+		if err != nil {
+			response.AbortBadRequest(c, err.Error())
+			return
+		}
+		if result.Status != LoginEmailVerificationPassed {
+			response.AbortBadRequest(c, result.Message)
 			return
 		}
 	}
@@ -162,17 +161,17 @@ func Login(c *gin.Context) {
 
 	user.LastLoginAt = time.Now()
 	if err := db.DB(ctx).Model(&user).Update("last_login_at", user.LastLoginAt).Error; err != nil {
-		c.JSON(http.StatusOK, response.Err(err.Error()))
+		response.AbortBadRequest(c, err.Error())
 		return
 	}
 	if err := setLoginSession(ctx, c, &user); err != nil {
-		c.JSON(http.StatusOK, response.Err(errSaveSessionFailed))
+		response.AbortBadRequest(c, errSaveSessionFailed)
 		return
 	}
 
 	logger.InfoF(ctx, "[LoginAudit] successful login for user: %s, ID: %d, IP: %s", user.Username, user.ID, c.ClientIP())
 
-	custom_events.TriggerAdminLoginEvent(ctx, &user, c.ClientIP())
+	listener.EmitAdminLoggedIn(ctx, &user, c.ClientIP())
 
 	c.JSON(http.StatusOK, response.OK(oauth.BuildBasicUserInfo(&user, needChangePassword)))
 }
@@ -189,14 +188,15 @@ func Login(c *gin.Context) {
 // @Failure 500 {object} response.Any "服务内部错误"
 // @Router /api/v1/user/register [post]
 func Register(c *gin.Context) {
-	if !isRegistrationEnabled() || !isPasswordRegisterEnabled() {
-		c.JSON(http.StatusOK, response.Err(errRegistrationDisabled))
+	ctx := c.Request.Context()
+	if !isRegistrationEnabled(ctx) || !isPasswordRegisterEnabled(ctx) {
+		response.AbortBadRequest(c, errRegistrationDisabled)
 		return
 	}
 
 	var req registerRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, response.Err(err.Error()))
+		response.AbortBadRequest(c, err.Error())
 		return
 	}
 
@@ -208,23 +208,21 @@ func Register(c *gin.Context) {
 	req.Code = strings.TrimSpace(req.Code)
 
 	if req.Username == "" || req.Password == "" {
-		c.JSON(http.StatusOK, response.Err(errInvalidParams))
+		response.AbortBadRequest(c, errInvalidParams)
 		return
 	}
 	if req.Email == "" {
-		c.JSON(http.StatusOK, response.Err(errEmailRequired))
+		response.AbortBadRequest(c, errEmailRequired)
 		return
 	}
 	if len(req.Password) < minPasswordLength {
-		c.JSON(http.StatusOK, response.Err(errPasswordTooShort))
+		response.AbortBadRequest(c, errPasswordTooShort)
 		return
 	}
 
-	ctx := c.Request.Context()
-
 	// 邮箱注册验证校验
-	if err := validateRegisterEmailVerification(ctx, &req); err != nil {
-		c.JSON(http.StatusOK, response.Err(err.Error()))
+	if err := validateRegisterEmailVerification(ctx, req.Email, req.Code); err != nil {
+		response.AbortBadRequest(c, err.Error())
 		return
 	}
 
@@ -245,17 +243,17 @@ func Register(c *gin.Context) {
 		user.Nickname = req.Username
 	}
 	if err := user.SetEncryptedPassword(req.Password); err != nil {
-		c.JSON(http.StatusOK, response.Err(err.Error()))
+		response.AbortBadRequest(c, err.Error())
 		return
 	}
 
 	if err := user.RegisterUser(ctx, db.DB(ctx)); err != nil {
-		c.JSON(http.StatusOK, response.Err(err.Error()))
+		response.AbortBadRequest(c, err.Error())
 		return
 	}
 
 	if err := setLoginSession(ctx, c, &user); err != nil {
-		c.JSON(http.StatusOK, response.Err(errSaveSessionFailed))
+		response.AbortBadRequest(c, errSaveSessionFailed)
 		return
 	}
 
@@ -281,7 +279,7 @@ func Logout(c *gin.Context) {
 	session.Options(oauth.GetSessionOptions(-1))
 	session.Clear()
 	if err := session.Save(); err != nil {
-		c.JSON(http.StatusOK, response.Err(err.Error()))
+		response.AbortBadRequest(c, err.Error())
 		return
 	}
 	c.JSON(http.StatusOK, response.OK(""))
@@ -306,7 +304,7 @@ type changePasswordRequest struct {
 func ChangePassword(c *gin.Context) {
 	var req changePasswordRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, response.Err(err.Error()))
+		response.AbortBadRequest(c, err.Error())
 		return
 	}
 
@@ -314,47 +312,47 @@ func ChangePassword(c *gin.Context) {
 	req.NewPassword = strings.TrimSpace(req.NewPassword)
 
 	if req.OldPassword == "" || req.NewPassword == "" {
-		c.JSON(http.StatusOK, response.Err(errInvalidParams))
+		response.AbortBadRequest(c, errInvalidParams)
 		return
 	}
 	if len(req.NewPassword) < minPasswordLength {
-		c.JSON(http.StatusOK, response.Err(errNewPasswordTooShort))
+		response.AbortBadRequest(c, errNewPasswordTooShort)
 		return
 	}
 
-	userObj, _ := util.GetFromContext[*model.User](c, oauth.UserObjKey)
+	userObj, _ := oauth.GetFromContext[*model.User](c, oauth.UserObjKey)
 	if userObj == nil {
-		c.JSON(http.StatusUnauthorized, response.Err(errLoginRequired))
+		response.AbortUnauthorized(c, errLoginRequired)
 		return
 	}
 
 	ctx := c.Request.Context()
 	var dbUser model.User
 	if err := db.DB(ctx).Where("id = ?", userObj.ID).First(&dbUser).Error; err != nil {
-		c.JSON(http.StatusOK, response.Err(errUserNotFound))
+		response.AbortBadRequest(c, errUserNotFound)
 		return
 	}
 
 	// 校验旧密码
 	if !dbUser.CheckPassword(req.OldPassword) {
-		c.JSON(http.StatusOK, response.Err(errOldPasswordIncorrect))
+		response.AbortBadRequest(c, errOldPasswordIncorrect)
 		return
 	}
 
 	// 加密并更新为新密码
 	if err := dbUser.SetEncryptedPassword(req.NewPassword); err != nil {
-		c.JSON(http.StatusOK, response.Err(errPasswordEncryptFailed))
+		response.AbortBadRequest(c, errPasswordEncryptFailed)
 		return
 	}
 
 	if err := db.DB(ctx).Model(&dbUser).Update("password", dbUser.Password).Error; err != nil {
-		c.JSON(http.StatusOK, response.Err(err.Error()))
+		response.AbortBadRequest(c, err.Error())
 		return
 	}
 
 	// 吊销该用户所有的 Access Token
 	if err := db.DB(ctx).Where("user_id = ?", dbUser.ID).Delete(&model.AccessToken{}).Error; err != nil {
-		c.JSON(http.StatusOK, response.Err("吊销 Access Token 失败: "+err.Error()))
+		response.AbortBadRequest(c, "吊销 Access Token 失败: "+err.Error())
 		return
 	}
 
@@ -364,4 +362,78 @@ func ChangePassword(c *gin.Context) {
 	_ = session.Save()
 
 	c.JSON(http.StatusOK, response.OK("密码修改成功"))
+}
+
+// SendEmailCode 发送邮箱验证码
+// @Summary 发送邮箱验证码
+// @Description 向指定邮箱发送验证码（用于注册场景）
+// @Tags user
+// @Accept json
+// @Produce json
+// @Param request body user.sendEmailCodeRequest true "发送验证码请求参数"
+// @Success 200 {object} response.Any "发送成功"
+// @Failure 400 {object} response.Any "参数错误"
+// @Router /api/v1/user/send-email-code [post]
+func SendEmailCode(c *gin.Context) {
+	var req sendEmailCodeRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		response.AbortBadRequest(c, err.Error())
+		return
+	}
+
+	req.Email = strings.TrimSpace(req.Email)
+	if req.Email == "" {
+		response.AbortBadRequest(c, errEmailRequired)
+		return
+	}
+
+	if req.Scene != "register" {
+		response.AbortBadRequest(c, errUnsupportedEmailScene)
+		return
+	}
+
+	ctx := c.Request.Context()
+	if err := sendRegisterEmailCode(ctx, req.Email); err != nil {
+		response.AbortBadRequest(c, err.Error())
+		return
+	}
+
+	c.JSON(http.StatusOK, response.OKNil())
+}
+
+// UpdateProfile 修改当前登录用户的个人资料
+// @Summary 修改当前登录用户的个人资料
+// @Description 修改当前登录用户的昵称、邮箱、头像、简介、电话、性别、个人网站和所在地。
+// @Tags user
+// @Accept json
+// @Produce json
+// @Param request body user.updateProfileRequest true "更新请求参数"
+// @Success 200 {object} response.Any{data=oauth.BasicUserInfo} "修改成功，返回更新后的用户信息"
+// @Failure 400 {object} response.Any "邮箱已被占用或参数错误"
+// @Failure 401 {object} response.Any "未登录"
+// @Router /api/v1/user/profile [put]
+func UpdateProfile(c *gin.Context) {
+	var req updateProfileRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		response.AbortBadRequest(c, err.Error())
+		return
+	}
+
+	userObj, _ := oauth.GetFromContext[*model.User](c, oauth.UserObjKey)
+	if userObj == nil {
+		response.AbortUnauthorized(c, errLoginRequired)
+		return
+	}
+
+	ctx := c.Request.Context()
+	dbUser, err := updateUserProfile(ctx, userObj.ID, updateProfileInput(req))
+	if err != nil {
+		response.AbortBadRequest(c, err.Error())
+		return
+	}
+
+	session := sessions.Default(c)
+	needChange := session.Get("need_change_password") == true
+
+	c.JSON(http.StatusOK, response.OK(oauth.BuildBasicUserInfo(dbUser, needChange)))
 }

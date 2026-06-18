@@ -1,15 +1,15 @@
 "use client"
 
-import {ComponentType, useMemo} from "react"
+import {useMemo, ComponentType} from "react"
 import {useMutation, useQueryClient} from "@tanstack/react-query"
 import {
-  BarChart3,
   Bell,
   Code,
   CreditCard,
   Database,
   FileText,
   FolderOpen,
+  Home,
   Info,
   Layers,
   LayoutList,
@@ -21,8 +21,8 @@ import {
 
 import {Card, CardContent, CardDescription, CardHeader, CardTitle} from "@/components/ui/card"
 import {Switch} from "@/components/ui/switch"
+import services from "@/lib/services"
 import type {SystemConfig} from "@/lib/services/admin"
-import {AdminService} from "@/lib/services/admin"
 import {toast} from "sonner"
 
 interface MenuItem {
@@ -42,7 +42,8 @@ const MENU_GROUPS: MenuGroup[] = [
   {
     name: "基础菜单",
     items: [
-      { path: "/home", label: "看板", description: "同步看板、镜像统计与镜像批次", icon: BarChart3 },
+      { path: "/home", label: "首页", description: "系统控制台/个人首页", icon: Home },
+      { path: "/files", label: "我的文件", description: "用户个人文件管理与上传", icon: FolderOpen },
     ]
   },
   {
@@ -89,7 +90,7 @@ export function OtherTab({ configs }: OtherTabProps) {
     mutationFn: async ({ path, enabled }: { path: string; enabled: boolean }) => {
       const newConfig = { ...menuDisplayConfig, [path]: enabled }
       const currentCfg = configs["menu_display_config"]
-      await AdminService.updateSystemConfig("menu_display_config", {
+      await services.adminSystemConfig.updateSystemConfig("menu_display_config", {
         value: JSON.stringify(newConfig),
         description: currentCfg?.description || "目录显示配置（JSON 字符串，格式为 {url: enabled}）",
       })

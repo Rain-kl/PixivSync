@@ -10,6 +10,7 @@ import (
 	"github.com/Rain-kl/Wavelet/internal/config"
 	"github.com/Rain-kl/Wavelet/internal/db"
 	"github.com/Rain-kl/Wavelet/internal/model"
+	"github.com/Rain-kl/Wavelet/internal/repository"
 	"github.com/alicebob/miniredis/v2"
 	"github.com/glebarez/sqlite"
 	"github.com/redis/go-redis/v9"
@@ -107,13 +108,13 @@ func TestMigrateClearsStaleSystemConfigCache(t *testing.T) {
 		Value: "true",
 		Type:  "system",
 	}
-	if err := db.HSetJSON(context.Background(), model.SystemConfigRedisHashKey, model.ConfigKeyCapLoginEnabled, &staleConfig); err != nil {
+	if err := db.HSetJSON(context.Background(), repository.SystemConfigRedisHashKey, model.ConfigKeyCapLoginEnabled, &staleConfig); err != nil {
 		t.Fatalf("HSetJSON() error = %v", err)
 	}
 
 	Migrate()
 
-	exists, err := db.Redis.Exists(context.Background(), db.PrefixedKey(model.SystemConfigRedisHashKey)).Result()
+	exists, err := db.Redis.Exists(context.Background(), db.PrefixedKey(repository.SystemConfigRedisHashKey)).Result()
 	if err != nil {
 		t.Fatalf("Redis.Exists() error = %v", err)
 	}
@@ -121,7 +122,7 @@ func TestMigrateClearsStaleSystemConfigCache(t *testing.T) {
 		t.Fatalf("system config cache exists = %d, want 0", exists)
 	}
 
-	enabled, err := model.GetBoolByKey(context.Background(), model.ConfigKeyCapLoginEnabled)
+	enabled, err := repository.GetBoolByKey(context.Background(), model.ConfigKeyCapLoginEnabled)
 	if err != nil {
 		t.Fatalf("GetBoolByKey(%s) error = %v", model.ConfigKeyCapLoginEnabled, err)
 	}

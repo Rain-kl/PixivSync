@@ -15,6 +15,7 @@ import (
 
 	"github.com/Rain-kl/Wavelet/internal/common/response"
 	"github.com/Rain-kl/Wavelet/internal/model"
+	"github.com/Rain-kl/Wavelet/internal/repository"
 	"github.com/Rain-kl/Wavelet/internal/testhelper"
 	pkgcap "github.com/Rain-kl/Wavelet/pkg/cap"
 )
@@ -23,8 +24,7 @@ func TestCapEndpointsAndMiddleware(t *testing.T) {
 	sqliteDB, _, cleanup := testhelper.SetupTestEnvironment(t)
 	defer cleanup()
 
-	gin.SetMode(gin.TestMode)
-	r := gin.New()
+	r := testhelper.NewTestGinEngine()
 
 	// Mount CAPTCHA API endpoints
 	capGroup := r.Group("/api/cap")
@@ -68,7 +68,7 @@ func TestCapEndpointsAndMiddleware(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed to enable cap_login_enabled in DB: %v", err)
 	}
-	if err := model.InvalidateSystemConfigCache(context.Background(), model.ConfigKeyCapLoginEnabled); err != nil {
+	if err := repository.InvalidateSystemConfigCache(context.Background(), model.ConfigKeyCapLoginEnabled); err != nil {
 		t.Fatalf("InvalidateSystemConfigCache() error = %v", err)
 	}
 	InvalidateRuntimeSettings()

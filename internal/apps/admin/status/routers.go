@@ -290,7 +290,7 @@ func exportSQLite(c *gin.Context) {
 
 	f, err := os.Open(path) //nolint:gosec // path is loaded from server startup configuration, not user input
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, response.Err("无法打开数据库文件: "+err.Error()))
+		response.AbortInternal(c, "无法打开数据库文件: "+err.Error())
 		return
 	}
 	defer func() {
@@ -301,7 +301,7 @@ func exportSQLite(c *gin.Context) {
 
 	fi, err := f.Stat()
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, response.Err("无法读取数据库文件信息: "+err.Error()))
+		response.AbortInternal(c, "无法读取数据库文件信息: "+err.Error())
 		return
 	}
 
@@ -319,7 +319,7 @@ func exportPostgres(c *gin.Context) {
 	// 检查 pg_dump 是否可用
 	pgDumpPath, err := exec.LookPath("pg_dump")
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, response.Err("pg_dump 不可用，请确保服务器已安装 PostgreSQL 客户端工具"))
+		response.AbortInternal(c, "pg_dump 不可用，请确保服务器已安装 PostgreSQL 客户端工具")
 		return
 	}
 

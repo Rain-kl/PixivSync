@@ -15,12 +15,12 @@ import (
 	"time"
 
 	"github.com/Rain-kl/Wavelet/internal/apps/oauth"
-	"github.com/Rain-kl/Wavelet/internal/apps/upload"
+	uploadtask "github.com/Rain-kl/Wavelet/internal/apps/upload/task"
 	"github.com/Rain-kl/Wavelet/internal/apps/user"
+	"github.com/Rain-kl/Wavelet/internal/bootstrap"
 	"github.com/Rain-kl/Wavelet/internal/model"
 	"github.com/Rain-kl/Wavelet/internal/task"
 	"github.com/Rain-kl/Wavelet/internal/testhelper"
-	"github.com/Rain-kl/Wavelet/internal/util"
 	"github.com/gin-gonic/gin"
 	"github.com/hibiken/asynq"
 	"github.com/stretchr/testify/assert"
@@ -31,6 +31,7 @@ import (
 
 func setupTaskTestEnvironment(t *testing.T) func() {
 	_, mr, cleanup := testhelper.SetupTestEnvironment(t)
+	bootstrap.RegisterTasks()
 	task.AsynqClient = asynq.NewClient(asynq.RedisClientOpt{
 		Addr: mr.Addr(),
 	})
@@ -44,14 +45,13 @@ func setupTaskTestEnvironment(t *testing.T) func() {
 }
 
 func setupTestRouter(authUser *model.User) *gin.Engine {
-	gin.SetMode(gin.TestMode)
-	r := gin.New()
+	r := testhelper.NewTestGinEngine()
 	adminGroup := r.Group("/api/v1/admin")
 
 	// Mock authentication middleware
 	adminGroup.Use(func(c *gin.Context) {
 		if authUser != nil {
-			util.SetToContext(c, oauth.UserObjKey, authUser)
+			oauth.SetToContext(c, oauth.UserObjKey, authUser)
 		}
 		c.Next()
 	})
@@ -93,18 +93,18 @@ func TestListTaskTypes(t *testing.T) {
 	foundCleanup := false
 	foundWarmImageCache := false
 	for _, m := range taskMetas {
-		if m.Type == upload.TaskTypeSystemCleanup {
+		if m.Type == uploadtask.TaskTypeSystemCleanup {
 			foundCleanup = true
 		}
-		if m.Type == upload.TaskTypeWarmImageCache {
+		if m.Type == uploadtask.TaskTypeWarmImageCache {
 			foundWarmImageCache = true
 		}
 	}
 	if !foundCleanup {
-		t.Errorf("expected task type %s to be listed", upload.TaskTypeSystemCleanup)
+		t.Errorf("expected task type %s to be listed", uploadtask.TaskTypeSystemCleanup)
 	}
 	if !foundWarmImageCache {
-		t.Errorf("expected task type %s to be listed", upload.TaskTypeWarmImageCache)
+		t.Errorf("expected task type %s to be listed", uploadtask.TaskTypeWarmImageCache)
 	}
 }
 
@@ -117,7 +117,7 @@ func TestDispatchTask(t *testing.T) {
 
 	t.Run("dispatch valid task successfully", func(t *testing.T) {
 		payload := DispatchTaskRequest{
-			TaskType: upload.TaskTypeSystemCleanup,
+			TaskType: uploadtask.TaskTypeSystemCleanup,
 		}
 		body, _ := json.Marshal(payload)
 		req, _ := http.NewRequest("POST", "/api/v1/admin/tasks/dispatch", bytes.NewBuffer(body))

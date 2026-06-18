@@ -10,7 +10,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
-	"time"
+	"strings"
 
 	"github.com/gin-gonic/gin"
 	"gorm.io/gorm"
@@ -20,6 +20,7 @@ import (
 	"github.com/Rain-kl/Wavelet/internal/common/response"
 	"github.com/Rain-kl/Wavelet/internal/db"
 	"github.com/Rain-kl/Wavelet/internal/model"
+	"github.com/Rain-kl/Wavelet/internal/repository"
 	"github.com/Rain-kl/Wavelet/internal/storage"
 	"github.com/Rain-kl/Wavelet/pkg/logger"
 	mail "github.com/Rain-kl/Wavelet/pkg/mail"
@@ -60,44 +61,17 @@ type UpdateSystemConfigRequest struct {
 func CreateSystemConfig(c *gin.Context) {
 	var req CreateSystemConfigRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, response.Err(err.Error()))
+		response.AbortBadRequest(c, err.Error())
 		return
 	}
 
-	// 检查配置键是否已存在
-	var existing model.SystemConfig
-	if err := db.DB(c.Request.Context()).Where("key = ?", req.Key).First(&existing).Error; err == nil {
-		c.JSON(http.StatusBadRequest, response.Err(ConfigKeyExists))
-		return
-	} else if !errors.Is(err, gorm.ErrRecordNotFound) {
-		c.JSON(http.StatusInternalServerError, response.Err(err.Error()))
-		return
-	}
-
-	config := model.SystemConfig{
-		Key:         req.Key,
-		Value:       req.Value,
-		Type:        req.Type,
-		Visibility:  req.Visibility,
-		Description: req.Description,
-	}
-
-	if err := db.DB(c.Request.Context()).Transaction(func(tx *gorm.DB) error {
-		// 创建配置
-		if err := tx.Create(&config).Error; err != nil {
-			return err
+	if err := createSystemConfig(c.Request.Context(), req); err != nil {
+		if err.Error() == ConfigKeyExists {
+			response.AbortBadRequest(c, ConfigKeyExists)
+			return
 		}
-
-		return nil
-	}); err != nil {
-		c.JSON(http.StatusInternalServerError, response.Err(err.Error()))
+		response.AbortInternal(c, err.Error())
 		return
-	}
-
-	invalidateSystemConfigCaches(c.Request.Context(), req.Key)
-
-	if err := model.InvalidateVisibleSystemConfigsCache(c.Request.Context()); err != nil {
-		logger.WarnF(c.Request.Context(), "清理公共配置列表缓存失败: %v", err)
 	}
 
 	c.JSON(http.StatusOK, response.OKNil())
@@ -116,15 +90,9 @@ func CreateSystemConfig(c *gin.Context) {
 // @Failure 500 {object} response.Any "内部错误"
 // @Router /api/v1/admin/system-configs [get]
 func ListSystemConfigs(c *gin.Context) {
-	configType := c.Query("type")
-	query := db.DB(c.Request.Context()).Order("created_at DESC")
-	if configType != "" {
-		query = query.Where("type = ?", configType)
-	}
-
-	var configs []model.SystemConfig
-	if err := query.Find(&configs).Error; err != nil {
-		c.JSON(http.StatusInternalServerError, response.Err(err.Error()))
+	configs, err := listSystemConfigs(c.Request.Context(), c.Query("type"))
+	if err != nil {
+		response.AbortInternal(c, err.Error())
 		return
 	}
 
@@ -149,12 +117,12 @@ func ListSystemConfigs(c *gin.Context) {
 // @Failure 500 {object} response.Any "内部错误"
 // @Router /api/v1/admin/system-configs/{key} [get]
 func GetSystemConfig(c *gin.Context) {
-	var config model.SystemConfig
-	if err := db.DB(c.Request.Context()).Where("key = ?", c.Param("key")).First(&config).Error; err != nil {
+	config, err := getSystemConfig(c.Request.Context(), c.Param("key"))
+	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
-			c.JSON(http.StatusNotFound, response.Err(SystemConfigNotFound))
+			response.AbortNotFound(c, SystemConfigNotFound)
 		} else {
-			c.JSON(http.StatusInternalServerError, response.Err(err.Error()))
+			response.AbortInternal(c, err.Error())
 		}
 		return
 	}
@@ -183,106 +151,29 @@ func GetSystemConfig(c *gin.Context) {
 func UpdateSystemConfig(c *gin.Context) {
 	var req UpdateSystemConfigRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, response.Err(err.Error()))
+		response.AbortBadRequest(c, err.Error())
 		return
 	}
 
 	key := c.Param("key")
-
-	// 检查配置是否存在
-	var config model.SystemConfig
-	if err := db.DB(c.Request.Context()).Where("key = ?", key).First(&config).Error; err != nil {
+	if err := updateSystemConfig(c.Request.Context(), key, req); err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
-			c.JSON(http.StatusNotFound, response.Err(SystemConfigNotFound))
-		} else {
-			c.JSON(http.StatusInternalServerError, response.Err(err.Error()))
-		}
-		return
-	}
-
-	var originalDriver storage.Driver
-	if key == model.ConfigKeyStorageConfig {
-		var currentCfg storage.Config
-		if err := json.Unmarshal([]byte(config.Value), &currentCfg); err == nil {
-			originalDriver = currentCfg.Driver
-		}
-
-		validatedVal, err := validateAndMergeStorageConfig(c.Request.Context(), req.Value, config.Value)
-		if err != nil {
-			c.JSON(http.StatusBadRequest, response.Err(err.Error()))
+			response.AbortNotFound(c, SystemConfigNotFound)
 			return
 		}
-		req.Value = validatedVal
-	}
-
-	if err := db.DB(c.Request.Context()).Transaction(func(tx *gorm.DB) error {
-		// 更新配置
-		updates := map[string]interface{}{
-			"description": req.Description,
+		if isStorageConfigValidationError(err) {
+			response.AbortBadRequest(c, err.Error())
+			return
 		}
-		if req.Visibility != nil {
-			updates["visibility"] = *req.Visibility
-			config.Visibility = *req.Visibility
-		}
-		if key != model.ConfigKeySMTPPassword || req.Value != maskedConfigValue {
-			updates["value"] = req.Value
-			config.Value = req.Value
-		}
-		if err := tx.Model(&config).Updates(updates).Error; err != nil {
-			return err
-		}
-
-		resolveStorageMigrationTasksOnDirectDriverUpdate(
-			c.Request.Context(),
-			tx,
-			key,
-			originalDriver,
-			req.Value,
-		)
-
-		return nil
-	}); err != nil {
-		c.JSON(http.StatusInternalServerError, response.Err(err.Error()))
+		response.AbortInternal(c, err.Error())
 		return
 	}
-
-	invalidateCachesAfterConfigUpdate(c.Request.Context(), key)
 
 	c.JSON(http.StatusOK, response.OKNil())
 }
 
-func resolveStorageMigrationTasksOnDirectDriverUpdate(
-	ctx context.Context,
-	tx *gorm.DB,
-	key string,
-	originalDriver storage.Driver,
-	newValue string,
-) {
-	if key != model.ConfigKeyStorageConfig || originalDriver == "" {
-		return
-	}
-
-	var newCfg storage.Config
-	if err := json.Unmarshal([]byte(newValue), &newCfg); err != nil {
-		return
-	}
-	if newCfg.Driver != originalDriver {
-		return
-	}
-
-	if err := tx.Model(&model.TaskExecution{}).
-		Where("task_type = ? AND status = ?", "storage:migrate", model.TaskExecutionStatusFailed).
-		Updates(map[string]any{
-			"status":      model.TaskExecutionStatusSucceeded,
-			"result":      "存储配置直接更新，故障迁移任务自动标记为已解决",
-			"finished_at": time.Now(),
-		}).Error; err != nil {
-		logger.ErrorF(ctx, "自动更新迁移任务状态失败: %v", err)
-	}
-}
-
 func invalidateSystemConfigCaches(ctx context.Context, key string) {
-	if err := model.InvalidateSystemConfigCache(ctx, key); err != nil {
+	if err := repository.InvalidateSystemConfigCache(ctx, key); err != nil {
 		logger.WarnF(ctx, "清理系统配置缓存失败: %v", err)
 	}
 	if cap.IsRuntimeConfigKey(key) {
@@ -304,7 +195,7 @@ func invalidateCachesAfterConfigUpdate(ctx context.Context, key string) {
 		upload.PublishAccessCacheInvalidation(ctx)
 	}
 
-	if err := model.InvalidateVisibleSystemConfigsCache(ctx); err != nil {
+	if err := repository.InvalidateVisibleSystemConfigsCache(ctx); err != nil {
 		logger.WarnF(ctx, "清理公共配置列表缓存失败: %v", err)
 	}
 }
@@ -339,14 +230,13 @@ type TestSMTPResponse struct {
 func TestSMTP(c *gin.Context) {
 	var req TestSMTPRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, response.Err(err.Error()))
+		response.AbortBadRequest(c, err.Error())
 		return
 	}
 
 	password := req.SMTPPassword
 	if password == maskedConfigValue {
-		var sc model.SystemConfig
-		if err := sc.GetByKey(c.Request.Context(), model.ConfigKeySMTPPassword); err == nil {
+		if sc, err := repository.GetSystemConfigByKey(c.Request.Context(), model.ConfigKeySMTPPassword); err == nil {
 			password = sc.Value
 		}
 	}
@@ -373,6 +263,17 @@ func TestSMTP(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, response.OK(resp))
+}
+
+func isStorageConfigValidationError(err error) bool {
+	msg := err.Error()
+	return msg == StorageDriverSwitchRequiresMigration ||
+		strings.HasPrefix(msg, "解析") ||
+		strings.HasPrefix(msg, "验证") ||
+		strings.HasPrefix(msg, "初始化测试") ||
+		strings.HasPrefix(msg, "存储连通性") ||
+		strings.HasPrefix(msg, "序列化") ||
+		strings.HasPrefix(msg, "检查存量文件")
 }
 
 func maskSensitiveConfig(key, value string) string {
@@ -409,19 +310,8 @@ func validateAndMergeStorageConfig(ctx context.Context, value string, currentCon
 
 	// 合并被掩码屏蔽的敏感信息，获取完整的真实配置
 	targetCfg := storage.MergeMaskedSecrets(newCfg, currentCfg)
-
-	// 校验配置参数是否合法
-	if err := storage.ValidateConfig(targetCfg); err != nil {
-		return "", fmt.Errorf("验证存储配置参数失败: %w", err)
-	}
-
-	// 进行连通性测试验证，如果测试失败则拒绝保存
-	testBackend, err := storage.NewBackend(ctx, targetCfg, targetCfg.Driver)
-	if err != nil {
-		return "", fmt.Errorf("初始化测试存储实例失败: %w", err)
-	}
-	if err := testBackend.Test(ctx); err != nil {
-		return "", fmt.Errorf("存储连通性测试失败: %w", err)
+	if err := validateMergedStorageConfig(ctx, currentCfg, newCfg, targetCfg); err != nil {
+		return "", err
 	}
 
 	// 序列化为最终保存的真实明文配置，防止保存屏蔽的 ****** 字符
@@ -431,4 +321,45 @@ func validateAndMergeStorageConfig(ctx context.Context, value string, currentCon
 	}
 
 	return string(unmaskedVal), nil
+}
+
+func validateMergedStorageConfig(ctx context.Context, currentCfg, newCfg, targetCfg storage.Config) error {
+	if newCfg.Driver != "" && newCfg.Driver != currentCfg.Driver {
+		var uploadCount int64
+		if err := db.DB(ctx).Model(&model.Upload{}).
+			Where("status != ?", model.UploadStatusDeleted).
+			Count(&uploadCount).Error; err != nil {
+			return fmt.Errorf("检查存量文件失败: %w", err)
+		}
+		if uploadCount > 0 {
+			return errors.New(StorageDriverSwitchRequiresMigration)
+		}
+		if err := validateDriverConfig(targetCfg, newCfg.Driver); err != nil {
+			return fmt.Errorf("验证目标存储配置参数失败: %w", err)
+		}
+		pendingCfg := targetCfg
+		pendingCfg.Driver = newCfg.Driver
+		return testStorageBackend(ctx, pendingCfg, newCfg.Driver)
+	}
+
+	if err := storage.ValidateConfig(targetCfg); err != nil {
+		return fmt.Errorf("验证存储配置参数失败: %w", err)
+	}
+	return testStorageBackend(ctx, targetCfg, targetCfg.Driver)
+}
+
+func validateDriverConfig(cfg storage.Config, driver storage.Driver) error {
+	cfg.Driver = driver
+	return storage.ValidateConfig(cfg)
+}
+
+func testStorageBackend(ctx context.Context, cfg storage.Config, driver storage.Driver) error {
+	testBackend, err := storage.NewBackend(ctx, cfg, driver)
+	if err != nil {
+		return fmt.Errorf("初始化测试存储实例失败: %w", err)
+	}
+	if err := testBackend.Test(ctx); err != nil {
+		return fmt.Errorf("存储连通性测试失败: %w", err)
+	}
+	return nil
 }

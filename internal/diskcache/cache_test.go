@@ -10,6 +10,7 @@ import (
 
 	"github.com/Rain-kl/Wavelet/internal/db"
 	"github.com/Rain-kl/Wavelet/internal/model"
+	"github.com/Rain-kl/Wavelet/internal/repository"
 	"github.com/Rain-kl/Wavelet/internal/testhelper"
 )
 
@@ -31,7 +32,7 @@ func TestDiskCacheReloadConfig(t *testing.T) {
 
 	// Invalidate Redis config cache to force DB reload
 	if db.Redis != nil {
-		db.Redis.Del(context.Background(), db.PrefixedKey(model.SystemConfigRedisHashKey))
+		db.Redis.Del(context.Background(), db.PrefixedKey(repository.SystemConfigRedisHashKey))
 	}
 
 	// Reload config

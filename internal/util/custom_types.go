@@ -1,7 +1,8 @@
 // Copyright 2025 linux.do
 // Copyright 2026 Arctel.net
-// SPDX-License-Identifier: AGPL-3.0-only
+// SPDX-License-Identifier: Apache-2.0
 
+// Package util provides framework-agnostic helper types and HTTP utilities.
 package util
 
 import (

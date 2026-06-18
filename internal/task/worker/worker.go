@@ -7,22 +7,18 @@ package worker
 import (
 	"time"
 
+	"github.com/Rain-kl/Wavelet/internal/bootstrap"
 	"github.com/Rain-kl/Wavelet/internal/config"
 	"github.com/Rain-kl/Wavelet/internal/task"
-	taskhandlers "github.com/Rain-kl/Wavelet/internal/task/handlers"
 	"github.com/hibiken/asynq"
 )
 
 // workerShutdownTimeout Worker 优雅关闭超时时间
 const workerShutdownTimeout = 3 * time.Minute
 
-func init() {
-	// 注册所有任务处理器
-	taskhandlers.Register()
-}
-
 // StartWorker 启动任务处理服务器
 func StartWorker() error {
+	bootstrap.RegisterWorker()
 	asynqServer := asynq.NewServer(
 		task.RedisOpt,
 		asynq.Config{

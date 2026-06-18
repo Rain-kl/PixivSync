@@ -12,7 +12,7 @@ import (
 
 	"github.com/Rain-kl/Wavelet/internal/config"
 	"github.com/Rain-kl/Wavelet/internal/db"
-	"github.com/Rain-kl/Wavelet/internal/model"
+	"github.com/Rain-kl/Wavelet/internal/repository"
 	"github.com/pressly/goose/v3"
 )
 
@@ -69,7 +69,7 @@ func Migrate() {
 }
 
 func clearSystemConfigCache() {
-	if err := model.InvalidateAllSystemConfigCaches(context.Background()); err != nil {
+	if err := repository.InvalidateAllSystemConfigCaches(context.Background()); err != nil {
 		log.Printf("[%s] clear system config cache failed: %v\n", dbType(), err)
 	}
 }

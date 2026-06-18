@@ -5,9 +5,9 @@ import {motion} from "motion/react"
 import {FolderOpen} from "lucide-react"
 
 import {Tabs, TabsContent, TabsList, TabsTrigger} from "@/components/ui/tabs"
-import {FileStats} from "@/components/common/admin/file-stats"
-import {FileList} from "@/components/common/admin/file-list"
-import {StorageConfigTab} from "@/components/common/admin/storage-config-tab"
+import {FileStats} from "./components/file-stats"
+import {FileList} from "./components/file-list"
+import {StorageConfigTab} from "./components/storage-config-tab"
 
 export default function FilesPage() {
   const [activeTab, setActiveTab] = React.useState("stats")

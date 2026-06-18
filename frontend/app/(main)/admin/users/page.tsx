@@ -25,10 +25,9 @@ import {EmptyStateWithBorder} from "@/components/layout/empty"
 import {LoadingStateWithBorder} from "@/components/layout/loading"
 import {ErrorInline} from "@/components/layout/error"
 import {useAdminUsers} from "@/contexts/admin-users-context"
-import {CreateUserModal} from "@/components/common/admin/create-user-modal"
-
-import {UserFilterBar} from "@/components/common/admin/user-filter-bar"
-import {UserDetailSheet} from "@/components/common/admin/user-detail-sheet"
+import {CreateUserModal} from "./components/create-user-modal"
+import {UserFilterBar} from "./components/user-filter-bar"
+import {UserDetailSheet} from "./components/user-detail-sheet"
 
 export default function UsersPage() {
   const {

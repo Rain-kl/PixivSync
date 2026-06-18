@@ -6,11 +6,10 @@ import {KeyRound, ShieldAlert, X} from "lucide-react"
 import {Card, CardContent, CardDescription, CardHeader, CardTitle} from "@/components/ui/card"
 import {Badge} from "@/components/ui/badge"
 import {Select, SelectContent, SelectItem, SelectTrigger, SelectValue} from "@/components/ui/select"
+import services from "@/lib/services"
 import type {SystemConfig} from "@/lib/services/admin"
-import {AdminService} from "@/lib/services/admin"
 import {TemplatesManager} from "./templates"
 import {toast} from "sonner"
-import {PixEzRateLimitForm} from "@/components/common/pixez/PixEzRateLimitForm"
 
 interface OperationTabProps {
   configs: Record<string, SystemConfig>
@@ -22,7 +21,7 @@ export function OperationTab({ configs, systemConfigsQuery }: OperationTabProps)
 
   const uploadTypesQuery = useQuery({
     queryKey: ["admin", "upload-types"],
-    queryFn: () => AdminService.listUploadTypes(),
+    queryFn: () => services.adminSystemConfig.listUploadTypes(),
   })
 
   const updateWhitelistMutation = useMutation({
@@ -31,7 +30,7 @@ export function OperationTab({ configs, systemConfigsQuery }: OperationTabProps)
       if (!config) {
         throw new Error("缺少配置项: file_access_whitelist")
       }
-      await AdminService.updateSystemConfig("file_access_whitelist", {
+      await services.adminSystemConfig.updateSystemConfig("file_access_whitelist", {
         value: newValue,
         description: config.description,
       })
@@ -84,9 +83,6 @@ export function OperationTab({ configs, systemConfigsQuery }: OperationTabProps)
 
   return (
     <div className="space-y-6">
-      {/* PixEz 抓取限制 */}
-      <PixEzRateLimitForm />
-
 
       {/* 文件访问白名单设置 */}
       <Card className="border border-dashed shadow-sm">
@@ -167,7 +163,6 @@ export function OperationTab({ configs, systemConfigsQuery }: OperationTabProps)
 
       {/* 通知模板管理 */}
       <TemplatesManager />
-
     </div>
   )
 }

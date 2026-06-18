@@ -40,7 +40,6 @@ type Upload struct {
 	MimeType      string         `json:"mime_type" gorm:"size:100;not null"`             // 媒体类型 (MIME, 如 image/png)
 	Extension     string         `json:"extension" gorm:"size:50;not null"`              // 文件后缀名 (不含点，如 png, pdf)
 	Hash          string         `json:"hash" gorm:"size:64;index"`                      // 文件哈希 (SHA-256/MD5，可用于排重)
-	StorageDriver string         `json:"storage_driver" gorm:"size:50;not null"`         // 存储引擎驱动 (如 local, s3, oss)
 	Type          string         `json:"type" gorm:"column:type;size:50;not null;index"` // 业务标识类型 (如 avatar, doc, attachment)
 	Status        UploadStatus   `json:"status" gorm:"type:varchar(20);not null"`        // 状态
 	AccessMode    int            `json:"access_mode" gorm:"column:access_mode;not null;default:0"`

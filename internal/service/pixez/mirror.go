@@ -21,9 +21,10 @@ import (
 
 	"github.com/Rain-kl/Wavelet/internal/db"
 	"github.com/Rain-kl/Wavelet/internal/db/idgen"
-	"github.com/Rain-kl/Wavelet/pkg/logger"
 	"github.com/Rain-kl/Wavelet/internal/model"
+	"github.com/Rain-kl/Wavelet/internal/repository"
 	"github.com/Rain-kl/Wavelet/internal/storage"
+	"github.com/Rain-kl/Wavelet/pkg/logger"
 	"github.com/Rain-kl/Wavelet/internal/task"
 	"gorm.io/gorm"
 )
@@ -228,7 +229,7 @@ func ProcessMirrorIllust(ctx context.Context, client *Client, taskID string, ill
 	failedURLs := make([]string, 0)
 
 	// 获取多图下载间隔
-	downloadInterval, err := model.GetIntByKey(ctx, model.ConfigKeyPixezMirrorDownloadInterval)
+	downloadInterval, err := repository.GetIntByKey(ctx, model.ConfigKeyPixezMirrorDownloadInterval)
 	if err != nil {
 		downloadInterval = 1 // 默认 1 秒
 	}
@@ -443,7 +444,7 @@ func registerMirrorUpload(ctx context.Context, pixivURL string, pageIndex int, d
 	}
 	id := idgen.NextUint64ID()
 	subPath := fmt.Sprintf("uploads/%s/%d.%s", time.Now().Format("2006/01/02"), id, ext)
-	driver, backend, err := storage.Active(ctx)
+	_, backend, err := storage.Active(ctx)
 	if err != nil {
 		return model.PixezMirrorImageFile{}, fmt.Errorf("active storage configuration: %w", err)
 	}
@@ -462,7 +463,6 @@ func registerMirrorUpload(ctx context.Context, pixivURL string, pageIndex int, d
 		MimeType:      mimeType,
 		Extension:     ext,
 		Hash:          hash,
-		StorageDriver: string(driver),
 		Type:          pixezMirrorUploadType,
 		Status:        model.UploadStatusUsed,
 		AccessMode:    1,
@@ -614,7 +614,7 @@ func mustJSON(v any) string {
 }
 
 func waitMirrorConcurrencyLimit(ctx context.Context, modelObj any, idColumn string, targetID int64, configKey string) error {
-	maxConcurrency, err := model.GetIntByKey(ctx, configKey)
+	maxConcurrency, err := repository.GetIntByKey(ctx, configKey)
 	if err != nil {
 		maxConcurrency = 5 // 默认限制为 5
 	}

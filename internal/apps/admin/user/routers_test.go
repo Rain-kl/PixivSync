@@ -1,10 +1,11 @@
 // Copyright 2025 linux.do
 // Copyright 2026 Arctel.net
-// SPDX-License-Identifier: AGPL-3.0-only
+// SPDX-License-Identifier: Apache-2.0
 
 package user
 
-import ("bytes"
+import (
+	"bytes"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
@@ -14,20 +15,19 @@ import ("bytes"
 	"github.com/Rain-kl/Wavelet/internal/apps/oauth"
 	"github.com/Rain-kl/Wavelet/internal/model"
 	"github.com/Rain-kl/Wavelet/internal/testhelper"
-	"github.com/Rain-kl/Wavelet/internal/util"
 	"github.com/gin-gonic/gin"
 
-	"github.com/Rain-kl/Wavelet/internal/common/response")
+	"github.com/Rain-kl/Wavelet/internal/common/response"
+)
 
 func setupTestRouter(authUser *model.User) *gin.Engine {
-	gin.SetMode(gin.TestMode)
-	r := gin.New()
+	r := testhelper.NewTestGinEngine()
 	adminGroup := r.Group("/api/v1/admin")
 
 	// Mock authentication middleware
 	adminGroup.Use(func(c *gin.Context) {
 		if authUser != nil {
-			util.SetToContext(c, oauth.UserObjKey, authUser)
+			oauth.SetToContext(c, oauth.UserObjKey, authUser)
 		}
 		c.Next()
 	})
@@ -108,9 +108,9 @@ func TestListUsers(t *testing.T) {
 		if listResp.Total != 3 {
 			t.Errorf("expected total 3, got %d", listResp.Total)
 		}
-		// Ordered by ID DESC
-		if listResp.Users[0].ID != 1003 || listResp.Users[1].ID != 1002 {
-			t.Errorf("expected ordered DESC, got first ID %d, second ID %d", listResp.Users[0].ID, listResp.Users[1].ID)
+		// Ordered by ID ASC
+		if listResp.Users[0].ID != 1001 || listResp.Users[1].ID != 1002 {
+			t.Errorf("expected ordered ASC, got first ID %d, second ID %d", listResp.Users[0].ID, listResp.Users[1].ID)
 		}
 	})
 

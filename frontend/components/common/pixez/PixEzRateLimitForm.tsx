@@ -13,7 +13,7 @@ import {Input} from "@/components/ui/input"
 import {Skeleton} from "@/components/ui/skeleton"
 import {Spinner} from "@/components/ui/spinner"
 import {ErrorInline} from "@/components/layout/error"
-import {AdminService} from "@/lib/services"
+import {AdminSystemConfigService} from "@/lib/services"
 
 import {PIXEZ_RATE_LIMIT_CONFIG_KEYS, usePixEzSettings} from "./api/usePixEzSettings"
 
@@ -86,13 +86,13 @@ export function PixEzRateLimitForm() {
     try {
       setSaving(true)
       await Promise.all([
-        AdminService.updateSystemConfig(PIXEZ_RATE_LIMIT_CONFIG_KEYS.downloadInterval, {
+        AdminSystemConfigService.updateSystemConfig(PIXEZ_RATE_LIMIT_CONFIG_KEYS.downloadInterval, {
           value: values.downloadInterval,
         }),
-        AdminService.updateSystemConfig(PIXEZ_RATE_LIMIT_CONFIG_KEYS.illustConcurrency, {
+        AdminSystemConfigService.updateSystemConfig(PIXEZ_RATE_LIMIT_CONFIG_KEYS.illustConcurrency, {
           value: values.illustConcurrency,
         }),
-        AdminService.updateSystemConfig(PIXEZ_RATE_LIMIT_CONFIG_KEYS.novelConcurrency, {
+        AdminSystemConfigService.updateSystemConfig(PIXEZ_RATE_LIMIT_CONFIG_KEYS.novelConcurrency, {
           value: values.novelConcurrency,
         }),
       ])

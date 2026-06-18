@@ -9,6 +9,7 @@ import (
 
 	"github.com/Rain-kl/Wavelet/internal/db"
 	"github.com/Rain-kl/Wavelet/internal/model"
+	"github.com/Rain-kl/Wavelet/internal/repository"
 	"github.com/Rain-kl/Wavelet/internal/testhelper"
 )
 
@@ -17,11 +18,11 @@ func TestListVisibleSystemConfigsUsesRedisCache(t *testing.T) {
 	defer cleanup()
 	ctx := context.Background()
 
-	if err := model.InvalidateVisibleSystemConfigsCache(ctx); err != nil {
+	if err := repository.InvalidateVisibleSystemConfigsCache(ctx); err != nil {
 		t.Fatalf("InvalidateVisibleSystemConfigsCache() error = %v", err)
 	}
 
-	if _, err := model.ListVisibleSystemConfigs(ctx); err != nil {
+	if _, err := repository.ListVisibleSystemConfigs(ctx); err != nil {
 		t.Fatalf("ListVisibleSystemConfigs() warm cache error = %v", err)
 	}
 
@@ -35,7 +36,7 @@ func TestListVisibleSystemConfigsUsesRedisCache(t *testing.T) {
 		t.Fatalf("Create(cache_probe_public_key) error = %v", err)
 	}
 
-	cached, err := model.ListVisibleSystemConfigs(ctx)
+	cached, err := repository.ListVisibleSystemConfigs(ctx)
 	if err != nil {
 		t.Fatalf("ListVisibleSystemConfigs() cached call error = %v", err)
 	}
@@ -45,7 +46,7 @@ func TestListVisibleSystemConfigsUsesRedisCache(t *testing.T) {
 		}
 	}
 
-	exists, err := db.Redis.Exists(ctx, db.PrefixedKey(model.SystemConfigVisibleListRedisKey)).Result()
+	exists, err := db.Redis.Exists(ctx, db.PrefixedKey(repository.SystemConfigVisibleListRedisKey)).Result()
 	if err != nil {
 		t.Fatalf("Redis.Exists() error = %v", err)
 	}
@@ -53,11 +54,11 @@ func TestListVisibleSystemConfigsUsesRedisCache(t *testing.T) {
 		t.Fatal("expected visible config list cache key to exist")
 	}
 
-	if err := model.InvalidateVisibleSystemConfigsCache(ctx); err != nil {
+	if err := repository.InvalidateVisibleSystemConfigsCache(ctx); err != nil {
 		t.Fatalf("InvalidateVisibleSystemConfigsCache() error = %v", err)
 	}
 
-	refreshed, err := model.ListVisibleSystemConfigs(ctx)
+	refreshed, err := repository.ListVisibleSystemConfigs(ctx)
 	if err != nil {
 		t.Fatalf("ListVisibleSystemConfigs() refreshed call error = %v", err)
 	}

@@ -14,7 +14,6 @@ import (
 	"github.com/Rain-kl/Wavelet/internal/config"
 	"github.com/Rain-kl/Wavelet/internal/db/idgen"
 	"github.com/Rain-kl/Wavelet/internal/model"
-	"github.com/Rain-kl/Wavelet/internal/util"
 	"github.com/gin-gonic/gin"
 )
 
@@ -29,7 +28,7 @@ func RiskControlMiddleware() gin.HandlerFunc {
 
 		// 1. 限流背压检测（检测本地缓冲队列是否已满）
 		if IsBufferFull() {
-			c.AbortWithStatusJSON(http.StatusTooManyRequests, response.Err("系统繁忙，请稍后再试"))
+			response.AbortTooManyRequests(c, "系统繁忙，请稍后再试")
 			return
 		}
 
@@ -39,7 +38,7 @@ func RiskControlMiddleware() gin.HandlerFunc {
 		c.Next()
 
 		// 3. 后置身份检查：仅记录通过认证的请求
-		userObj, exists := util.GetFromContext[*model.User](c, oauth.UserObjKey)
+		userObj, exists := oauth.GetFromContext[*model.User](c, oauth.UserObjKey)
 		if !exists || userObj == nil {
 			return
 		}

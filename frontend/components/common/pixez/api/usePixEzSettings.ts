@@ -1,7 +1,7 @@
 import {useMemo} from "react"
 import {useQuery} from "@tanstack/react-query"
 
-import {AdminService} from "@/lib/services"
+import {AdminSystemConfigService} from "@/lib/services"
 
 export const PIXEZ_RATE_LIMIT_CONFIG_KEYS = {
   downloadInterval: "pixez_mirror_download_interval_seconds",
@@ -12,7 +12,7 @@ export const PIXEZ_RATE_LIMIT_CONFIG_KEYS = {
 export function usePixEzSettings() {
   const query = useQuery({
     queryKey: ["admin", "system-configs", "business"],
-    queryFn: () => AdminService.listSystemConfigs("business"),
+    queryFn: () => AdminSystemConfigService.listSystemConfigs("business"),
   })
 
   const configs = useMemo(() => {

@@ -21,13 +21,13 @@ const (
 )
 
 // InitLogWriter 初始化日志写入通道和后台写入协程
-func InitLogWriter() {
+func InitLogWriter(ctx context.Context) {
 	if !config.Config.ClickHouse.Enabled {
 		return
 	}
 
 	logChan = make(chan *UserAccessLog, defaultQueueSize)
-	go startBatchWorker()
+	go startBatchWorker(context.WithoutCancel(ctx))
 }
 
 // IsBufferFull 检查当前本地缓冲队列是否已满
@@ -52,7 +52,7 @@ func QueueAccessLog(logItem *UserAccessLog) {
 	}
 }
 
-func startBatchWorker() {
+func startBatchWorker(ctx context.Context) {
 	ticker := time.NewTicker(flushInterval)
 	defer ticker.Stop()
 
@@ -67,7 +67,6 @@ func startBatchWorker() {
 			return
 		}
 
-		ctx := context.Background()
 		b, err := db.ChConn.PrepareBatch(ctx, "INSERT INTO w_user_access_logs (id, user_id, path, method, ip, user_agent, headers, status, latency, created_at)")
 		if err != nil {
 			logger.ErrorF(ctx, "[RiskControl] Prepare ClickHouse batch failed: %v", err)

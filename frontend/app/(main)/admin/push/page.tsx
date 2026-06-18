@@ -8,9 +8,9 @@ import {motion} from "motion/react"
 import {Bell, History, Layers, Settings} from "lucide-react"
 
 import {Tabs, TabsContent, TabsList, TabsTrigger} from "@/components/ui/tabs"
-import {EventsTab} from "@/components/common/admin/push/events-tab"
-import {HistoriesTab} from "@/components/common/admin/push/histories-tab"
-import {SettingsTab} from "@/components/common/admin/push/settings-tab"
+import {EventsTab} from "./components/events-tab"
+import {HistoriesTab} from "./components/histories-tab"
+import {SettingsTab} from "./components/settings-tab"
 
 export default function PushAdminPage() {
   const [activeTab, setActiveTab] = React.useState("events")

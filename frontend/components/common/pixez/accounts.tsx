@@ -21,7 +21,7 @@ import {EmptyStateWithBorder} from "@/components/layout/empty"
 import {ErrorInline} from "@/components/layout/error"
 import {LoadingStateWithBorder} from "@/components/layout/loading"
 import type {PixezAccount} from "@/lib/services"
-import {AdminService, PixezService} from "@/lib/services"
+import {AdminTaskService, PixezService} from "@/lib/services"
 
 import {AccountCard} from "./AccountCard"
 import {usePixEzAccounts} from "./api/usePixEzAccounts"
@@ -120,11 +120,11 @@ export function PixEzAccounts() {
       setSyncingID(id)
       const payload = account ? JSON.stringify({pixiv_user_id: account.pixiv_user_id}) : ""
       const [illustTaskID, novelTaskID] = await Promise.all([
-        AdminService.dispatchTask({
+        AdminTaskService.dispatchTask({
           task_type: "pixez_export_bookmark_illusts",
           payload,
         }),
-        AdminService.dispatchTask({
+        AdminTaskService.dispatchTask({
           task_type: "pixez_export_bookmark_novels",
           payload,
         }),

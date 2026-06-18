@@ -1,21 +1,18 @@
 // Copyright 2026 Arctel.net
-// SPDX-License-Identifier: AGPL-3.0-only
+// SPDX-License-Identifier: Apache-2.0
 
 // Package push defines push notification HTTP routes.
 package push
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"net/http"
 	"strconv"
-	"strings"
 
-	"github.com/Rain-kl/Wavelet/internal/db"
 	"github.com/Rain-kl/Wavelet/internal/model"
-	"github.com/Rain-kl/Wavelet/internal/task"
+	"github.com/Rain-kl/Wavelet/internal/repository"
 	"github.com/Rain-kl/Wavelet/pkg/push"
 	"github.com/gin-gonic/gin"
 	"gorm.io/gorm"
@@ -39,30 +36,7 @@ type TestPushRequest struct {
 
 // SyncEvents automatically registers/updates built-in events in the database.
 func SyncEvents(ctx context.Context) error {
-	for _, meta := range BuiltInEvents {
-		var event model.PushEvent
-		err := db.DB(ctx).Where("event_key = ?", meta.Key).First(&event).Error
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			var defaultTemplateStr string
-			if defaultTemplateBytes, err := json.Marshal(meta.DefaultTemplate); err == nil {
-				defaultTemplateStr = string(defaultTemplateBytes)
-			}
-			event = model.PushEvent{
-				EventKey: meta.Key,
-				Name:     meta.Name,
-				Channels: []string{},
-				Targets:  []string{},
-				Template: defaultTemplateStr,
-				Enabled:  false,
-			}
-			if err := db.DB(ctx).Create(&event).Error; err != nil {
-				return err
-			}
-		} else if err != nil {
-			return err
-		}
-	}
-	return nil
+	return syncBuiltInEvents(ctx)
 }
 
 // ListEvents 获取通知事件列表
@@ -75,10 +49,9 @@ func SyncEvents(ctx context.Context) error {
 // @Router /api/v1/admin/push/events [get]
 func ListEvents(c *gin.Context) {
 	ctx := c.Request.Context()
-
-	var events []model.PushEvent
-	if err := db.DB(ctx).Order("created_at DESC").Find(&events).Error; err != nil {
-		c.JSON(http.StatusInternalServerError, response.Err(err.Error()))
+	events, err := listPushEvents(ctx)
+	if err != nil {
+		response.AbortInternal(c, err.Error())
 		return
 	}
 	c.JSON(http.StatusOK, response.OK(events))
@@ -115,46 +88,6 @@ func ListBuiltInEvents(c *gin.Context) {
 	c.JSON(http.StatusOK, response.OK(BuiltInEvents))
 }
 
-func getEventInfo(req CreateEventRequest) (string, string, []byte, error) {
-	if req.TaskType != "" {
-		// 1. 检查关联任务是否存在
-		meta := task.GetTaskMetaByAsynqTask(req.TaskType)
-		if meta == nil {
-			return "", "", nil, errors.New("unsupported task type")
-		}
-		eventKey := "task_completed:" + req.TaskType
-		eventName := "任务完成: " + meta.Name
-
-		defaultTemplate := NotificationMessage{
-			Title:   "任务完成: " + meta.Name,
-			Content: "异步任务 {{task_name}} (ID: {{task_id}}) 已完成。状态: {{task_status}}，耗时: {{task_duration}} ms。",
-			Level:   defaultLevelInfo,
-		}
-		defaultTemplateBytes, err := json.Marshal(defaultTemplate)
-		if err != nil {
-			return "", "", nil, err
-		}
-		return eventKey, eventName, defaultTemplateBytes, nil
-	}
-
-	if req.EventKey == "" {
-		return "", "", nil, errors.New("either event_key or task_type must be provided")
-	}
-
-	// 1. 检查内置事件是否存在
-	meta, found := findBuiltInEvent(req.EventKey)
-	if !found {
-		return "", "", nil, errors.New("unsupported built-in event key")
-	}
-
-	defaultTemplateBytes, err := json.Marshal(meta.DefaultTemplate)
-	if err != nil {
-		return "", "", nil, err
-	}
-
-	return req.EventKey, meta.Name, defaultTemplateBytes, nil
-}
-
 // CreateEvent 创建通知事件
 // @Summary 创建通知事件
 // @Description 绑定系统内置事件或异步任务、推送渠道、接收目标并创建通知事件配置，需要管理员权限
@@ -168,74 +101,15 @@ func getEventInfo(req CreateEventRequest) (string, string, []byte, error) {
 func CreateEvent(c *gin.Context) {
 	var req CreateEventRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, response.Err(err.Error()))
+		response.AbortBadRequest(c, err.Error())
 		return
 	}
 
-	ctx := c.Request.Context()
-
-	eventKey, eventName, defaultTemplateBytes, err := getEventInfo(req)
+	event, err := createPushEvent(c.Request.Context(), req)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, response.Err(err.Error()))
+		response.AbortBadRequest(c, err.Error())
 		return
 	}
-
-	// 2. 检查是否已经创建过该事件的配置
-	var count int64
-	if err := db.DB(ctx).Model(&model.PushEvent{}).Where("event_key = ?", eventKey).Count(&count).Error; err != nil {
-		c.JSON(http.StatusInternalServerError, response.Err(err.Error()))
-		return
-	}
-	if count > 0 {
-		c.JSON(http.StatusBadRequest, response.Err("this notification event is already configured"))
-		return
-	}
-
-	// 3. 模板处理
-	templateStr := strings.TrimSpace(req.Template)
-	if templateStr == "" {
-		templateStr = string(defaultTemplateBytes)
-	} else {
-		var tempMap map[string]any
-		if err := json.Unmarshal([]byte(templateStr), &tempMap); err != nil {
-			c.JSON(http.StatusBadRequest, response.Err("custom template is not a valid JSON format"))
-			return
-		}
-	}
-
-	// 4. 创建事件记录
-	channels := req.Channels
-	if channels == nil {
-		channels = []string{}
-	}
-	targets := req.Targets
-	if targets == nil {
-		targets = []string{}
-	}
-
-	event := model.PushEvent{
-		EventKey: eventKey,
-		Name:     eventName,
-		TaskType: req.TaskType,
-		Channels: channels,
-		Targets:  targets,
-		Template: templateStr,
-		Enabled:  req.Enabled,
-	}
-
-	if err := event.Validate(); err != nil {
-		c.JSON(http.StatusBadRequest, response.Err(err.Error()))
-		return
-	}
-
-	if err := db.DB(ctx).Create(&event).Error; err != nil {
-		c.JSON(http.StatusInternalServerError, response.Err(err.Error()))
-		return
-	}
-
-	// 缓存一致性：清除旧事件缓存
-	model.DeleteActivePushEventCache(ctx, event.EventKey)
-
 	c.JSON(http.StatusOK, response.OK(event))
 }
 
@@ -249,32 +123,20 @@ func CreateEvent(c *gin.Context) {
 // @Success 200 {object} response.Any{data=string} "删除成功"
 // @Router /api/v1/admin/push/events/{id} [delete]
 func DeleteEvent(c *gin.Context) {
-	idStr := c.Param("id")
-	id, err := strconv.ParseUint(idStr, 10, 64)
+	id, err := strconv.ParseUint(c.Param("id"), 10, 64)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, response.Err("invalid event id"))
+		response.AbortBadRequest(c, "invalid event id")
 		return
 	}
 
-	ctx := c.Request.Context()
-	var event model.PushEvent
-	if err := db.DB(ctx).First(&event, id).Error; err != nil {
+	if err := deletePushEvent(c.Request.Context(), id); err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
-			c.JSON(http.StatusNotFound, response.Err("notification event not found"))
-		} else {
-			c.JSON(http.StatusInternalServerError, response.Err(err.Error()))
+			response.AbortNotFound(c, "notification event not found")
+			return
 		}
+		response.AbortInternal(c, err.Error())
 		return
 	}
-
-	if err := db.DB(ctx).Delete(&event).Error; err != nil {
-		c.JSON(http.StatusInternalServerError, response.Err(err.Error()))
-		return
-	}
-
-	// 缓存一致性：清除事件缓存
-	model.DeleteActivePushEventCache(ctx, event.EventKey)
-
 	c.JSON(http.StatusOK, response.OKNil())
 }
 
@@ -290,47 +152,26 @@ func DeleteEvent(c *gin.Context) {
 // @Success 200 {object} response.Any{data=string} "修改成功"
 // @Router /api/v1/admin/push/events/{id} [put]
 func UpdateEvent(c *gin.Context) {
-	idStr := c.Param("id")
-	id, err := strconv.ParseUint(idStr, 10, 64)
+	id, err := strconv.ParseUint(c.Param("id"), 10, 64)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, response.Err("invalid event id"))
+		response.AbortBadRequest(c, "invalid event id")
 		return
 	}
 
 	var req UpdateEventRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, response.Err(err.Error()))
+		response.AbortBadRequest(c, err.Error())
 		return
 	}
 
-	var event model.PushEvent
-	if err := db.DB(c.Request.Context()).First(&event, id).Error; err != nil {
+	if err := updatePushEvent(c.Request.Context(), id, req); err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
-			c.JSON(http.StatusNotFound, response.Err("notification event not found"))
-		} else {
-			c.JSON(http.StatusInternalServerError, response.Err(err.Error()))
+			response.AbortNotFound(c, "notification event not found")
+			return
 		}
+		response.AbortBadRequest(c, err.Error())
 		return
 	}
-
-	event.Channels = req.Channels
-	event.Targets = req.Targets
-	event.Template = req.Template
-	event.Enabled = req.Enabled
-
-	if err := event.Validate(); err != nil {
-		c.JSON(http.StatusBadRequest, response.Err(err.Error()))
-		return
-	}
-
-	if err := db.DB(c.Request.Context()).Save(&event).Error; err != nil {
-		c.JSON(http.StatusInternalServerError, response.Err(err.Error()))
-		return
-	}
-
-	// 缓存一致性：清除事件缓存
-	model.DeleteActivePushEventCache(c.Request.Context(), event.EventKey)
-
 	c.JSON(http.StatusOK, response.OKNil())
 }
 
@@ -344,37 +185,22 @@ func UpdateEvent(c *gin.Context) {
 // @Success 200 {object} response.Any{data=string} "切换成功"
 // @Router /api/v1/admin/push/events/{id}/toggle [post]
 func ToggleEvent(c *gin.Context) {
-	idStr := c.Param("id")
-	id, err := strconv.ParseUint(idStr, 10, 64)
+	id, err := strconv.ParseUint(c.Param("id"), 10, 64)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, response.Err("invalid event id"))
+		response.AbortBadRequest(c, "invalid event id")
 		return
 	}
 
-	var event model.PushEvent
-	if err := db.DB(c.Request.Context()).First(&event, id).Error; err != nil {
+	enabled, err := togglePushEvent(c.Request.Context(), id)
+	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
-			c.JSON(http.StatusNotFound, response.Err("notification event not found"))
-		} else {
-			c.JSON(http.StatusInternalServerError, response.Err(err.Error()))
+			response.AbortNotFound(c, "notification event not found")
+			return
 		}
+		response.AbortBadRequest(c, err.Error())
 		return
 	}
-
-	event.Enabled = !event.Enabled
-	if event.Enabled && len(event.Channels) == 0 {
-		c.JSON(http.StatusBadRequest, response.Err("cannot enable event without any push channels configured"))
-		return
-	}
-	if err := db.DB(c.Request.Context()).Model(&event).Update("enabled", event.Enabled).Error; err != nil {
-		c.JSON(http.StatusInternalServerError, response.Err(err.Error()))
-		return
-	}
-
-	// 缓存一致性：清除事件缓存
-	model.DeleteActivePushEventCache(c.Request.Context(), event.EventKey)
-
-	c.JSON(http.StatusOK, response.OK(event.Enabled))
+	c.JSON(http.StatusOK, response.OK(enabled))
 }
 
 // pushHistoriesResponse 推送历史分页响应
@@ -398,38 +224,23 @@ type pushHistoriesResponse struct {
 // @Success 200 {object} response.Any{data=pushHistoriesResponse} "推送历史列表"
 // @Router /api/v1/admin/push/histories [get]
 func ListHistories(c *gin.Context) {
-	pageStr := c.DefaultQuery("page", "1")
-	pageSizeStr := c.DefaultQuery("page_size", "20")
-	eventKey := c.Query("event_key")
-	status := c.Query("status")
-
-	page, err := strconv.Atoi(pageStr)
-	if err != nil || page < 1 {
+	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
+	pageSize, _ := strconv.Atoi(c.DefaultQuery("page_size", "20"))
+	if page < 1 {
 		page = 1
 	}
-	pageSize, err := strconv.Atoi(pageSizeStr)
-	if err != nil || pageSize < 1 {
+	if pageSize < 1 {
 		pageSize = 20
 	}
 
-	query := db.DB(c.Request.Context()).Model(&model.PushHistory{}).Order("created_at DESC")
-	if eventKey != "" {
-		query = query.Where("event_key = ?", eventKey)
-	}
-	if status != "" {
-		query = query.Where("status = ?", status)
-	}
-
-	var total int64
-	if err := query.Count(&total).Error; err != nil {
-		c.JSON(http.StatusInternalServerError, response.Err(err.Error()))
-		return
-	}
-
-	var results []model.PushHistory
-	offset := (page - 1) * pageSize
-	if err := query.Offset(offset).Limit(pageSize).Find(&results).Error; err != nil {
-		c.JSON(http.StatusInternalServerError, response.Err(err.Error()))
+	total, results, err := listPushHistories(c.Request.Context(), repository.PushHistoryListFilter{
+		EventKey: c.Query("event_key"),
+		Status:   c.Query("status"),
+		Page:     page,
+		PageSize: pageSize,
+	})
+	if err != nil {
+		response.AbortInternal(c, err.Error())
 		return
 	}
 
@@ -452,53 +263,30 @@ func ListHistories(c *gin.Context) {
 func TestPush(c *gin.Context) {
 	var req TestPushRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, response.Err(err.Error()))
+		response.AbortBadRequest(c, err.Error())
 		return
 	}
 
 	pusher, err := push.GetPusher(req.Config.Channel)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, response.Err(err.Error()))
+		response.AbortBadRequest(c, err.Error())
 		return
 	}
-
-	// 校验配置
 	if err := pusher.ValidateConfig(req.Config); err != nil {
-		c.JSON(http.StatusBadRequest, response.Err(fmt.Sprintf("validation failed: %v", err)))
+		response.AbortBadRequest(c, fmt.Sprintf("validation failed: %v", err))
 		return
 	}
 
-	// 邮件渠道需要从系统设置中拉取发件人 SMTP 信息做测试 (除非配了独立的)
-	if req.Config.Channel == channelEmail && (req.Config.URL == "" || req.Config.Key == "") {
-		var smtpHost, smtpPort, smtpUser, smtpPass model.SystemConfig
-		ctx := c.Request.Context()
-		_ = smtpHost.GetByKey(ctx, model.ConfigKeySMTPHost)
-		_ = smtpPort.GetByKey(ctx, model.ConfigKeySMTPPort)
-		_ = smtpUser.GetByKey(ctx, model.ConfigKeySMTPUsername)
-		_ = smtpPass.GetByKey(ctx, model.ConfigKeySMTPPassword)
-
-		if smtpHost.Value != "" && smtpUser.Value != "" {
-			port := smtpPort.Value
-			if port == "" {
-				port = "587"
-			}
-			req.Config.URL = smtpHost.Value + ":" + port
-			req.Config.Key = smtpUser.Value
-			req.Config.Secret = smtpPass.Value
-		}
-	}
+	applySMTPFallbackToPushConfig(c.Request.Context(), &req.Config)
 
 	testBody := map[string]any{
 		keyTitle:   "测试通道推送",
 		keyContent: "当您收到这条消息，说明当前渠道连通性测试通过。",
 		keyLevel:   defaultLevelInfo,
 	}
-
-	err = pusher.Send(c.Request.Context(), req.Config, req.Target, testBody, "", nil)
-	if err != nil {
-		c.JSON(http.StatusOK, response.Err(err.Error()))
+	if err := pusher.Send(c.Request.Context(), req.Config, req.Target, testBody, "", nil); err != nil {
+		response.AbortBadRequest(c, err.Error())
 		return
 	}
-
 	c.JSON(http.StatusOK, response.OKNil())
 }

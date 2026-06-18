@@ -1,61 +1,54 @@
 /**
  * 服务层统一入口
- * 提供所有业务服务的访问接口
  *
  * @example
  * ```typescript
- * // 推荐：使用统一的 services 对象
  * import services from '@/lib/services';
  *
  * const user = await services.auth.getUserInfo();
- * const systemConfig = await services.admin.listSystemConfigs();
- * ```
- *
- * @example
- * ```typescript
- * // 按需导入：直接导入特定服务
- * import { AuthService } from '@/lib/services';
- *
- * const user = await AuthService.getUserInfo();
+ * const configs = await services.adminSystemConfig.listSystemConfigs();
  * ```
  */
 
+import {
+  AdminAuthSourceService,
+  AdminCacheService,
+  AdminLogService,
+  AdminStatusService,
+  AdminSystemConfigService,
+  AdminTaskService,
+  AdminTemplateService,
+  AdminUserService,
+} from './admin';
 import {AuthService} from './auth';
-import {AdminService} from './admin';
-import {UserService} from './user';
 import {ConfigService} from './config';
-import {UploadService} from './upload';
 import {DbManageService} from './db-manage';
-import {PixezService} from './pixez';
 import {PushService} from './push';
+import {PixezService} from './pixez';
+import {AdminUploadService, UploadService} from './upload';
+import {UserService} from './user';
 
-/**
- * 服务对象
- * 集中导出所有业务服务
- *
- * @description
- * 推荐使用此对象访问所有服务，保持代码风格统一
- */
 const services = {
-  /** 认证服务 */
   auth: AuthService,
-  /** 管理员服务 */
-  admin: AdminService,
-  /** 用户服务 */
+  adminSystemConfig: AdminSystemConfigService,
+  adminAuthSource: AdminAuthSourceService,
+  adminTask: AdminTaskService,
+  adminUser: AdminUserService,
+  adminStatus: AdminStatusService,
+  adminLog: AdminLogService,
+  adminTemplate: AdminTemplateService,
+  adminCache: AdminCacheService,
   user: UserService,
-  /** 配置服务 */
   config: ConfigService,
-  /** 上传服务 */
   upload: UploadService,
-  /** 数据库管理服务 */
+  adminUpload: AdminUploadService,
   dbManage: DbManageService,
-  /** 通知推送服务 */
   push: PushService,
-  /** PixEz 镜像同步服务 */
   pixez: PixezService,
 } as const;
 
 export default services;
+export { services };
 
 // ==================== 核心模块导出 ====================
 
@@ -89,20 +82,26 @@ export type {
 
 // ==================== 业务服务导出 ====================
 
-// 认证服务
 export { AuthService } from './auth';
 export type { User, OAuthLoginUrlResponse, OAuthCallbackRequest, AuthSource, ExternalAccountBinding, ChangePasswordRequest, UpdateProfileRequest } from './auth';
 
-// 配置服务
 export { ConfigService } from './config';
 export type { PublicConfigResponse } from './config';
 
-// 管理员服务
-export { AdminService } from './admin';
+export {
+  AdminSystemConfigService,
+  AdminAuthSourceService,
+  AdminTaskService,
+  AdminUserService,
+  AdminStatusService,
+  AdminLogService,
+  AdminTemplateService,
+  AdminCacheService,
+} from './admin';
+
 export type {
   SystemConfig,
   CreateSystemConfigRequest,
-  CreateUserRequest,
   UpdateSystemConfigRequest,
   TaskMeta,
   TaskParam,
@@ -116,33 +115,37 @@ export type {
   ListUsersRequest,
   ListUsersResponse,
   UpdateUserStatusRequest,
+  CreateUserRequest,
   SystemStatus,
-  DatabaseInfo,
   AppUpdateStatus,
   Schedule,
   CreateScheduleRequest,
   UpdateScheduleRequest,
   CacheStatus,
   CacheConfig,
+  Template,
+  CreateTemplateRequest,
+  UpdateTemplateRequest,
+  AuthSource as AdminAuthSource,
+  AuthSourceRequest,
+  ToggleAuthSourceRequest,
+  StorageDriver,
+  StorageConfig,
+  ObjectStorageConfig,
 } from './admin';
 
-// 用户服务
 export { UserService } from './user';
 export type { AccessToken, CreateTokenResponse } from './user';
 
-// 上传服务
-export { UploadService } from './upload';
-export type { UploadImageResponse } from './upload';
+export { UploadService, AdminUploadService, formatFileSize, getFileUrl } from './upload';
+export type { UploadImageResponse, Upload, ListUploadsResponse, FileStatsResponse, ImageQuality } from './upload';
 
-// 数据库管理服务
 export { DbManageService } from './db-manage';
 export type { DBOverview, TableDataResponse, ExecuteSQLResponse } from './db-manage';
 
-// 通知推送服务
 export { PushService } from './push';
 export type { PushEvent, PushHistory, PushChannelConfig, ListPushHistoriesRequest, ListPushHistoriesResponse, UpdatePushEventRequest, TestPushRequest } from './push';
 
-// PixEz 服务
 export { PixezService } from './pixez';
 export type {
   PixezAccount,

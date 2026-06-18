@@ -26,8 +26,16 @@ import (
 // handlerRegistry 已注册的任务处理器
 var handlerRegistry = make(map[string]TaskHandler)
 
-// OnTaskCompleted is a hook called when a task execution completes.
-var OnTaskCompleted func(ctx context.Context, execution *model.TaskExecution, result *TaskResult, execErr error)
+// CompletedHandler is called when a task execution completes.
+type CompletedHandler func(ctx context.Context, execution *model.TaskExecution, result *TaskResult, execErr error)
+
+var taskCompletedHandlers []CompletedHandler
+
+// OnTaskCompleted registers a handler for task completion events.
+// Handlers must be registered during application bootstrap before processing tasks.
+func OnTaskCompleted(handler CompletedHandler) {
+	taskCompletedHandlers = append(taskCompletedHandlers, handler)
+}
 
 // RegisterHandler 注册任务处理器
 // 传入任务类型标识（对应 constants.go 中的 AsynqTask 常量）和 TaskHandler 实现
@@ -408,9 +416,17 @@ func completeTaskExecution(ctx context.Context, execution *model.TaskExecution, 
 		}
 	}
 
-	if OnTaskCompleted != nil {
-		asyncCtx := context.WithoutCancel(ctx)
-		go OnTaskCompleted(asyncCtx, execution, result, execErr)
+	notifyTaskCompleted(ctx, execution, result, execErr)
+}
+
+func notifyTaskCompleted(ctx context.Context, execution *model.TaskExecution, result *TaskResult, execErr error) {
+	if len(taskCompletedHandlers) == 0 {
+		return
+	}
+
+	asyncCtx := context.WithoutCancel(ctx)
+	for _, handler := range taskCompletedHandlers {
+		go handler(asyncCtx, execution, result, execErr)
 	}
 }
 

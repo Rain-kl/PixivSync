@@ -15,6 +15,7 @@ import (
 
 	"github.com/Rain-kl/Wavelet/internal/db"
 	"github.com/Rain-kl/Wavelet/internal/model"
+	"github.com/Rain-kl/Wavelet/internal/repository"
 	"gorm.io/gorm"
 )
 
@@ -123,8 +124,7 @@ func Active(ctx context.Context) (Driver, Backend, error) {
 		return activeDriver, activeBackend, nil
 	}
 
-	var sc model.SystemConfig
-	err := sc.GetByKey(ctx, model.ConfigKeyStorageConfig)
+	sc, err := repository.GetSystemConfigByKey(ctx, model.ConfigKeyStorageConfig)
 	if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
 		return "", nil, err
 	}
@@ -153,25 +153,6 @@ func Active(ctx context.Context) (Driver, Backend, error) {
 	activeConfigJSON = sc.Value
 
 	return activeDriver, activeBackend, nil
-}
-
-// ForDriver returns the active or pending backend for an upload record, reusing the active singleton if matched.
-func ForDriver(ctx context.Context, driver Driver) (Backend, error) {
-	if driver == DriverS3 && mockBackend != nil {
-		return mockBackend, nil
-	}
-	activeDrv, activeBnd, err := Active(ctx)
-	if err == nil && activeDrv == driver {
-		return activeBnd, nil
-	}
-	cfg, err := LoadConfig(ctx)
-	if err != nil {
-		return nil, err
-	}
-	if cfg.Driver == driver {
-		return NewBackend(ctx, cfg, driver)
-	}
-	return nil, fmt.Errorf("storage configuration for driver %q is unavailable", driver)
 }
 
 type functionBackend struct {

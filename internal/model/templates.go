@@ -5,14 +5,10 @@ package model
 
 import (
 	"bytes"
-	"context"
 	"errors"
-	"fmt"
 	"strings"
 	"text/template"
 	"time"
-
-	"github.com/Rain-kl/Wavelet/internal/db"
 )
 
 // Template 邮件/消息模板实体
@@ -89,18 +85,4 @@ func (t *Template) Render(data any) (string, string, error) {
 	}
 
 	return subject, bodyBuf.String(), nil
-}
-
-// RenderTemplate 渲染指定模板。模板不存在或渲染失败时返回错误，由调用方决定如何处理。
-func RenderTemplate(ctx context.Context, key string, data any) (string, string, error) {
-	var t Template
-	if err := db.DB(ctx).Where("key = ?", key).First(&t).Error; err != nil {
-		return "", "", fmt.Errorf(errTemplateUnavailable, key, err)
-	}
-
-	subject, body, err := t.Render(data)
-	if err != nil {
-		return "", "", fmt.Errorf(errTemplateRenderFailed, key, err)
-	}
-	return subject, body, nil
 }

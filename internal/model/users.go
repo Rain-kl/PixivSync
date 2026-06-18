@@ -139,12 +139,7 @@ func (u *User) assignIDIfMissing() error {
 }
 
 // CreateUser 创建新用户（用于 OAuth/OIDC 自动注册，含底层权限校验）
-func (u *User) CreateUser(ctx context.Context, tx *gorm.DB, oauthInfo *OAuthUserInfo) error {
-	enabled, err := GetBoolByKey(ctx, ConfigKeyRegistrationEnabled)
-	if err == nil && !enabled {
-		return errors.New(errRegistrationDisabled)
-	}
-
+func (u *User) CreateUser(_ context.Context, tx *gorm.DB, oauthInfo *OAuthUserInfo) error {
 	now := time.Now()
 	userID := oauthInfo.GetID()
 	newUser := User{
@@ -169,12 +164,7 @@ func (u *User) CreateUser(ctx context.Context, tx *gorm.DB, oauthInfo *OAuthUser
 }
 
 // RegisterUser 创建新用户并注册（用于本地密码注册，含全局开关和唯一性多重底层校验）
-func (u *User) RegisterUser(ctx context.Context, tx *gorm.DB) error {
-	enabled, err := GetBoolByKey(ctx, ConfigKeyRegistrationEnabled)
-	if err == nil && !enabled {
-		return errors.New(errRegistrationDisabled)
-	}
-
+func (u *User) RegisterUser(_ context.Context, tx *gorm.DB) error {
 	// 检查用户名冲突
 	var count int64
 	if err := tx.Model(&User{}).Where("username = ?", u.Username).Count(&count).Error; err != nil {

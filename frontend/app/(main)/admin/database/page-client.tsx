@@ -20,26 +20,25 @@ import {
 import {Card, CardContent, CardDescription, CardHeader, CardTitle} from "@/components/ui/card"
 import {Button} from "@/components/ui/button"
 import {Skeleton} from "@/components/ui/skeleton"
-import {AdminService} from "@/lib/services/admin"
+import services from "@/lib/services"
 import type {DBOverview} from "@/lib/services/db-manage"
-import {DbManageService} from "@/lib/services/db-manage"
 
 const sectionFallback = (
   <div className="h-48 animate-pulse rounded-lg border border-border/40 bg-muted/20" />
 )
 
 const TableBrowser = dynamic(
-  () => import("@/components/common/admin/database-table-browser").then((mod) => mod.TableBrowser),
+  () => import("./components/table-browser").then((mod) => mod.TableBrowser),
   { loading: () => sectionFallback },
 )
 
 const CacheManager = dynamic(
-  () => import("@/components/common/admin/database-cache-manager").then((mod) => mod.CacheManager),
+  () => import("./components/cache-manager").then((mod) => mod.CacheManager),
   { loading: () => sectionFallback },
 )
 
 const SQLConsole = dynamic(
-  () => import("@/components/common/admin/database-sql-console").then((mod) => mod.SQLConsole),
+  () => import("./components/sql-console").then((mod) => mod.SQLConsole),
   { ssr: false },
 )
 
@@ -67,7 +66,7 @@ export function DatabasePageClient() {
   const fetchOverview = useCallback(async (isSilent = false) => {
     if (!isSilent) setLoadingOverview(true)
     try {
-      const data = await DbManageService.getOverview()
+      const data = await services.dbManage.getOverview()
       setOverview(data)
     } catch (err) {
       toast.error("获取数据库概览失败", {
@@ -82,7 +81,7 @@ export function DatabasePageClient() {
   const fetchTables = useCallback(async () => {
     setLoadingTables(true)
     try {
-      const data = await DbManageService.listTables()
+      const data = await services.dbManage.listTables()
       setTables(data)
     } catch (err) {
       toast.error("获取数据库数据表列表失败", {
@@ -104,7 +103,7 @@ export function DatabasePageClient() {
   const handleExport = async () => {
     setExporting(true)
     try {
-      const { blob, filename } = await AdminService.exportDatabase()
+      const { blob, filename } = await services.dbManage.exportDatabase()
       const url = URL.createObjectURL(blob)
       const a = document.createElement("a")
       a.href = url

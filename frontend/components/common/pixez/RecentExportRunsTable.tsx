@@ -13,7 +13,7 @@ import {Spinner} from "@/components/ui/spinner"
 import {Table, TableBody, TableCell, TableHead, TableHeader, TableRow} from "@/components/ui/table"
 import {EmptyStateWithBorder} from "@/components/layout/empty"
 import type {PixezExportRun, PixezRunStatus} from "@/lib/services"
-import {AdminService} from "@/lib/services"
+import {AdminTaskService} from "@/lib/services"
 import {useUser} from "@/contexts/user-context"
 
 import {formatPixEzDateTime, formatPixEzDuration, pixezRunStatusLabel, pixezTargetLabel} from "./pixez-format"
@@ -38,7 +38,7 @@ export function RecentExportRunsTable({runs}: {runs: PixezExportRun[]}) {
   const handleRetry = async (run: PixezExportRun) => {
     try {
       setRetryingID(run.id)
-      const taskID = await AdminService.dispatchTask({
+      const taskID = await AdminTaskService.dispatchTask({
         task_type: taskTypeForRun(run),
         payload: JSON.stringify({pixiv_user_id: run.pixiv_user_id}),
       })

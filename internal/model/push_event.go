@@ -4,13 +4,9 @@
 package model
 
 import (
-	"context"
 	"errors"
 	"strings"
 	"time"
-
-	"github.com/Rain-kl/Wavelet/internal/db"
-	"gorm.io/gorm"
 )
 
 // PushEvent 系统通知事件模型
@@ -50,49 +46,5 @@ func (pe *PushEvent) Validate() error {
 	if pe.Enabled && len(pe.Channels) == 0 {
 		return errors.New("cannot enable event without any push channels configured")
 	}
-	return nil
-}
-
-const activePushEventCacheTTL = 24 * time.Hour
-
-// GetActivePushEventByKey 获取启用的通知事件 (优先从 Redis 缓存获取)
-func GetActivePushEventByKey(ctx context.Context, key string) (*PushEvent, error) {
-	cacheKey := "push:event:active:" + key
-	var event PushEvent
-	if db.Redis != nil {
-		if err := db.GetJSON(ctx, cacheKey, &event); err == nil {
-			return &event, nil
-		}
-	}
-
-	err := db.DB(ctx).Where("event_key = ? AND enabled = ?", key, true).First(&event).Error
-	if err != nil {
-		return nil, err
-	}
-
-	if db.Redis != nil {
-		// 缓存有效时间设置为 24 小时
-		_ = db.SetJSON(ctx, cacheKey, event, activePushEventCacheTTL)
-	}
-
-	return &event, nil
-}
-
-// DeleteActivePushEventCache 清理启用通知事件的缓存
-func DeleteActivePushEventCache(ctx context.Context, key string) {
-	if db.Redis != nil {
-		_ = db.Redis.Del(ctx, db.PrefixedKey("push:event:active:"+key)).Err()
-	}
-}
-
-// AfterSave GORM 保存后钩子，用于自动清理缓存
-func (pe *PushEvent) AfterSave(tx *gorm.DB) error {
-	DeleteActivePushEventCache(tx.Statement.Context, pe.EventKey)
-	return nil
-}
-
-// AfterDelete GORM 删除后钩子，用于自动清理缓存
-func (pe *PushEvent) AfterDelete(tx *gorm.DB) error {
-	DeleteActivePushEventCache(tx.Statement.Context, pe.EventKey)
 	return nil
 }

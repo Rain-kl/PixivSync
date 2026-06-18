@@ -13,6 +13,7 @@ import (
 	"github.com/gorilla/websocket"
 
 	"github.com/Rain-kl/Wavelet/internal/model"
+	"github.com/Rain-kl/Wavelet/internal/repository"
 )
 
 // getUpgrader 返回 WebSocket 升级器并执行 Origin 安全检查以防止 CSWSH 攻击
@@ -32,8 +33,7 @@ func getUpgrader() *websocket.Upgrader {
 
 			// 2. 检查配置的允许跨域 Origin (Check allowed origins in system config)
 			ctx := r.Context()
-			var sc model.SystemConfig
-			if err := sc.GetByKey(ctx, model.ConfigKeyServerAddress); err == nil && sc.Value != "" {
+			if sc, err := repository.GetSystemConfigByKey(ctx, model.ConfigKeyServerAddress); err == nil && sc.Value != "" {
 				originToCheck := strings.TrimRight(strings.TrimSpace(origin), "/")
 				allowedOrigins := strings.Split(sc.Value, ",")
 				for _, allowed := range allowedOrigins {

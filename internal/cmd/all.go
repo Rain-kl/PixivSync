@@ -9,6 +9,7 @@ import (
 	"log"
 	"sync"
 
+	"github.com/Rain-kl/Wavelet/internal/bootstrap"
 	"github.com/Rain-kl/Wavelet/internal/router"
 	"github.com/Rain-kl/Wavelet/internal/task/scheduler"
 	"github.com/Rain-kl/Wavelet/internal/task/worker"
@@ -20,6 +21,8 @@ var allCmd = &cobra.Command{
 	Short: "以融合模式同时启动 API、Worker 和 Scheduler",
 	Run: func(_ *cobra.Command, _ []string) {
 		log.Println("[All] 融合模式启动")
+		bootstrap.RegisterAll()
+		runBootstrap(bootstrap.Options{API: true})
 
 		var wg sync.WaitGroup
 

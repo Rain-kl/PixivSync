@@ -5,9 +5,11 @@ package oauth
 
 import (
 	"context"
+	"net/http"
 	"sync"
 
 	"github.com/coreos/go-oidc/v3/oidc"
+	"golang.org/x/oauth2"
 	"golang.org/x/sync/singleflight"
 )
 
@@ -33,12 +35,19 @@ var globalOIDCProviderCache = &oidcProviderCache{
 	entries: make(map[string]*oidc.Provider),
 }
 
+// discoveryContext 从请求 ctx 提取 HTTP 客户端，并绑定到不可取消的 Background ctx。
+// 这样既能在测试中注入 mock 客户端，又避免请求取消导致 provider 拉取失败。
+func discoveryContext(ctx context.Context) context.Context {
+	bg := context.Background()
+	if client, ok := ctx.Value(oauth2.HTTPClient).(*http.Client); ok && client != nil {
+		bg = oidc.ClientContext(bg, client)
+	}
+	return bg
+}
+
 // get 返回缓存的 provider；若无则通过 oidc.NewProvider 获取并写入缓存。
 // 同一 issuer 并发调用时，singleflight 保证只有一次实际 HTTP 请求。
-//
-// 注意：接受 _ 形参以与调用方类型一致，内部有意使用 context.Background() 而非传入的请求 ctx，
-// 以防止请求被提前取消时导致缓存写入失败。
-func (c *oidcProviderCache) get(_ context.Context, issuer string) (*oidc.Provider, error) { //nolint:contextcheck // intentional: use Background to avoid request cancellation affecting cache write
+func (c *oidcProviderCache) get(ctx context.Context, issuer string) (*oidc.Provider, error) {
 	// 快路径：已有缓存则直接返回。
 	c.mu.RLock()
 	if p, ok := c.entries[issuer]; ok {
@@ -48,8 +57,8 @@ func (c *oidcProviderCache) get(_ context.Context, issuer string) (*oidc.Provide
 	c.mu.RUnlock()
 
 	// 慢路径：通过 singleflight 合并并发的首次请求。
-	// 闭包内有意使用 context.Background() 而非请求 ctx，防止请求取消导致缓存写入失败。
-	v, err, _ := c.sfGroup.Do(issuer, func() (any, error) { //nolint:contextcheck // intentional: Background ctx prevents cache write failure on request cancellation
+	discCtx := discoveryContext(ctx)
+	v, err, _ := c.sfGroup.Do(issuer, func() (any, error) {
 		// 双检：singleflight 内再次检查，前一个并发组可能已写入缓存。
 		c.mu.RLock()
 		if p, ok := c.entries[issuer]; ok {
@@ -58,7 +67,7 @@ func (c *oidcProviderCache) get(_ context.Context, issuer string) (*oidc.Provide
 		}
 		c.mu.RUnlock()
 
-		p, err := oidc.NewProvider(context.Background(), issuer)
+		p, err := oidc.NewProvider(discCtx, issuer)
 		if err != nil {
 			return nil, err
 		}

@@ -4,8 +4,6 @@
 package cap
 
 import (
-	"net/http"
-
 	"github.com/gin-gonic/gin"
 
 	"github.com/Rain-kl/Wavelet/internal/common/response"
@@ -21,13 +19,13 @@ func VerifyMiddleware(mgr *Manager, scope string) gin.HandlerFunc {
 
 		token := c.GetHeader("X-Cap-Token")
 		if token == "" {
-			c.AbortWithStatusJSON(http.StatusUnauthorized, response.Err(errCapTokenMissing))
+			response.AbortUnauthorized(c, errCapTokenMissing)
 			return
 		}
 
 		valid, err := mgr.VerifyToken(c.Request.Context(), token, scope)
 		if err != nil || !valid {
-			c.AbortWithStatusJSON(http.StatusUnauthorized, response.Err(errCapTokenInvalidOrExpired))
+			response.AbortUnauthorized(c, errCapTokenInvalidOrExpired)
 			return
 		}
 

@@ -45,9 +45,9 @@ import {
 } from "@/components/ui/dialog"
 import {Select, SelectContent, SelectItem, SelectTrigger, SelectValue,} from "@/components/ui/select"
 import {Label} from "@/components/ui/label"
-import type {ChangePasswordRequest, UpdateProfileRequest} from "@/lib/services/auth"
 import {AuthService} from "@/lib/services/auth"
-import {UploadService} from "@/lib/services/upload/upload.service"
+import type {ChangePasswordRequest, UpdateProfileRequest} from "@/lib/services/auth"
+import services from "@/lib/services"
 import {ImageCrop, ImageCropApply, ImageCropContent, ImageCropReset} from "@/components/ui/image-crop"
 import {toast} from "sonner"
 
@@ -193,7 +193,7 @@ export function ProfileMain() {
 
   const handleCroppedImage = async (croppedBase64: string) => {
     try {
-      const res = await UploadService.uploadBase64Image(croppedBase64, "avatar", "avatar.png")
+      const res = await services.upload.uploadBase64Image(croppedBase64, "avatar", "avatar.png")
       setAvatarUrl(`/f/${res.id}`)
       setIsCropDialogOpen(false)
       setCropFile(null)

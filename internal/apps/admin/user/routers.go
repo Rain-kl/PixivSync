@@ -5,16 +5,13 @@
 package user
 
 import (
+	"errors"
 	"net/http"
 	"strconv"
-	"strings"
 	"time"
 
 	"github.com/Rain-kl/Wavelet/internal/apps/oauth"
-	"github.com/Rain-kl/Wavelet/internal/db"
-	"github.com/Rain-kl/Wavelet/internal/db/idgen"
 	"github.com/Rain-kl/Wavelet/internal/model"
-	"github.com/Rain-kl/Wavelet/internal/util"
 	"github.com/gin-gonic/gin"
 	"gorm.io/gorm"
 
@@ -59,7 +56,7 @@ type listUsersResponse struct {
 func parseUserID(c *gin.Context) (uint64, bool) {
 	id, err := strconv.ParseUint(c.Param("id"), 10, 64)
 	if err != nil || id == 0 {
-		c.JSON(http.StatusBadRequest, response.Err(userNotFound))
+		response.AbortBadRequest(c, userNotFound)
 		return 0, false
 	}
 	return id, true
@@ -85,6 +82,31 @@ func toUser(u model.User) user {
 	}
 }
 
+func abortUserLogicError(c *gin.Context, err error, notFoundMsg string, forbiddenMsgs, badRequestMsgs []string) bool {
+	if err == nil {
+		return false
+	}
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		response.AbortNotFound(c, notFoundMsg)
+		return true
+	}
+	msg := err.Error()
+	for _, m := range badRequestMsgs {
+		if msg == m {
+			response.AbortBadRequest(c, msg)
+			return true
+		}
+	}
+	for _, m := range forbiddenMsgs {
+		if msg == m {
+			response.AbortForbidden(c, msg)
+			return true
+		}
+	}
+	response.AbortInternal(c, msg)
+	return true
+}
+
 // ListUsers 获取用户列表
 // @Summary 获取用户列表
 // @Description 分页返回用户列表，支持按用户 ID 和用户名筛选，需要管理员权限
@@ -98,43 +120,16 @@ func toUser(u model.User) user {
 // @Failure 403 {object} response.Any "无管理员权限"
 // @Failure 500 {object} response.Any "内部错误"
 // @Router /api/v1/admin/users [get]
-// ListUsers 获取用户列表
 func ListUsers(c *gin.Context) {
 	var req listUsersRequest
 	if err := c.ShouldBindQuery(&req); err != nil {
-		c.JSON(http.StatusBadRequest, response.Err(err.Error()))
+		response.AbortBadRequest(c, err.Error())
 		return
 	}
 
-	var modelUsers []model.User
-	var total int64
-
-	query := db.DB(c.Request.Context()).Model(&model.User{})
-
-	username := strings.TrimSpace(req.Username)
-
-	if req.UserID != nil {
-		query = query.Where("id = ?", *req.UserID)
-	}
-
-	if username != "" {
-		query = query.Where("username LIKE ?", username+"%")
-	}
-
-	if err := query.Count(&total).Error; err != nil {
-		c.JSON(http.StatusInternalServerError, response.Err(err.Error()))
-		return
-	}
-
-	offset := (req.Page - 1) * req.PageSize
-	if err := query.
-		Select("id, username, nickname, avatar_url, is_active, is_admin, " +
-			"last_login_at, created_at, updated_at").
-		Order("id DESC").
-		Offset(offset).
-		Limit(req.PageSize).
-		Find(&modelUsers).Error; err != nil {
-		c.JSON(http.StatusInternalServerError, response.Err(err.Error()))
+	total, modelUsers, err := listUsers(c.Request.Context(), req)
+	if err != nil {
+		response.AbortInternal(c, err.Error())
 		return
 	}
 
@@ -169,17 +164,8 @@ func GetUser(c *gin.Context) {
 		return
 	}
 
-	var targetUser model.User
-	if err := db.DB(c.Request.Context()).
-		Select("id, username, nickname, email, avatar_url, is_active, is_admin, "+
-			"bio, phone, gender, website, location, last_login_at, created_at, updated_at").
-		Where("id = ?", id).
-		First(&targetUser).Error; err != nil {
-		if err == gorm.ErrRecordNotFound {
-			c.JSON(http.StatusNotFound, response.Err(userNotFound))
-			return
-		}
-		c.JSON(http.StatusInternalServerError, response.Err(err.Error()))
+	targetUser, err := getUserDetail(c.Request.Context(), id)
+	if abortUserLogicError(c, err, userNotFound, nil, nil) {
 		return
 	}
 
@@ -210,7 +196,7 @@ type updateUserStatusRequest struct {
 func UpdateUserStatus(c *gin.Context) {
 	var req updateUserStatusRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, response.Err(err.Error()))
+		response.AbortBadRequest(c, err.Error())
 		return
 	}
 
@@ -219,33 +205,11 @@ func UpdateUserStatus(c *gin.Context) {
 		return
 	}
 
-	var targetUser struct {
-		ID      uint64 `gorm:"column:id"`
-		IsAdmin bool   `gorm:"column:is_admin"`
-	}
-	if err := db.DB(c.Request.Context()).
-		Model(&model.User{}).
-		Select("id, is_admin").
-		Where("id = ?", id).
-		First(&targetUser).Error; err != nil {
-		if err == gorm.ErrRecordNotFound {
-			c.JSON(http.StatusNotFound, response.Err(userNotFound))
+	if err := updateUserStatus(c.Request.Context(), id, req.IsActive); err != nil {
+		if abortUserLogicError(c, err, userNotFound, []string{cannotDisable}, nil) {
 			return
 		}
-		c.JSON(http.StatusInternalServerError, response.Err(err.Error()))
-		return
-	}
-
-	if !req.IsActive && targetUser.IsAdmin {
-		c.JSON(http.StatusForbidden, response.Err(cannotDisable))
-		return
-	}
-
-	if err := db.DB(c.Request.Context()).
-		Model(&model.User{}).
-		Where("id = ?", id).
-		Update("is_active", req.IsActive).Error; err != nil {
-		c.JSON(http.StatusInternalServerError, response.Err(updateUserFailed))
+		response.AbortInternal(c, updateUserFailed)
 		return
 	}
 
@@ -272,44 +236,12 @@ func DeleteUser(c *gin.Context) {
 		return
 	}
 
-	currUser, _ := util.GetFromContext[*model.User](c, oauth.UserObjKey)
-	if currUser != nil && currUser.ID == id {
-		c.JSON(http.StatusForbidden, response.Err(cannotDeleteSelf))
-		return
-	}
-
-	var targetUser struct {
-		ID      uint64 `gorm:"column:id"`
-		IsAdmin bool   `gorm:"column:is_admin"`
-	}
-	if err := db.DB(c.Request.Context()).
-		Model(&model.User{}).
-		Select("id, is_admin").
-		Where("id = ?", id).
-		First(&targetUser).Error; err != nil {
-		if err == gorm.ErrRecordNotFound {
-			c.JSON(http.StatusNotFound, response.Err(userNotFound))
+	currUser, _ := oauth.GetFromContext[*model.User](c, oauth.UserObjKey)
+	if err := deleteUser(c.Request.Context(), currUser.ID, id); err != nil {
+		if abortUserLogicError(c, err, userNotFound, []string{cannotDelete, cannotDeleteSelf}, nil) {
 			return
 		}
-		c.JSON(http.StatusInternalServerError, response.Err(err.Error()))
-		return
-	}
-
-	if targetUser.IsAdmin {
-		c.JSON(http.StatusForbidden, response.Err(cannotDelete))
-		return
-	}
-
-	if err := db.DB(c.Request.Context()).Transaction(func(tx *gorm.DB) error {
-		if err := tx.Where("user_id = ?", id).Delete(&model.AccessToken{}).Error; err != nil {
-			return err
-		}
-		if err := tx.Where("user_id = ?", id).Delete(&model.ExternalAccount{}).Error; err != nil {
-			return err
-		}
-		return tx.Where("id = ?", id).Delete(&model.User{}).Error
-	}); err != nil {
-		c.JSON(http.StatusInternalServerError, response.Err(deleteUserFailed))
+		response.AbortInternal(c, deleteUserFailed)
 		return
 	}
 
@@ -343,69 +275,12 @@ type createUserRequest struct {
 func CreateUser(c *gin.Context) {
 	var req createUserRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, response.Err(err.Error()))
+		response.AbortBadRequest(c, err.Error())
 		return
 	}
 
-	req.Username = strings.TrimSpace(req.Username)
-	req.Nickname = strings.TrimSpace(req.Nickname)
-	req.Password = strings.TrimSpace(req.Password)
-	req.Email = strings.TrimSpace(req.Email)
-
-	if req.Username == "" {
-		c.JSON(http.StatusBadRequest, response.Err(usernameRequired))
-		return
-	}
-	if req.Email == "" {
-		c.JSON(http.StatusBadRequest, response.Err(emailRequired))
-		return
-	}
-	if len(req.Password) < minPasswordLength {
-		c.JSON(http.StatusBadRequest, response.Err(passwordTooShort))
-		return
-	}
-
-	ctx := c.Request.Context()
-	var count int64
-	if err := db.DB(ctx).Model(&model.User{}).Where("username = ?", req.Username).Count(&count).Error; err != nil {
-		c.JSON(http.StatusInternalServerError, response.Err(err.Error()))
-		return
-	}
-	if count > 0 {
-		c.JSON(http.StatusBadRequest, response.Err(usernameExists))
-		return
-	}
-
-	var emailCount int64
-	if err := db.DB(ctx).Model(&model.User{}).Where("email = ?", req.Email).Count(&emailCount).Error; err != nil {
-		c.JSON(http.StatusInternalServerError, response.Err(err.Error()))
-		return
-	}
-	if emailCount > 0 {
-		c.JSON(http.StatusBadRequest, response.Err(emailExists))
-		return
-	}
-
-	newUser := model.User{
-		ID:          idgen.NextUint64ID(),
-		Username:    req.Username,
-		Nickname:    req.Nickname,
-		Email:       req.Email,
-		IsActive:    req.IsActive,
-		IsAdmin:     req.IsAdmin,
-		LastLoginAt: time.Time{},
-	}
-	if newUser.Nickname == "" {
-		newUser.Nickname = req.Username
-	}
-
-	if err := newUser.SetEncryptedPassword(req.Password); err != nil {
-		c.JSON(http.StatusInternalServerError, response.Err(err.Error()))
-		return
-	}
-
-	if err := db.DB(ctx).Create(&newUser).Error; err != nil {
-		c.JSON(http.StatusInternalServerError, response.Err(err.Error()))
+	newUser, err := createUser(c.Request.Context(), req)
+	if abortUserLogicError(c, err, "", nil, []string{usernameRequired, emailRequired, passwordTooShort, usernameExists, emailExists}) {
 		return
 	}
 

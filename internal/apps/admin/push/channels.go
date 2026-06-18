@@ -1,5 +1,5 @@
 // Copyright 2026 Arctel.net
-// SPDX-License-Identifier: AGPL-3.0-only
+// SPDX-License-Identifier: Apache-2.0
 
 package push
 
@@ -10,13 +10,12 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/Rain-kl/Wavelet/internal/db"
-	"github.com/Rain-kl/Wavelet/internal/model"
 	pkgpush "github.com/Rain-kl/Wavelet/pkg/push"
 	"github.com/gin-gonic/gin"
 	"gorm.io/gorm"
 
 	"github.com/Rain-kl/Wavelet/internal/common/response"
+	"github.com/Rain-kl/Wavelet/internal/model"
 )
 
 // ListChannelDefinitions 获取各种消息通道的表单配置定义列表
@@ -40,10 +39,9 @@ func ListChannelDefinitions(c *gin.Context) {
 // @Success 200 {object} response.Any{data=[]model.PushChannel} "消息通道列表"
 // @Router /api/v1/admin/push/channels [get]
 func ListChannels(c *gin.Context) {
-	ctx := c.Request.Context()
-	var channels []model.PushChannel
-	if err := db.DB(ctx).Order("created_at DESC").Find(&channels).Error; err != nil {
-		c.JSON(http.StatusInternalServerError, response.Err(err.Error()))
+	channels, err := listPushChannels(c.Request.Context())
+	if err != nil {
+		response.AbortInternal(c, err.Error())
 		return
 	}
 	c.JSON(http.StatusOK, response.OK(channels))
@@ -73,45 +71,15 @@ type CreateChannelRequest struct {
 func CreateChannel(c *gin.Context) {
 	var req CreateChannelRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, response.Err(err.Error()))
+		response.AbortBadRequest(c, err.Error())
 		return
 	}
 
-	ctx := c.Request.Context()
-
-	var count int64
-	if err := db.DB(ctx).Model(&model.PushChannel{}).Where("name = ?", req.Name).Count(&count).Error; err != nil {
-		c.JSON(http.StatusInternalServerError, response.Err(err.Error()))
+	channel, err := createPushChannel(c.Request.Context(), req)
+	if err != nil {
+		response.AbortBadRequest(c, err.Error())
 		return
 	}
-	if count > 0 {
-		c.JSON(http.StatusBadRequest, response.Err("channel name already exists"))
-		return
-	}
-
-	channel := model.PushChannel{
-		Name:        req.Name,
-		Description: req.Description,
-		Type:        req.Type,
-		Token:       req.Token,
-		URL:         req.URL,
-		Other:       req.Other,
-		Enabled:     req.Enabled,
-	}
-
-	if err := channel.Validate(); err != nil {
-		c.JSON(http.StatusBadRequest, response.Err(err.Error()))
-		return
-	}
-
-	if err := db.DB(ctx).Create(&channel).Error; err != nil {
-		c.JSON(http.StatusInternalServerError, response.Err(err.Error()))
-		return
-	}
-
-	// 缓存一致性：清除渠道缓存
-	model.DeleteActivePushChannelCache(ctx, channel.Name)
-
 	c.JSON(http.StatusOK, response.OK(channel))
 }
 
@@ -137,51 +105,27 @@ type UpdateChannelRequest struct {
 // @Success 200 {object} response.Any{data=model.PushChannel} "更新成功"
 // @Router /api/v1/admin/push/channels/{id} [put]
 func UpdateChannel(c *gin.Context) {
-	idStr := c.Param("id")
-	id, err := strconv.ParseUint(idStr, 10, 64)
+	id, err := strconv.ParseUint(c.Param("id"), 10, 64)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, response.Err("invalid channel id"))
+		response.AbortBadRequest(c, "invalid channel id")
 		return
 	}
 
 	var req UpdateChannelRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, response.Err(err.Error()))
+		response.AbortBadRequest(c, err.Error())
 		return
 	}
 
-	ctx := c.Request.Context()
-
-	var channel model.PushChannel
-	if err := db.DB(ctx).Where("id = ?", id).First(&channel).Error; err != nil {
+	channel, err := updatePushChannel(c.Request.Context(), id, req)
+	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
-			c.JSON(http.StatusNotFound, response.Err("channel not found"))
+			response.AbortNotFound(c, "channel not found")
 			return
 		}
-		c.JSON(http.StatusInternalServerError, response.Err(err.Error()))
+		response.AbortInternal(c, err.Error())
 		return
 	}
-
-	channel.Description = req.Description
-	channel.Type = req.Type
-	channel.Token = req.Token
-	channel.URL = req.URL
-	channel.Other = req.Other
-	channel.Enabled = req.Enabled
-
-	if err := channel.Validate(); err != nil {
-		c.JSON(http.StatusBadRequest, response.Err(err.Error()))
-		return
-	}
-
-	if err := db.DB(ctx).Save(&channel).Error; err != nil {
-		c.JSON(http.StatusInternalServerError, response.Err(err.Error()))
-		return
-	}
-
-	// 缓存一致性：清除渠道缓存
-	model.DeleteActivePushChannelCache(ctx, channel.Name)
-
 	c.JSON(http.StatusOK, response.OK(channel))
 }
 
@@ -195,32 +139,20 @@ func UpdateChannel(c *gin.Context) {
 // @Success 200 {object} response.Any "删除成功"
 // @Router /api/v1/admin/push/channels/{id} [delete]
 func DeleteChannel(c *gin.Context) {
-	idStr := c.Param("id")
-	id, err := strconv.ParseUint(idStr, 10, 64)
+	id, err := strconv.ParseUint(c.Param("id"), 10, 64)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, response.Err("invalid channel id"))
+		response.AbortBadRequest(c, "invalid channel id")
 		return
 	}
 
-	ctx := c.Request.Context()
-	var channel model.PushChannel
-	if err := db.DB(ctx).Where("id = ?", id).First(&channel).Error; err != nil {
+	if err := deletePushChannel(c.Request.Context(), id); err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
-			c.JSON(http.StatusNotFound, response.Err("channel not found"))
+			response.AbortNotFound(c, "channel not found")
 			return
 		}
-		c.JSON(http.StatusInternalServerError, response.Err(err.Error()))
+		response.AbortInternal(c, err.Error())
 		return
 	}
-
-	if err := db.DB(ctx).Delete(&channel).Error; err != nil {
-		c.JSON(http.StatusInternalServerError, response.Err(err.Error()))
-		return
-	}
-
-	// 缓存一致性：清除渠道缓存
-	model.DeleteActivePushChannelCache(ctx, channel.Name)
-
 	c.JSON(http.StatusOK, response.OKNil())
 }
 
@@ -247,31 +179,17 @@ type TestChannelRequest struct {
 func TestChannel(c *gin.Context) {
 	var req TestChannelRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, response.Err(err.Error()))
+		response.AbortBadRequest(c, err.Error())
 		return
 	}
 
 	ctx := c.Request.Context()
-	var url, token, other, channelType string
-
-	if req.Name != "" {
-		var channel model.PushChannel
-		if err := db.DB(ctx).Where("name = ?", req.Name).First(&channel).Error; err != nil {
-			c.JSON(http.StatusBadRequest, response.Err("channel not found"))
-			return
-		}
-		url = channel.URL
-		token = channel.Token
-		other = channel.Other
-		channelType = channel.Type
-	} else {
-		url = req.URL
-		token = req.Token
-		other = req.Other
-		channelType = req.Type
+	url, token, other, channelType, err := loadChannelForTest(ctx, req)
+	if err != nil {
+		response.AbortBadRequest(c, err.Error())
+		return
 	}
 
-	// 对邮件类型应用全局配置作为回退
 	if channelType == channelEmail {
 		url, token, other = resolveSMTPConfig(ctx, url, token, other)
 	}
@@ -284,43 +202,24 @@ func TestChannel(c *gin.Context) {
 		Type:    channelType,
 		Enabled: true,
 	}
-
 	if err := tempChannel.Validate(); err != nil {
-		c.JSON(http.StatusBadRequest, response.Err(err.Error()))
+		response.AbortBadRequest(c, err.Error())
 		return
 	}
 	url = tempChannel.URL
 
 	var config pkgpush.Config
 	var renderedJSON string
-
 	switch channelType {
 	case channelLark:
-		config = pkgpush.Config{
-			Channel: channelLark,
-			URL:     url,
-			Secret:  token,
-		}
+		config = pkgpush.Config{Channel: channelLark, URL: url, Secret: token}
 		renderedJSON = other
 	case channelEmail:
-		config = pkgpush.Config{
-			Channel: channelEmail,
-			URL:     url,
-			Key:     token,
-			Secret:  other,
-		}
+		config = pkgpush.Config{Channel: channelEmail, URL: url, Key: token, Secret: other}
 	case channelTelegram:
-		config = pkgpush.Config{
-			Channel: channelTelegram,
-			URL:     url,
-			Secret:  token,
-			Key:     other,
-		}
+		config = pkgpush.Config{Channel: channelTelegram, URL: url, Secret: token, Key: other}
 	default:
-		config = pkgpush.Config{
-			Channel: channelCustom,
-			URL:     url,
-		}
+		config = pkgpush.Config{Channel: channelCustom, URL: url}
 		customPushReq := CustomPushRequest{
 			Title:       "通道测试通知",
 			Content:     "这是一条来自系统的消息通道连通性测试消息。",
@@ -342,12 +241,10 @@ func TestChannel(c *gin.Context) {
 		},
 		Template: renderedJSON,
 	}
-
 	if err := enqueuePushTask(ctx, payload); err != nil {
-		c.JSON(http.StatusInternalServerError, response.Err(err.Error()))
+		response.AbortInternal(c, err.Error())
 		return
 	}
-
 	c.JSON(http.StatusOK, response.OKNil())
 }
 

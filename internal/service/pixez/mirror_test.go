@@ -106,7 +106,6 @@ func TestFindMirroredImageUploadMapsDerivedFilenames(t *testing.T) {
 		MimeType:      "image/jpeg",
 		Extension:     "jpg",
 		Hash:          "hash",
-		StorageDriver: "local",
 		Type:          pixezMirrorUploadType,
 		Status:        model.UploadStatusUsed,
 		AccessMode:    1,

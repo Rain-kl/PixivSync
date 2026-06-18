@@ -12,8 +12,8 @@ import {motion} from "motion/react"
 
 import {Tabs, TabsContent, TabsList, TabsTrigger} from "@/components/ui/tabs"
 import {useAuth} from "@/components/providers/auth-provider"
+import services from "@/lib/services"
 import type {SystemConfig} from "@/lib/services/admin"
-import {AdminService} from "@/lib/services/admin"
 
 const tabFallback = (
   <div className="h-64 animate-pulse rounded-lg border border-border/40 bg-muted/20" />
@@ -45,7 +45,7 @@ const InfoTab = dynamic(
 )
 
 const SystemStatusManager = dynamic(
-  () => import("@/components/common/admin/status").then((mod) => mod.SystemStatusManager),
+  () => import("./components/system-status").then((mod) => mod.SystemStatusManager),
   { loading: () => tabFallback },
 )
 
@@ -62,7 +62,7 @@ export function AdminSettingsPageClient() {
 
   const systemConfigsQuery = useQuery({
     queryKey: ["admin", "system-configs"],
-    queryFn: () => AdminService.listSystemConfigs("system"),
+    queryFn: () => services.adminSystemConfig.listSystemConfigs("system"),
     enabled: !!user?.is_admin,
   })
 

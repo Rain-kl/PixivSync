@@ -9,10 +9,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"time"
 
-	"github.com/Rain-kl/Wavelet/internal/db"
-	"github.com/Rain-kl/Wavelet/internal/model"
 	"github.com/Rain-kl/Wavelet/internal/task"
 	"github.com/Rain-kl/Wavelet/pkg/push"
 )
@@ -118,46 +115,7 @@ func (h *PushHandler) Execute(ctx context.Context, payload []byte) (*task.TaskRe
 }
 
 func (h *PushHandler) recordHistory(ctx context.Context, req SendPayload, status string, errMsg string) {
-	title := req.Body.Title
-	content := req.Body.Content
-	level := req.Body.Level
-
-	if title == "" {
-		title = "系统通知"
-	}
-	if level == "" {
-		level = defaultLevelInfo
-	}
-
-	target := req.Target
-	if target == "" {
-		// 如果目标人为空 (例如 webhook bot)，用其地址填充前缀或默认词作为归档
-		if req.Config.URL != "" {
-			target = req.Config.URL
-			// 隐藏敏感 URL 细节
-			//nolint:mnd
-			if len(target) > 50 {
-				target = target[:47] + "..."
-			}
-		} else {
-			target = "default"
-		}
-	}
-
-	history := model.PushHistory{
-		EventKey:  req.EventKey,
-		Channel:   req.Config.Channel,
-		Target:    target,
-		Title:     title,
-		Content:   content,
-		Level:     level,
-		Status:    status,
-		ErrorMsg:  errMsg,
-		CreatedAt: time.Now(),
-	}
-
-	// 记录到数据库
-	if dbErr := db.DB(ctx).Create(&history).Error; dbErr != nil {
+	if dbErr := recordPushHistory(ctx, req, status, errMsg); dbErr != nil {
 		task.AppendLog(ctx, "写入推送历史审计记录失败: %v", dbErr)
 	}
 }

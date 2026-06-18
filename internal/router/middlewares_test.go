@@ -10,6 +10,7 @@ import (
 	"testing"
 
 	"github.com/Rain-kl/Wavelet/internal/model"
+	"github.com/Rain-kl/Wavelet/internal/repository"
 	"github.com/Rain-kl/Wavelet/internal/testhelper"
 	"github.com/gin-gonic/gin"
 )
@@ -21,7 +22,7 @@ func TestCORSMiddleware(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 
 	clearConfigCache := func() {
-		if err := model.InvalidateAllSystemConfigCaches(context.Background()); err != nil {
+		if err := repository.InvalidateAllSystemConfigCaches(context.Background()); err != nil {
 			t.Fatalf("InvalidateAllSystemConfigCaches() error = %v", err)
 		}
 	}

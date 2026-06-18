@@ -11,8 +11,8 @@ import {Label} from "@/components/ui/label"
 import {Switch} from "@/components/ui/switch"
 import {Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle} from "@/components/ui/dialog"
 import {Badge} from "@/components/ui/badge"
+import services from "@/lib/services"
 import type {SystemConfig} from "@/lib/services/admin"
-import {AdminService} from "@/lib/services/admin"
 import {toast} from "sonner"
 
 interface SystemTabProps {
@@ -58,7 +58,7 @@ export function SystemTab({ configs, systemConfigsQuery }: SystemTabProps) {
       if (!config) {
         throw new Error(`缺少配置项: ${key}`)
       }
-      await AdminService.updateSystemConfig(key, {
+      await services.adminSystemConfig.updateSystemConfig(key, {
         value: value ? "true" : "false",
         description: config.description,
       })
@@ -78,11 +78,11 @@ export function SystemTab({ configs, systemConfigsQuery }: SystemTabProps) {
       const currentAddrCfg = configs["server_address"]
       const currentSiteCfg = configs["site_name"]
       await Promise.all([
-        AdminService.updateSystemConfig("server_address", {
+        services.adminSystemConfig.updateSystemConfig("server_address", {
           value: serverAddress,
           description: currentAddrCfg?.description || "服务器地址",
         }),
-        AdminService.updateSystemConfig("site_name", {
+        services.adminSystemConfig.updateSystemConfig("site_name", {
           value: siteName,
           description: currentSiteCfg?.description || "系统平台的展示名称",
         }),
@@ -122,7 +122,7 @@ export function SystemTab({ configs, systemConfigsQuery }: SystemTabProps) {
             continue
           }
         }
-        await AdminService.updateSystemConfig(update.key, {
+        await services.adminSystemConfig.updateSystemConfig(update.key, {
           value: update.value,
           description: currentCfg?.description || "",
         })
@@ -148,7 +148,7 @@ export function SystemTab({ configs, systemConfigsQuery }: SystemTabProps) {
       setSmtpTestSuccess(null)
       setSmtpTestError("")
 
-      const res = await AdminService.testSMTP({
+      const res = await services.adminSystemConfig.testSMTP({
         smtp_host: smtpHost,
         smtp_port: parseInt(smtpPort, 10) || 587,
         smtp_username: smtpUsername,
@@ -482,4 +482,3 @@ export function SystemTab({ configs, systemConfigsQuery }: SystemTabProps) {
     </div>
   )
 }
-

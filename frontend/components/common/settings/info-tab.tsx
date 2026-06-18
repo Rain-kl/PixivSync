@@ -4,7 +4,7 @@ import {useMutation, useQuery} from "@tanstack/react-query"
 import {ExternalLink, RefreshCw, Sparkles} from "lucide-react"
 import {toast} from "sonner"
 
-import {AdminService} from "@/lib/services/admin"
+import services from "@/lib/services"
 import {
   AlertDialog,
   AlertDialogAction,
@@ -33,13 +33,13 @@ function InfoRow({ label, value }: { label: string; value: React.ReactNode }) {
 export function InfoTab() {
   const updateQuery = useQuery({
     queryKey: ["admin", "update"],
-    queryFn: () => AdminService.getUpdateStatus(),
+    queryFn: () => services.adminStatus.getUpdateStatus(),
     refetchInterval: 30 * 60 * 1000,
     staleTime: 5 * 60 * 1000,
   })
 
   const applyUpdateMutation = useMutation({
-    mutationFn: () => AdminService.applyUpdate(),
+    mutationFn: () => services.adminStatus.applyUpdate(),
     onSuccess: () => {
       toast.success("升级包已校验完成，服务正在重启")
     },

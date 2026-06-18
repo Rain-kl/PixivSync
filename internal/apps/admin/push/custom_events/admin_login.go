@@ -9,7 +9,7 @@ import (
 	"time"
 
 	"github.com/Rain-kl/Wavelet/internal/apps/admin/push"
-	"github.com/Rain-kl/Wavelet/internal/model"
+	"github.com/Rain-kl/Wavelet/internal/listener"
 )
 
 // AdminLogin is the metadata definition for the admin login event.
@@ -24,19 +24,14 @@ var AdminLogin = push.EventMetadata{
 	Description: "当管理员成功登录系统时触发此通知",
 }
 
-func init() {
-	push.RegisterBuiltInEvent(AdminLogin)
-}
-
-// TriggerAdminLoginEvent triggers the admin login event asynchronously.
-func TriggerAdminLoginEvent(ctx context.Context, user *model.User, ip string) {
-	if user == nil || !user.IsAdmin {
+func handleAdminLogin(ctx context.Context, event listener.AdminLoggedIn) {
+	if event.User == nil {
 		return
 	}
 
 	body := map[string]any{
-		"user": user,
-		"ip":   ip,
+		"user": event.User,
+		"ip":   event.IP,
 		"time": time.Now().Format("2006-01-02 15:04:05"),
 	}
 	push.DefaultTrigger.Trigger(ctx, AdminLogin, body)

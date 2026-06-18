@@ -13,8 +13,9 @@ description: "Wavelet 项目专用：新增或修改 Asynq 异步任务、后台
 
 - `internal/task/handler.go`：`TaskHandler`、`TaskResult`、`PayloadValidator`
 - `internal/task/meta.go`：`TaskMeta`、`TaskParam`
-- `internal/task/executor.go`：下发、执行、日志、重试
-- `internal/task/handlers/register.go`：Handler 和元数据注册
+- `internal/task/executor.go`：下发、执行、日志、重试、`OnTaskCompleted` 订阅
+- `internal/task/handlers/register.go`：Handler 和元数据注册（由 bootstrap 调用）
+- `internal/bootstrap/bootstrap.go`：任务注册与进程级装配入口
 - `internal/task/worker/worker.go`：Worker 路由和队列
 - `internal/task/scheduler/scheduler.go`：定时调度
 - `internal/apps/admin/task/routers.go`：Admin 任务 API
@@ -42,12 +43,29 @@ description: "Wavelet 项目专用：新增或修改 Asynq 异步任务、后台
 - 失败返回 error，由任务框架处理状态和重试。
 - 不要吞掉关键错误。
 - 复杂 SQL 放到 `internal/model/` 或模块内的业务服务层（如 `internal/apps/<module>/service.go` 或 `logics.go`）。
-- 新增 Go 文件后检查许可证头，必要时运行 `make license`。
 
 ### 注册
 
 - 在 `internal/task/handlers/register.go` 同时注册 Handler 和 `TaskMeta`。
 - 不要在其他位置单独注册任务。
+- **禁止**在业务包 `routers.go` 或 `init()` 中调用 `task.RegisterHandler`；统一由 `bootstrap.RegisterTasks()` → `taskhandlers.Register()` 在进程启动时装配。
+- 任务完成钩子（如 push 通知）通过 `task.OnTaskCompleted` 注册，在 `bootstrap.RegisterTaskListeners()` 中装配（Worker/`all` 进程）。
+
+### 进程装配分工
+
+| 进程 | 注册入口 |
+| :--- | :--- |
+| `api` | `cmd/api.go` → `bootstrap.RegisterAPI()`（含 `RegisterTasks`） |
+| `worker` | `worker.StartWorker()` → `bootstrap.RegisterWorker()`（含 `RegisterTasks` + `RegisterTaskListeners`） |
+| `scheduler` | `scheduler.StartScheduler()` → `bootstrap.RegisterScheduler()` |
+| `all` | `cmd/all.go` → `bootstrap.RegisterAll()` |
+
+所有 `Register*` 使用 `sync.Once`，重复调用安全。
+
+### 测试
+
+- 依赖已注册任务类型或 Handler 的测试（如 `internal/apps/admin/task/routers_test.go`），必须在 setup 中显式调用 `bootstrap.RegisterTasks()`。
+- 不得依赖 `init()` 副作用或 import 链触发注册。
 
 ## 日志要求
 

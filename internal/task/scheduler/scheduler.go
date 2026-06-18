@@ -11,6 +11,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/Rain-kl/Wavelet/internal/bootstrap"
 	"github.com/Rain-kl/Wavelet/internal/model"
 	"github.com/Rain-kl/Wavelet/internal/task"
 	"github.com/Rain-kl/Wavelet/pkg/logger"
@@ -32,6 +33,8 @@ func GetAsynqClient() *asynq.Client {
 
 // StartScheduler 启动调度器 (该函数阻塞，直到调度器退出)
 func StartScheduler() error {
+	bootstrap.RegisterScheduler()
+
 	var err error
 	schedulerOnce.Do(func() {
 		quitChan = make(chan struct{})

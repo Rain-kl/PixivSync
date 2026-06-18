@@ -10,7 +10,7 @@ import {Input} from "@/components/ui/input"
 import {Label} from "@/components/ui/label"
 import {Textarea} from "@/components/ui/textarea"
 import {Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle} from "@/components/ui/dialog"
-import {AdminService} from "@/lib/services/admin"
+import services from "@/lib/services"
 import type {Template} from "@/lib/services/admin/types"
 import {toast} from "sonner"
 
@@ -29,12 +29,12 @@ export function TemplatesManager() {
 
   const templatesQuery = useQuery({
     queryKey: ["admin", "templates"],
-    queryFn: () => AdminService.listTemplates(),
+    queryFn: () => services.adminTemplate.listTemplates(),
   })
 
   const createTemplateMutation = useMutation({
     mutationFn: async () => {
-      await AdminService.createTemplate({
+      await services.adminTemplate.createTemplate({
         key,
         name,
         type,
@@ -55,7 +55,7 @@ export function TemplatesManager() {
 
   const updateTemplateMutation = useMutation({
     mutationFn: async (key: string) => {
-      await AdminService.updateTemplate(key, {
+      await services.adminTemplate.updateTemplate(key, {
         name,
         type,
         subject,
@@ -75,7 +75,7 @@ export function TemplatesManager() {
 
   const deleteTemplateMutation = useMutation({
     mutationFn: async (key: string) => {
-      await AdminService.deleteTemplate(key)
+      await services.adminTemplate.deleteTemplate(key)
     },
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ["admin", "templates"] })

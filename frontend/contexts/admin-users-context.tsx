@@ -3,7 +3,8 @@
 import * as React from "react"
 import {createContext, useCallback, useContext, useEffect, useRef, useState} from "react"
 import {toast} from "sonner"
-import {AdminService, AdminUser, CreateUserRequest, ListUsersRequest} from "@/lib/services/admin"
+import type {AdminUser, CreateUserRequest, ListUsersRequest} from "@/lib/services/admin"
+import services from "@/lib/services"
 
 /** 用户列表查询参数 */
 export interface UserQueryParams {
@@ -113,12 +114,12 @@ export function AdminUsersProvider({ children }: { children: React.ReactNode }) 
       // Current API doesn't support status filter in listUsers?
       // The previous implementation did client-side filtering.
       // Ideally backend supports it. If not, we fetch and filter?
-      // "AdminService.listUsers" in previous code only took page, page_size, username.
+      // "services.adminUser.listUsers" in previous code only took page, page_size, username.
       // So status filter was client side.
       // However, caching client-filtered result is tricky if we don't have all data.
       // But previous implementation fetched *paged* data then filtered? No, that would be wrong (filtering 20 items might leave 0).
       // Let's check previous implementation:
-      // "const data = await AdminService.listUsers(...) ... let filteredUsers = data.users ... if (statusFilter...) filtered..."
+      // "const data = await services.adminUser.listUsers(...) ... let filteredUsers = data.users ... if (statusFilter...) filtered..."
       // This means filtering happens ONLY on the current page of results! This is technically buggy if the user wants "all inactive users".
       // But preserving that behavior for now.
 
@@ -129,7 +130,7 @@ export function AdminUsersProvider({ children }: { children: React.ReactNode }) 
         username: debouncedSearchUsername || undefined
       }
 
-      const response = await AdminService.listUsers(requestParams)
+      const response = await services.adminUser.listUsers(requestParams)
 
       if (requestId !== latestRequestIdRef.current) return
 
@@ -180,7 +181,7 @@ export function AdminUsersProvider({ children }: { children: React.ReactNode }) 
     cacheRef.current = {}
 
     try {
-      await AdminService.updateUserStatus(user.id, { is_active: !user.is_active })
+      await services.adminUser.updateUserStatus(user.id, { is_active: !user.is_active })
       toast.success(`已${ !user.is_active ? '启用' : '禁用' }用户 ${ user.username }`)
     } catch {
       // Revert on error
@@ -192,12 +193,12 @@ export function AdminUsersProvider({ children }: { children: React.ReactNode }) 
   }
 
   const getUserDetail = async (id: string) => {
-    return AdminService.getUser(id)
+    return services.adminUser.getUser(id)
   }
 
   const createUser = async (req: CreateUserRequest) => {
     try {
-      const newUser = await AdminService.createUser(req)
+      const newUser = await services.adminUser.createUser(req)
       setUsers(prev => [newUser, ...prev])
       setTotal(prev => prev + 1)
       // Clear cache because data changed
@@ -212,7 +213,7 @@ export function AdminUsersProvider({ children }: { children: React.ReactNode }) 
 
   const deleteUser = async (user: AdminUser) => {
     try {
-      await AdminService.deleteUser(user.id)
+      await services.adminUser.deleteUser(user.id)
       setUsers(prev => prev.filter(u => u.id !== user.id))
       setTotal(prev => Math.max(0, prev - 1))
       cacheRef.current = {}

@@ -39,6 +39,11 @@
 - 当 API Handler 发生变化时，更新 Swagger 文档（运行 `make swagger`）。
 - 在完成代码开发后必须运行 `make code-check`, 并修复报错。
 - 需要缓存或文件管理能力时，必须复用现有平台实现，禁止在业务包中自行创建缓存目录、直接管理缓存文件或重复封装存储后端。
+- 禁止在 `init()` 中注册跨模块集成（任务 Handler、推送内置事件、域事件监听器、任务完成钩子）。统一通过 `internal/bootstrap` 在 `internal/cmd` 入口显式装配。
+- `internal/router/router.go` 的 `Serve()` 仅负责 HTTP 路由与中间件，禁止在其中执行 `SyncEvents`、`InitLogWriter` 等进程级运行时初始化。
+- 核心业务模块（如 `oauth`、`user`）禁止直接 `import` `internal/apps/admin/push` 或 `custom_events` 触发通知；应通过 `internal/listener` 发射域事件，由 push 模块在 bootstrap 阶段订阅。
+- 编写依赖任务注册或推送事件同步的测试时，必须在测试 setup 中显式调用 `bootstrap.RegisterTasks()`、`bootstrap.RegisterPushDomainEvents()` 等，不得依赖 `init()` 副作用。
+- API 错误响应必须通过 `response.Abort*` 中断请求，由 `ErrorHandlerMiddleware` 统一写出 JSON；禁止 `c.JSON(http.StatusOK, response.Err(...))` 及 Handler 直接 `c.JSON(status, response.Err(...))`。
 
 ## 项目介绍
 
@@ -67,7 +72,8 @@
 
 后端目录：
 
-- `internal/cmd/`：用于 API、worker、scheduler、root init 的 Cobra 命令。
+- `internal/cmd/`：用于 API、worker、scheduler、root init 的 Cobra 命令。进程启动时在此调用 `bootstrap.Register*` 与 `bootstrap.Init`，再启动 router / worker / scheduler。
+- `internal/bootstrap/`：应用装配根（composition root）。集中注册任务 Handler、推送域事件订阅、任务完成监听器，并执行 `SyncEvents`、ClickHouse 访问日志写入等进程级初始化；所有注册函数使用 `sync.Once` 保证幂等。
 - `internal/config/`：Viper 加载和配置结构体。运行时代码应使用 `config.Config.<Section>.<Field>`。
 - `internal/router/`：唯一的 HTTP 路由注册点。
 - `internal/apps/`：按功能（Feature-based）组织的 HTTP Handler、中间件、内部服务与模块逻辑。移除全局 service 层，模块内部业务逻辑（如验证码业务逻辑管理器 `internal/apps/cap/manager.go`）均收敛于各自模块中；管理端模块位于 `internal/apps/admin/`。
@@ -79,7 +85,7 @@
 - `internal/task/`：Asynq 任务框架；参见 `new-async-task` 了解变更。
 - `internal/common/`：共享的通用模型及响应（如 `internal/common/response`）、绑定（bind）、常量以及通用错误。
 - `internal/util/`：纯底层工具包，无任何 HTTP/数据库框架依赖。
-- `internal/listener/`：事件监听器和消息/Webhook 消费者。
+- `internal/listener/`：域事件分发层。核心域（auth、user 等）在此定义并发射事件（如 `EmitAdminLoggedIn`）；运维模块（push、webhook 等）在 bootstrap 阶段订阅，实现跨模块解耦。
 - `internal/otel_trace/`：链路追踪（tracing）助手。
 - `internal/testhelper/`：后端测试共享辅助能力。
 - `internal/buildinfo/`：暴露在发布/构建工作流中注入的元数据（如版本号、编译时间等）。
@@ -123,23 +129,130 @@ Handler 规范：
 
 - Handler 命名为 动词 + 名词，例如 `ListUsers`。
 - 使用 `ShouldBindQuery` 或 `ShouldBindJSON` 进行绑定。
-- 成功时统一通过导入 `"github.com/Rain-kl/Wavelet/internal/common/response"` 使用 `response.OK(data)` 或 `response.OKNil()` 返回。
-- 失败时统一通过 `response.AbortWithError(c, code, msg)` 返回（这会自动将业务错误和状态码挂载到 Context 并中断请求，全局中间件捕获后会将其完整记录到 OpenTelemetry Trace/Jaeger，并格式化输出 JSON）。
-- API 响应的外层结构必须为 `{ "error_msg": "", "data": ... }`。
-- 分页响应在 `data` 下使用 `{ "total": 0, "results": [] }`。
 - 每个 HTTP API 都需要有完整的 Swagger 注释；在 API 变更后运行 `make swagger`。
 
-错误处理与日志:
+#### API 响应信封（统一格式）
 
+所有 JSON API 响应的外层结构**必须**为：
+
+```json
+{ "error_msg": "", "data": ... }
+```
+
+- 成功时：`error_msg` 为空字符串，`data` 承载业务载荷。
+- 失败时：`data` 为 `null`，`error_msg` 为用户可见的错误说明。
+- 分页响应在 `data` 下使用 `{ "total": 0, "results": [] }`。
+
+#### 成功响应（唯一写法）
+
+成功时**始终**使用 HTTP `200`，由 Handler 直接写出 JSON：
+
+```go
+import (
+    "net/http"
+    "github.com/Rain-kl/Wavelet/internal/common/response"
+    "github.com/gin-gonic/gin"
+)
+
+// 有数据
+c.JSON(http.StatusOK, response.OK(data))
+
+// 无数据（data 为 null）
+c.JSON(http.StatusOK, response.OKNil())
+```
+
+#### 失败响应（中断请求，禁止直接写错误 JSON）
+
+失败时**禁止**在 Handler / 中间件中直接调用 `c.JSON(..., response.Err(msg))`，也**禁止**用 HTTP `200` 携带非空 `error_msg` 表示失败。
+
+统一通过 `internal/common/response` 的 **Abort 系列函数**中断请求。这些函数会将 `*response.APIError` 挂载到 Gin 的 `c.Errors` 链并 `c.Abort()`；请求结束后由全局 `response.ErrorHandlerMiddleware()`（在 `internal/router/middlewares.go` 中注册）统一写出 JSON，并记录到 OpenTelemetry Trace/Jaeger。
+
+**推荐使用的便捷函数（优先于手写状态码）：**
+
+| 函数 | HTTP 状态码 | 典型场景 |
+|------|-------------|----------|
+| `response.AbortBadRequest(c, msg)` | 400 | 参数绑定失败、字段校验、业务规则拒绝（如密码错误、重复注册） |
+| `response.AbortUnauthorized(c, msg)` | 401 | 未登录、Session/Token 失效（`oauth.LoginRequired()`） |
+| `response.AbortForbidden(c, msg)` | 403 | 已登录但无权访问（如 Token 不允许访问的端点） |
+| `response.AbortNotFound(c, msg)` | 404 | 资源不存在；管理员中间件对非管理员隐藏端点时也使用此码 |
+| `response.AbortConflict(c, msg)` | 409 | 资源冲突（如唯一键重复） |
+| `response.AbortTooManyRequests(c, msg)` | 429 | 限流、频率限制 |
+| `response.AbortInternal(c, msg)` | 500 | 对用户返回通用提示；底层错误须先记录日志 |
+| `response.AbortWithError(c, code, msg)` | 自定义 | 上表未覆盖的状态码时使用 |
+
+**标准 Handler 模板：**
+
+```go
+func CreateWidget(c *gin.Context) {
+    var req createWidgetRequest
+    if err := c.ShouldBindJSON(&req); err != nil {
+        response.AbortBadRequest(c, errBindParamsFailed)
+        return
+    }
+
+    widget, err := createWidgetLogic(c.Request.Context(), req)
+    if err != nil {
+        // 底层错误已记录日志时，向用户返回安全文案
+        response.AbortBadRequest(c, err.Error()) // 或按语义选用 AbortConflict / AbortInternal 等
+        return
+    }
+
+    c.JSON(http.StatusOK, response.OK(widget))
+}
+```
+
+**中间件**与 Handler 遵循同一规则。参考 `oauth.LoginRequired()` → `AbortUnauthorized`，`admin.LoginAdminRequired()` → `AbortNotFound`，`cap.VerifyMiddleware` → `AbortUnauthorized`。
+
+#### 错误消息定义
+
+- 面向用户的错误文案定义为模块内 **camelCase 字符串常量**（放在 `errs.go`），例如 `errBindParamsFailed = "参数绑定失败"`。
+- Handler / 中间件向 Abort 函数传入这些常量或经校验的安全字符串；**禁止**将数据库驱动错误、堆栈信息等内部细节直接暴露给客户端。
+- `response.Err(msg)` 仅供 `ErrorHandlerMiddleware` 内部构造 JSON，**业务代码不得直接用于 `c.JSON`**。
+
+#### `logics.go` 与 Handler 的分工
+
+- `logics.go` 接受 `context.Context`，返回 `(result, error)` 或带状态的业务结果结构体（参考 `internal/apps/user/logics.go` 的 `LoginEmailVerificationResult`）。
+- `logics.go` **不得**依赖 `*gin.Context`，**不得**调用 `response.Abort*` 或 `c.JSON`。
+- Handler 负责：绑定参数 → 调用 logic → 将 logic 错误/状态映射为对应的 `Abort*` 或 `response.OK`。
+
+#### 日志与内部错误
+
+- 数据库、Redis、第三方 API、文件 I/O 等**运行时错误**：在 Handler 或 logic 边界用 `pkg/logger` 记录（带 `ctx`），再向用户返回安全的 `AbortInternal` 或语义匹配的业务错误常量。
 - 任何关键错误在被吞掉、转换为通用响应，或由后台 worker 忽略之前，都必须通过 `pkg/logger` 打印日志。
 - 禁止用 `_ = ...` 静默丢弃重要错误。如果某个错误因为 best-effort 操作或确认无害而需要忽略，必须添加简短注释说明原因。
-- Handler 可以返回对用户安全的错误信息，但如果底层运行错误对生产问题排查有价值，仍然必须记录日志。
-- 避免重复刷日志：在真正处理或抑制错误的边界记录一次，然后返回或响应。
+- 避免重复刷日志：在真正处理或抑制错误的边界记录一次，然后 `Abort*` 或成功返回。
+
+#### 禁止写法（反模式）
+
+```go
+// ❌ 禁止：HTTP 200 表示失败
+c.JSON(http.StatusOK, response.Err("密码错误"))
+
+// ❌ 禁止：Handler 直接写错误 JSON，绕过 ErrorHandlerMiddleware 与 OTel 记录
+c.JSON(http.StatusBadRequest, response.Err("参数错误"))
+
+// ❌ 禁止：gin.H 手写错误体
+c.AbortWithStatusJSON(http.StatusBadRequest, gin.H{"error_msg": "...", "data": nil})
+
+// ❌ 禁止：logics.go 中中断 HTTP 请求
+func doSomething(c *gin.Context) { response.AbortBadRequest(c, "...") }
+```
+
+#### Swagger 注释约定
+
+- `@Success 200` 的 `data` 使用具体类型或 `response.Any`。
+- 对每个可能返回的 Abort 状态码声明 `@Failure`，例如 `@Failure 400 {object} response.Any "参数错误"`、`@Failure 401 {object} response.Any "未登录"`。
 
 路由与模块：
 
 - 仅在 `internal/router/router.go` 中作为统一高层入口进行路由分发委派，不允许在 `router.go` 中直接挂载业务 Handler。
-- 关于所有的路由归属划分、接口开发隔离防线以及详细的注册和开发步骤，请直接阅读并严格遵循 [new-api](file:///Users/ryan/DEV/Go/Wavelet/.agent/skills/new-api/SKILL.md) 技能。
+- 关于所有的路由归属划分、接口开发隔离防线以及详细的注册和开发步骤，请直接阅读并严格遵循 [new-api](file:///Users/ryan/DEV/Go/Wavelet/.claude/skills/new-api/SKILL.md) 技能。
+
+应用装配与跨模块集成：
+
+- 新增跨模块副作用（任务注册、推送订阅、后台监听器）时，在 `internal/bootstrap/bootstrap.go` 增加 `Register*` 函数，并在对应 `internal/cmd/*.go` 入口调用；参考现有 `RegisterAPI` / `RegisterWorker` / `RegisterAll` 分工。
+- `bootstrap.Init` 必须在 `RegisterPushDomainEvents()` 之后调用（API/`all` 模式），以确保 `SyncEvents` 能同步内置推送事件元数据。
+- Handler 与业务逻辑分离：HTTP Handler 负责绑定与响应；可复用逻辑放入 `logics.go`（接受 `context.Context`，不依赖 `*gin.Context`），便于 Worker 与单元测试复用。参考 `internal/apps/user/logics.go`。
 
 中间件：
 

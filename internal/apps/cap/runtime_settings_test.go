@@ -10,6 +10,7 @@ import (
 
 	"github.com/Rain-kl/Wavelet/internal/db"
 	"github.com/Rain-kl/Wavelet/internal/model"
+	"github.com/Rain-kl/Wavelet/internal/repository"
 	"github.com/Rain-kl/Wavelet/internal/testhelper"
 )
 
@@ -19,7 +20,7 @@ func TestCurrentSettingsLoadsSnapshotOnce(t *testing.T) {
 	ctx := context.Background()
 
 	ResetRuntimeSettingsForTest()
-	model.ResetSystemConfigRAMCacheForTest()
+	repository.ResetSystemConfigRAMCacheForTest()
 
 	first, err := CurrentSettings(ctx)
 	if err != nil {
@@ -34,7 +35,7 @@ func TestCurrentSettingsLoadsSnapshotOnce(t *testing.T) {
 		Update("value", "4").Error; err != nil {
 		t.Fatalf("Update(cap_challenge_count) error = %v", err)
 	}
-	if err := model.InvalidateSystemConfigCache(ctx, model.ConfigKeyCapChallengeCount); err != nil {
+	if err := repository.InvalidateSystemConfigCache(ctx, model.ConfigKeyCapChallengeCount); err != nil {
 		t.Fatalf("InvalidateSystemConfigCache() error = %v", err)
 	}
 	InvalidateRuntimeSettings()
@@ -64,7 +65,7 @@ func TestProtectionEnabledReflectsLoginSwitch(t *testing.T) {
 		Update("value", "true").Error; err != nil {
 		t.Fatalf("Update(cap_login_enabled) error = %v", err)
 	}
-	if err := model.InvalidateSystemConfigCache(ctx, model.ConfigKeyCapLoginEnabled); err != nil {
+	if err := repository.InvalidateSystemConfigCache(ctx, model.ConfigKeyCapLoginEnabled); err != nil {
 		t.Fatalf("InvalidateSystemConfigCache() error = %v", err)
 	}
 	InvalidateRuntimeSettings()

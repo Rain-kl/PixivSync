@@ -24,8 +24,8 @@ import {Input} from "@/components/ui/input"
 import {Label} from "@/components/ui/label"
 import {Select, SelectContent, SelectItem, SelectTrigger, SelectValue} from "@/components/ui/select"
 import {AuthSourceModal} from "@/components/common/settings/auth-source-modal"
+import services from "@/lib/services"
 import type {AuthSource, SystemConfig} from "@/lib/services/admin"
-import {AdminService} from "@/lib/services/admin"
 import {toast} from "sonner"
 
 const SECURITY_KEYS = [
@@ -89,7 +89,7 @@ export function SecurityTab({ configs, systemConfigsQuery }: SecurityTabProps) {
 
   const authSourcesQuery = useQuery({
     queryKey: ["auth", "sources"],
-    queryFn: () => AdminService.listAuthSources(),
+    queryFn: () => services.adminAuthSource.listAuthSources(),
   })
 
   useEffect(() => {
@@ -120,7 +120,7 @@ export function SecurityTab({ configs, systemConfigsQuery }: SecurityTabProps) {
       if (!config) {
         throw new Error("缺少配置项: login_session_ttl_hours")
       }
-      await AdminService.updateSystemConfig("login_session_ttl_hours", {
+      await services.adminSystemConfig.updateSystemConfig("login_session_ttl_hours", {
         value: value,
         description: config.description,
       })
@@ -159,7 +159,7 @@ export function SecurityTab({ configs, systemConfigsQuery }: SecurityTabProps) {
       if (!config) {
         throw new Error(`缺少配置项: ${key}`)
       }
-      await AdminService.updateSystemConfig(key, {
+      await services.adminSystemConfig.updateSystemConfig(key, {
         value: value ? "true" : "false",
         description: config.description,
       })
@@ -176,7 +176,7 @@ export function SecurityTab({ configs, systemConfigsQuery }: SecurityTabProps) {
 
   const toggleSourceMutation = useMutation({
     mutationFn: async (source: AuthSource) => {
-      await AdminService.toggleAuthSource(source.id, { is_active: !source.is_active })
+      await services.adminAuthSource.toggleAuthSource(source.id, { is_active: !source.is_active })
     },
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ["auth", "sources"] })
@@ -190,7 +190,7 @@ export function SecurityTab({ configs, systemConfigsQuery }: SecurityTabProps) {
 
   const deleteSourceMutation = useMutation({
     mutationFn: async (sourceId: string) => {
-      await AdminService.deleteAuthSource(sourceId)
+      await services.adminAuthSource.deleteAuthSource(sourceId)
     },
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ["auth", "sources"] })
@@ -219,7 +219,7 @@ export function SecurityTab({ configs, systemConfigsQuery }: SecurityTabProps) {
 
       for (const update of updates) {
         const currentCfg = configs[update.key]
-        await AdminService.updateSystemConfig(update.key, {
+        await services.adminSystemConfig.updateSystemConfig(update.key, {
           value: update.value,
           description: currentCfg?.description || "",
         })

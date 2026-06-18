@@ -10,17 +10,17 @@ const tabFallback = (
 )
 
 const AccessAnalytics = dynamic(
-  () => import("@/components/common/admin/access-analytics").then((mod) => mod.AccessAnalytics),
+  () => import("./components/access-analytics").then((mod) => mod.AccessAnalytics),
   { loading: () => tabFallback },
 )
 
 const AccessLogs = dynamic(
-  () => import("@/components/common/admin/access-logs").then((mod) => mod.AccessLogs),
+  () => import("./components/access-logs").then((mod) => mod.AccessLogs),
   { loading: () => tabFallback },
 )
 
 const AppLogs = dynamic(
-  () => import("@/components/common/admin/app-logs").then((mod) => mod.AppLogs),
+  () => import("./components/app-logs").then((mod) => mod.AppLogs),
   { loading: () => tabFallback },
 )
 

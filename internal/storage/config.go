@@ -14,6 +14,7 @@ import (
 
 	"github.com/Rain-kl/Wavelet/internal/db"
 	"github.com/Rain-kl/Wavelet/internal/model"
+	"github.com/Rain-kl/Wavelet/internal/repository"
 	"gorm.io/gorm"
 )
 
@@ -109,8 +110,8 @@ func LoadConfig(ctx context.Context) (Config, error) {
 }
 
 func loadConfigByKey(ctx context.Context, key string, fallback Config) (Config, error) {
-	var sc model.SystemConfig
-	if err := sc.GetByKey(ctx, key); err != nil {
+	sc, err := repository.GetSystemConfigByKey(ctx, key)
+	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return fallback, nil
 		}
@@ -208,7 +209,7 @@ func upsertSystemConfig(ctx context.Context, tx *gorm.DB, key string, value any,
 		FirstOrCreate(&sc).Error; err != nil {
 		return err
 	}
-	return model.InvalidateSystemConfigCache(ctx, key)
+	return repository.InvalidateSystemConfigCache(ctx, key)
 }
 
 // MergeMaskedSecrets restores unchanged secrets from the current configuration.

@@ -12,6 +12,7 @@ import (
 	"strings"
 
 	"github.com/Rain-kl/Wavelet/internal/model"
+	"github.com/Rain-kl/Wavelet/internal/repository"
 	"github.com/Rain-kl/Wavelet/internal/task"
 	"github.com/Rain-kl/Wavelet/pkg/mail"
 )
@@ -111,17 +112,16 @@ func (h *SendEmailHandler) Execute(ctx context.Context, payload []byte) (*task.T
 	var smtpUsername string
 	var smtpPassword string
 
-	var sc model.SystemConfig
-	if err := sc.GetByKey(ctx, model.ConfigKeySMTPHost); err == nil {
+	if sc, err := repository.GetSystemConfigByKey(ctx, model.ConfigKeySMTPHost); err == nil {
 		smtpHost = sc.Value
 	}
-	if err := sc.GetByKey(ctx, model.ConfigKeySMTPPort); err == nil {
+	if sc, err := repository.GetSystemConfigByKey(ctx, model.ConfigKeySMTPPort); err == nil {
 		smtpPortVal = sc.Value
 	}
-	if err := sc.GetByKey(ctx, model.ConfigKeySMTPUsername); err == nil {
+	if sc, err := repository.GetSystemConfigByKey(ctx, model.ConfigKeySMTPUsername); err == nil {
 		smtpUsername = sc.Value
 	}
-	if err := sc.GetByKey(ctx, model.ConfigKeySMTPPassword); err == nil {
+	if sc, err := repository.GetSystemConfigByKey(ctx, model.ConfigKeySMTPPassword); err == nil {
 		smtpPassword = sc.Value
 	}
 

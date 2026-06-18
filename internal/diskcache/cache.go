@@ -12,6 +12,7 @@ import (
 
 	"github.com/Rain-kl/Wavelet/internal/db"
 	"github.com/Rain-kl/Wavelet/internal/model"
+	"github.com/Rain-kl/Wavelet/internal/repository"
 	pkgcache "github.com/Rain-kl/Wavelet/pkg/cache/disk"
 )
 
@@ -69,27 +70,24 @@ func (c *DiskCache) ReloadConfig(ctx context.Context) {
 	}
 
 	// 1. Max Size
-	var scMaxSize model.SystemConfig
 	maxSizeMB := int64(defaultMaxSizeMB)
-	if err := scMaxSize.GetByKey(ctx, model.ConfigKeyDiskCacheMaxSizeMB); err == nil && scMaxSize.Value != "" {
+	if scMaxSize, err := repository.GetSystemConfigByKey(ctx, model.ConfigKeyDiskCacheMaxSizeMB); err == nil && scMaxSize.Value != "" {
 		if val, err := strconv.ParseInt(scMaxSize.Value, 10, 64); err == nil && val > 0 {
 			maxSizeMB = val
 		}
 	}
 
 	// 2. Default TTL
-	var scTTL model.SystemConfig
 	ttlMinutes := int64(defaultTTLMinutes)
-	if err := scTTL.GetByKey(ctx, model.ConfigKeyDiskCacheTTLMinutes); err == nil && scTTL.Value != "" {
+	if scTTL, err := repository.GetSystemConfigByKey(ctx, model.ConfigKeyDiskCacheTTLMinutes); err == nil && scTTL.Value != "" {
 		if val, err := strconv.ParseInt(scTTL.Value, 10, 64); err == nil && val >= 0 {
 			ttlMinutes = val
 		}
 	}
 
 	// 3. LRU Enabled
-	var scLRU model.SystemConfig
 	lruEnabled := true
-	if err := scLRU.GetByKey(ctx, model.ConfigKeyDiskCacheLRUEnabled); err == nil && scLRU.Value != "" {
+	if scLRU, err := repository.GetSystemConfigByKey(ctx, model.ConfigKeyDiskCacheLRUEnabled); err == nil && scLRU.Value != "" {
 		if val, err := strconv.ParseBool(scLRU.Value); err == nil {
 			lruEnabled = val
 		}

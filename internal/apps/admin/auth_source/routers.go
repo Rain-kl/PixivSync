@@ -50,7 +50,7 @@ type ToggleAuthSourceRequest struct {
 func ListAuthSources(c *gin.Context) {
 	sources, err := model.GetAuthSources(c.Request.Context())
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, response.Err(err.Error()))
+		response.AbortInternal(c, err.Error())
 		return
 	}
 	c.JSON(http.StatusOK, response.OK(sources))
@@ -72,7 +72,7 @@ func ListAuthSources(c *gin.Context) {
 func CreateAuthSource(c *gin.Context) {
 	var req AuthSourceRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, response.Err(err.Error()))
+		response.AbortBadRequest(c, err.Error())
 		return
 	}
 
@@ -88,7 +88,7 @@ func CreateAuthSource(c *gin.Context) {
 		IconURL:            req.IconURL,
 	}
 	if err := model.CreateAuthSource(c.Request.Context(), &source); err != nil {
-		c.JSON(http.StatusBadRequest, response.Err(err.Error()))
+		response.AbortBadRequest(c, err.Error())
 		return
 	}
 	source.Sanitize()
@@ -113,13 +113,13 @@ func CreateAuthSource(c *gin.Context) {
 func UpdateAuthSource(c *gin.Context) {
 	id, err := parseSourceID(c)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, response.Err(err.Error()))
+		response.AbortBadRequest(c, err.Error())
 		return
 	}
 
 	var req AuthSourceRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, response.Err(err.Error()))
+		response.AbortBadRequest(c, err.Error())
 		return
 	}
 
@@ -140,7 +140,7 @@ func UpdateAuthSource(c *gin.Context) {
 	}
 	keepSecret := source.ClientSecret == ""
 	if err := model.UpdateAuthSource(c.Request.Context(), &source, keepSecret); err != nil {
-		c.JSON(http.StatusBadRequest, response.Err(err.Error()))
+		response.AbortBadRequest(c, err.Error())
 		return
 	}
 
@@ -153,7 +153,7 @@ func UpdateAuthSource(c *gin.Context) {
 
 	updated, err := model.GetAuthSourceByID(c.Request.Context(), id)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, response.Err(err.Error()))
+		response.AbortInternal(c, err.Error())
 		return
 	}
 	updated.Sanitize()
@@ -177,18 +177,18 @@ func UpdateAuthSource(c *gin.Context) {
 func ToggleAuthSource(c *gin.Context) {
 	id, err := parseSourceID(c)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, response.Err(err.Error()))
+		response.AbortBadRequest(c, err.Error())
 		return
 	}
 
 	var req ToggleAuthSourceRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, response.Err(err.Error()))
+		response.AbortBadRequest(c, err.Error())
 		return
 	}
 
 	if err := model.ToggleAuthSource(c.Request.Context(), id, req.IsActive); err != nil {
-		c.JSON(http.StatusBadRequest, response.Err(err.Error()))
+		response.AbortBadRequest(c, err.Error())
 		return
 	}
 	c.JSON(http.StatusOK, response.OKNil())
@@ -209,11 +209,11 @@ func ToggleAuthSource(c *gin.Context) {
 func DeleteAuthSource(c *gin.Context) {
 	id, err := parseSourceID(c)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, response.Err(err.Error()))
+		response.AbortBadRequest(c, err.Error())
 		return
 	}
 	if err := model.DeleteAuthSource(c.Request.Context(), id); err != nil {
-		c.JSON(http.StatusBadRequest, response.Err(err.Error()))
+		response.AbortBadRequest(c, err.Error())
 		return
 	}
 	c.JSON(http.StatusOK, response.OKNil())

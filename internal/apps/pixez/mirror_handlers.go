@@ -786,11 +786,7 @@ func deleteMirroredIllust(ctx context.Context, illustID int64) (bool, error) {
 		var upload model.Upload
 		if err := db.DB(ctx).Where("id = ?", file.UploadID).First(&upload).Error; err == nil {
 			_ = db.DB(ctx).Model(&upload).Update("status", model.UploadStatusDeleted).Error
-			driver := storage.Driver(upload.StorageDriver)
-			if driver == "" {
-				driver = storage.DriverLocal
-			}
-			backend, backendErr := storage.ForDriver(ctx, driver)
+			_, backend, backendErr := storage.Active(ctx)
 			if backendErr == nil {
 				_ = backend.Delete(ctx, upload.FilePath)
 			}

@@ -3,9 +3,9 @@
 import {Suspense} from "react"
 import {useRouter, useSearchParams} from "next/navigation"
 import {Tabs, TabsContent, TabsList, TabsTrigger} from "@/components/ui/tabs"
-import {TaskManager} from "@/components/common/admin/task-manager"
-import {TaskSchedulesManager} from "@/components/common/admin/task-schedules"
-import {TaskExecutionsManager} from "@/components/common/admin/task-executions"
+import {TaskManager} from "./components/task-manager"
+import {TaskSchedulesManager} from "./components/task-schedules"
+import {TaskExecutionsManager} from "./components/task-executions"
 import {Spinner} from "@/components/ui/spinner"
 import {Layers} from "lucide-react"
 

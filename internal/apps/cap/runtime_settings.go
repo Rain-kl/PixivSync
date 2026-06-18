@@ -16,6 +16,7 @@ import (
 
 	"github.com/Rain-kl/Wavelet/internal/db"
 	"github.com/Rain-kl/Wavelet/internal/model"
+	"github.com/Rain-kl/Wavelet/internal/repository"
 )
 
 const (
@@ -130,7 +131,7 @@ func (s *runtimeSettingsStore) current(ctx context.Context) (RuntimeSettings, er
 }
 
 func loadRuntimeSettings(ctx context.Context) (RuntimeSettings, error) {
-	configs, err := model.ListSystemConfigsByKeys(ctx, runtimeConfigKeys)
+	configs, err := repository.ListSystemConfigsByKeys(ctx, runtimeConfigKeys)
 	if err != nil {
 		return RuntimeSettings{}, err
 	}
@@ -190,7 +191,7 @@ func startRuntimeSettingsInvalidationListener() {
 	}
 
 	go func() {
-		pubsub := db.Redis.Subscribe(context.Background(), model.SystemConfigInvalidationChannel)
+		pubsub := db.Redis.Subscribe(context.Background(), repository.SystemConfigInvalidationChannel)
 		defer func() {
 			_ = pubsub.Close()
 		}()

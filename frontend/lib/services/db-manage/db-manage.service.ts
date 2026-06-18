@@ -1,3 +1,6 @@
+import type {InternalAxiosRequestConfig} from 'axios';
+
+import apiClient from '@/lib/services/core/api-client';
 import {BaseService} from '@/lib/services/core';
 import type {DBOverview, ExecuteSQLResponse, TableDataResponse} from './types';
 
@@ -37,5 +40,23 @@ export class DbManageService extends BaseService {
    */
   static async executeSQL(sql: string): Promise<ExecuteSQLResponse> {
     return this.post<ExecuteSQLResponse>('/query', { sql });
+  }
+
+  /**
+   * 导出数据库备份（SQLite .db / PostgreSQL .sql）
+   */
+  static async exportDatabase(): Promise<{ blob: Blob; filename: string }> {
+    const response = await apiClient.get<Blob>('/api/v1/admin/db-export', {
+      withCredentials: true,
+      responseType: 'blob',
+    } as InternalAxiosRequestConfig);
+
+    const disposition = response.headers['content-disposition'] as string | undefined;
+    let filename = 'wavelet_export';
+    if (disposition) {
+      const match = disposition.match(/filename="?([^";]+)"?/);
+      if (match) filename = match[1];
+    }
+    return { blob: response.data, filename };
   }
 }

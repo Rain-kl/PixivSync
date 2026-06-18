@@ -57,7 +57,7 @@ func setupPixezTestRouter() *gin.Engine {
 	config.Config.App.SessionSecret = "test_session_secret"
 	config.Config.App.SessionAge = 3600
 
-	r := gin.New()
+	r := testhelper.NewTestGinEngine()
 	store := cookie.NewStore([]byte(config.Config.App.SessionSecret))
 	store.Options(oauth.GetSessionOptions(config.Config.App.SessionAge))
 	r.Use(sessions.Sessions(config.Config.App.SessionCookieName, store))
@@ -788,7 +788,6 @@ func TestServeMirroredImageQuality(t *testing.T) {
 		FileSize:      int64(imageBytes.Len()),
 		MimeType:      "image/png",
 		Extension:     "png",
-		StorageDriver: "local",
 		Type:          "pixez_mirror",
 		Status:        model.UploadStatusUsed,
 		AccessMode:    1,

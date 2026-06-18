@@ -10,7 +10,7 @@ import ("net/http"
 	"github.com/Rain-kl/Wavelet/pkg/logger"
 	"github.com/gin-contrib/sessions"
 	"github.com/gin-gonic/gin"
-	"github.com/Rain-kl/Wavelet/internal/util"
+
 
 	"github.com/Rain-kl/Wavelet/internal/common/response")
 
@@ -60,7 +60,7 @@ func BuildBasicUserInfo(user *model.User, needChange bool) BasicUserInfo {
 // @Router /api/v1/user-info [get]
 // @Router /api/v1/user/self [get]
 func UserInfo(c *gin.Context) {
-	user, _ := util.GetFromContext[*model.User](c, UserObjKey)
+	user, _ := GetFromContext[*model.User](c, UserObjKey)
 	session := sessions.Default(c)
 	needChange := session.Get("need_change_password") == true
 
@@ -98,7 +98,7 @@ func Logout(c *gin.Context) {
 	session.Options(GetSessionOptions(-1))
 	session.Clear()
 	if err := session.Save(); err != nil {
-		c.JSON(http.StatusInternalServerError, response.Err(err.Error()))
+		response.AbortInternal(c, err.Error())
 		return
 	}
 	c.JSON(http.StatusOK, response.OKNil())

@@ -23,6 +23,7 @@ import (
 
 	"github.com/Rain-kl/Wavelet/internal/buildinfo"
 	"github.com/Rain-kl/Wavelet/internal/model"
+	"github.com/Rain-kl/Wavelet/internal/repository"
 	"github.com/Rain-kl/Wavelet/pkg/logger"
 	"golang.org/x/mod/semver"
 )
@@ -225,19 +226,19 @@ func (m *manager) fetchRelease(ctx context.Context, repository string) (githubRe
 }
 
 func loadRepository(ctx context.Context) (string, error) {
-	var config model.SystemConfig
-	if err := config.GetByKey(ctx, model.ConfigKeyUpdateUpstreamRepository); err != nil {
+	config, err := repository.GetSystemConfigByKey(ctx, model.ConfigKeyUpdateUpstreamRepository)
+	if err != nil {
 		return "", fmt.Errorf("%s: %w", errInvalidRepository, err)
 	}
 	return parseRepository(config.Value)
 }
 
 func (m *manager) status(ctx context.Context) (Status, releaseAsset, error) {
-	repository, err := loadRepository(ctx)
+	upstreamRepo, err := loadRepository(ctx)
 	if err != nil {
 		return Status{}, releaseAsset{}, err
 	}
-	release, asset, err := m.fetchRelease(ctx, repository)
+	release, asset, err := m.fetchRelease(ctx, upstreamRepo)
 	if err != nil {
 		return Status{}, releaseAsset{}, err
 	}
@@ -259,7 +260,7 @@ func (m *manager) status(ctx context.Context) (Status, releaseAsset, error) {
 		ReleaseNotes:       release.Body,
 		ReleaseURL:         release.HTMLURL,
 		PublishedAt:        release.Published.Format(time.RFC3339),
-		UpstreamRepository: repository,
+		UpstreamRepository: upstreamRepo,
 		AssetName:          asset.Name,
 		Platform:           runtime.GOOS + "/" + runtime.GOARCH,
 	}, asset, nil

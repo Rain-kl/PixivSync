@@ -3,7 +3,8 @@
 
 package user
 
-import ("bytes"
+import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"net/http"
@@ -16,12 +17,14 @@ import ("bytes"
 	"github.com/Rain-kl/Wavelet/internal/config"
 	"github.com/Rain-kl/Wavelet/internal/db"
 	"github.com/Rain-kl/Wavelet/internal/model"
+	"github.com/Rain-kl/Wavelet/internal/repository"
 	"github.com/Rain-kl/Wavelet/internal/testhelper"
 	"github.com/gin-contrib/sessions"
 	"github.com/gin-contrib/sessions/cookie"
 	"github.com/gin-gonic/gin"
 
-	"github.com/Rain-kl/Wavelet/internal/common/response")
+	"github.com/Rain-kl/Wavelet/internal/common/response"
+)
 
 func setupUserTestRouter(t *testing.T) *gin.Engine {
 	t.Helper()
@@ -45,11 +48,9 @@ func setupUserTestRouter(t *testing.T) *gin.Engine {
 	config.Config.App.SessionSecure = false
 	config.Config.App.SessionHTTPOnly = true
 
-	gin.SetMode(gin.TestMode)
-	r := gin.New()
 	store := cookie.NewStore([]byte(config.Config.App.SessionSecret))
 	store.Options(oauth.GetSessionOptions(3600))
-	r.Use(sessions.Sessions(config.Config.App.SessionCookieName, store))
+	r := testhelper.NewTestGinEngine(sessions.Sessions(config.Config.App.SessionCookieName, store))
 
 	api := r.Group("/api/v1")
 	api.POST("/user/register", Register)
@@ -281,7 +282,7 @@ func TestLoginEmailVerificationFallbackWhenSMTPUnconfigured(t *testing.T) {
 	}
 
 	// 2.5 Invalidate the system config cache in Redis
-	if err := db.Redis.Del(context.Background(), db.PrefixedKey(model.SystemConfigRedisHashKey)).Err(); err != nil {
+	if err := db.Redis.Del(context.Background(), db.PrefixedKey(repository.SystemConfigRedisHashKey)).Err(); err != nil {
 		t.Fatalf("invalidate system config cache failed: %v", err)
 	}
 
@@ -295,8 +296,8 @@ func TestLoginEmailVerificationFallbackWhenSMTPUnconfigured(t *testing.T) {
 	body, _ := json.Marshal(payload)
 
 	w := performUserRequest(router, http.MethodPost, "/api/v1/user/login", body, nil)
-	if w.Code != http.StatusOK {
-		t.Fatalf("Login(%q) status = %d, want %d. Body: %s", username, w.Code, http.StatusOK, w.Body.String())
+	if w.Code != http.StatusBadRequest {
+		t.Fatalf("Login(%q) status = %d, want %d. Body: %s", username, w.Code, http.StatusBadRequest, w.Body.String())
 	}
 
 	// Check response error msg
@@ -387,7 +388,7 @@ func TestLoginEmailVerificationFallbackForEmptyEmail(t *testing.T) {
 	}
 
 	// Invalidate the system config cache in Redis
-	if err := db.Redis.Del(context.Background(), db.PrefixedKey(model.SystemConfigRedisHashKey)).Err(); err != nil {
+	if err := db.Redis.Del(context.Background(), db.PrefixedKey(repository.SystemConfigRedisHashKey)).Err(); err != nil {
 		t.Fatalf("invalidate system config cache failed: %v", err)
 	}
 
@@ -401,8 +402,8 @@ func TestLoginEmailVerificationFallbackForEmptyEmail(t *testing.T) {
 	body, _ := json.Marshal(payload)
 
 	w := performUserRequest(router, http.MethodPost, "/api/v1/user/login", body, nil)
-	if w.Code != http.StatusOK {
-		t.Fatalf("Login(%q) status = %d, want %d. Body: %s", username, w.Code, http.StatusOK, w.Body.String())
+	if w.Code != http.StatusBadRequest {
+		t.Fatalf("Login(%q) status = %d, want %d. Body: %s", username, w.Code, http.StatusBadRequest, w.Body.String())
 	}
 
 	// Check response error msg
@@ -492,10 +493,8 @@ func TestAccessTokenEndpointsDisallowTokenAuth(t *testing.T) {
 	}
 
 	// 2. Set up router with access-token routes and oauth middlewares
-	gin.SetMode(gin.TestMode)
-	r := gin.New()
 	store := cookie.NewStore([]byte("test_session_secret"))
-	r.Use(sessions.Sessions("test_session_id", store))
+	r := testhelper.NewTestGinEngine(sessions.Sessions("test_session_id", store))
 
 	apiV1Router := r.Group("/api/v1")
 	userRouter := apiV1Router.Group("/user")
@@ -530,8 +529,7 @@ func TestAccessTokenEndpointsDisallowTokenAuth(t *testing.T) {
 
 	// 4. Test that accessing using a Session succeeds
 	sessionCookieStore := cookie.NewStore([]byte("test_session_secret"))
-	rSession := gin.New()
-	rSession.Use(sessions.Sessions("test_session_id", sessionCookieStore))
+	rSession := testhelper.NewTestGinEngine(sessions.Sessions("test_session_id", sessionCookieStore))
 	rSession.GET("/api/v1/user/access-tokens", oauth.LoginRequired(), oauth.DisallowTokenAuth(), ListAccessTokens)
 
 	// We can login/register or just mock the session handler to set user ID
@@ -594,10 +592,8 @@ func TestChangePasswordRevocation(t *testing.T) {
 	}
 
 	// 3. Set up router
-	gin.SetMode(gin.TestMode)
-	r := gin.New()
 	store := cookie.NewStore([]byte("test_session_secret"))
-	r.Use(sessions.Sessions("test_session_id", store))
+	r := testhelper.NewTestGinEngine(sessions.Sessions("test_session_id", store))
 
 	r.GET("/mock-login", func(c *gin.Context) {
 		session := sessions.Default(c)
