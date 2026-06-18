@@ -89,6 +89,17 @@ func TestProcessMirrorIllustRegistersUpload(t *testing.T) {
 	if _, err := os.Stat(upload.FilePath); err != nil {
 		t.Fatalf("mirrored local file missing: %v", err)
 	}
+
+	trendDate := upload.CreatedAt.Format("2006-01-02")
+	var trendStat model.UploadStat
+	if err := db.DB(ctx).
+		Where("dimension = ? AND stat_key = ?", model.UploadStatDimensionTrend, trendDate).
+		First(&trendStat).Error; err != nil {
+		t.Fatalf("load trend stat failed: %v", err)
+	}
+	if trendStat.FileCount != 1 || trendStat.FileSize != upload.FileSize {
+		t.Fatalf("unexpected trend stat: %+v", trendStat)
+	}
 }
 
 func TestFindMirroredImageUploadMapsDerivedFilenames(t *testing.T) {

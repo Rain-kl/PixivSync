@@ -19,6 +19,7 @@ import (
 	"strings"
 	"time"
 
+	uploadstats "github.com/Rain-kl/Wavelet/internal/apps/upload/stats"
 	"github.com/Rain-kl/Wavelet/internal/db"
 	"github.com/Rain-kl/Wavelet/internal/db/idgen"
 	"github.com/Rain-kl/Wavelet/internal/model"
@@ -481,6 +482,7 @@ func registerMirrorUpload(ctx context.Context, pixivURL string, pageIndex int, d
 		}
 		return model.PixezMirrorImageFile{}, fmt.Errorf("create upload record: %w", err)
 	}
+	uploadstats.RecordUploadStatsAdd(ctx, &upload)
 	return imageFileRecord(pixivURL, pageIndex, upload), nil
 }
 

@@ -15,6 +15,7 @@ import (
 	"time"
 
 	uploadapp "github.com/Rain-kl/Wavelet/internal/apps/upload"
+	uploadstats "github.com/Rain-kl/Wavelet/internal/apps/upload/stats"
 	"github.com/Rain-kl/Wavelet/internal/db"
 	"github.com/Rain-kl/Wavelet/pkg/logger"
 	"github.com/Rain-kl/Wavelet/internal/model"
@@ -785,6 +786,7 @@ func deleteMirroredIllust(ctx context.Context, illustID int64) (bool, error) {
 	for _, file := range files {
 		var upload model.Upload
 		if err := db.DB(ctx).Where("id = ?", file.UploadID).First(&upload).Error; err == nil {
+			uploadstats.RecordUploadStatsRemove(ctx, &upload)
 			_ = db.DB(ctx).Model(&upload).Update("status", model.UploadStatusDeleted).Error
 			_, backend, backendErr := storage.Active(ctx)
 			if backendErr == nil {
