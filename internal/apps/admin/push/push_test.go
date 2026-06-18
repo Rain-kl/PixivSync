@@ -14,7 +14,9 @@ import (
 	"testing"
 	"time"
 
+	"github.com/Rain-kl/Wavelet/internal/apps/oauth"
 	"github.com/Rain-kl/Wavelet/internal/model"
+	"github.com/Rain-kl/Wavelet/internal/repository"
 	"github.com/Rain-kl/Wavelet/internal/task"
 	"github.com/Rain-kl/Wavelet/internal/testhelper"
 	pkgpush "github.com/Rain-kl/Wavelet/pkg/push"
@@ -104,7 +106,7 @@ func setupTestRouter(authUser *model.User) *gin.Engine {
 
 	adminGroup.Use(func(c *gin.Context) {
 		if authUser != nil {
-			oauth.SetToContext(c, "user_obj", authUser)
+			oauth.SetToContext(c, oauth.UserObjKey, authUser)
 		}
 		c.Next()
 	})
@@ -189,7 +191,7 @@ func TestEventTrigger(t *testing.T) {
 		event.Enabled = true
 		event.Channels = []string{"mock_channel"}
 		event.Targets = []string{"admin_user"}
-		err = dbConn.Save(&event).Error
+		err = repository.SavePushEvent(context.Background(), &event)
 		require.NoError(t, err)
 
 		// Trigger
@@ -247,7 +249,7 @@ func TestEventTrigger(t *testing.T) {
 		event.Enabled = true
 		event.Channels = []string{"mock_channel"}
 		event.Targets = []string{"user.username"} // 动态目标
-		err = dbConn.Save(&event).Error
+		err = repository.SavePushEvent(context.Background(), &event)
 		require.NoError(t, err)
 
 		// Trigger with empty body (simulates cron scheduler triggering)

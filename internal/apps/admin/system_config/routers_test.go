@@ -27,7 +27,7 @@ import (
 	"github.com/Rain-kl/Wavelet/internal/common/response"
 )
 
-const expectedDefaultConfigsCount = 30
+const expectedDefaultConfigsCount = 33
 
 func setupTestRouter(authUser *model.User) *gin.Engine {
 	r := testhelper.NewTestGinEngine()
@@ -168,8 +168,22 @@ func TestListSystemConfigs(t *testing.T) {
 		var configs []model.SystemConfig
 		_ = json.Unmarshal(dataBytes, &configs)
 
-		if len(configs) != 1 || configs[0].Key != model.ConfigKeyMaxAPIKeysPerUser {
-			t.Errorf("expected 1 business config (max_api_keys_per_user), got %d: %v", len(configs), configs)
+		if len(configs) != 4 {
+			t.Errorf("expected 4 business configs, got %d: %v", len(configs), configs)
+		}
+		keys := make(map[string]struct{}, len(configs))
+		for _, cfg := range configs {
+			keys[cfg.Key] = struct{}{}
+		}
+		for _, key := range []string{
+			model.ConfigKeyMaxAPIKeysPerUser,
+			model.ConfigKeyPixezMirrorDownloadInterval,
+			model.ConfigKeyPixezMirrorIllustConcurrency,
+			model.ConfigKeyPixezMirrorNovelConcurrency,
+		} {
+			if _, ok := keys[key]; !ok {
+				t.Errorf("expected business config %q to be present", key)
+			}
 		}
 	})
 }

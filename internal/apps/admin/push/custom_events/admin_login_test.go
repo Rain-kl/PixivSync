@@ -13,6 +13,7 @@ import (
 	"github.com/Rain-kl/Wavelet/internal/apps/admin/push"
 	"github.com/Rain-kl/Wavelet/internal/listener"
 	"github.com/Rain-kl/Wavelet/internal/model"
+	"github.com/Rain-kl/Wavelet/internal/repository"
 	"github.com/Rain-kl/Wavelet/internal/task"
 	"github.com/Rain-kl/Wavelet/internal/testhelper"
 	"github.com/hibiken/asynq"
@@ -88,7 +89,7 @@ func enableAdminLoginEvent(t *testing.T, dbConn *gorm.DB, channelName string, ta
 	event.Enabled = true
 	event.Channels = []string{channelName}
 	event.Targets = targets
-	require.NoError(t, dbConn.Save(&event).Error)
+	require.NoError(t, repository.SavePushEvent(context.Background(), &event))
 }
 
 func waitForAsyncTrigger(t *testing.T) {
@@ -164,8 +165,7 @@ func TestAdminLoginPushIntegration(t *testing.T) {
 
 		var event model.PushEvent
 		require.NoError(t, dbConn.Where("event_key = ?", AdminLogin.Key).First(&event).Error)
-		event.Enabled = false
-		require.NoError(t, dbConn.Save(&event).Error)
+		require.NoError(t, repository.UpdatePushEventEnabled(context.Background(), &event, false))
 
 		listener.EmitAdminLoggedIn(context.Background(), adminUser, "10.0.0.1")
 		waitForAsyncTrigger(t)
