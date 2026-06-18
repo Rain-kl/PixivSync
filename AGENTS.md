@@ -21,14 +21,17 @@
 
 ## 务必阅读匹配的 Skill
 
-- `new-api`：在添加或修改自定义业务 API、Handler、服务层逻辑或注册自定义端点时使用。
-- `new-async-task`：在添加或修改 Asynq 任务、定时任务时使用。
-- `new-setting`：在添加或修改基于数据库的系统/业务/公开设置、`/admin/system` 参数或 `/admin/settings` 图形化设置时使用。
-- `database-migration`：在数据库升级流程时使用。
-- Go skills：使用针对性的 `go-*` skills 来获取 Go 实现细节，如测试、错误处理、包、Context、并发、日志、文档和审查。
-- `shadcn`：在添加、修改或组合 shadcn/ui 组件时使用。
-- `code-review-skill`：在提交 PR 之前使用，检查代码质量、样式、潜在错误和最佳实践。
-- `push-notification`：在添加或修改系统通知推送事件、修改消息推送底层设计、调用统一触发器投递消息、或开发带消息推送功能的业务功能时使用。
+| Skill | 何时使用 |
+| :--- | :--- |
+| `new-api` | 添加或修改自定义业务 API、Handler、服务层逻辑、自定义路由注册 |
+| `new-async-task` | 添加或修改 Asynq 任务、定时任务、TaskHandler、任务元数据 |
+| `new-setting` | 添加或修改系统/业务/公开设置、`/admin/system` 参数或 `/admin/settings` 图形化设置 |
+| `database-migration` | 数据库表结构变更、goose SQL 迁移、seed 数据 |
+| `file-upload` | 业务上传文件、Worker 程序化摄取、`upload.Ingest` 策略选型、文件访问与 `w_uploads` / 统计排查 |
+| `push-notification` | 系统通知推送事件、统一触发器投递、带消息推送的业务功能 |
+| `release-guide` | 根据自上一正式版本 Tag 以来的提交整理 Version Bump 提交信息以触发双语 Release |
+| `shadcn` | 添加、修改或组合 shadcn/ui 组件 |
+
 
 ## 严格遵循事项 (Guardrails)
 
@@ -39,6 +42,7 @@
 - 当 API Handler 发生变化时，更新 Swagger 文档（运行 `make swagger`）。
 - 在完成代码开发后必须运行 `make code-check`, 并修复报错。
 - 需要缓存或文件管理能力时，必须复用现有平台实现，禁止在业务包中自行创建缓存目录、直接管理缓存文件或重复封装存储后端。
+- 文件摄取必须通过 `upload.Ingest`（`upload.PolicyCreate` / `PolicyDedupNewRecord` / `PolicyResolveExisting`）；删除必须通过 `upload.Remove` 或 `upload.RemoveOwned`。禁止业务模块直接调用 `repository.CreateUpload` / `repository.SoftDeleteUpload`，禁止 `db.Create(&model.Upload{})` 旁路写 `w_uploads`。
 - 禁止在 `init()` 中注册跨模块集成（任务 Handler、推送内置事件、域事件监听器、任务完成钩子）。统一通过 `internal/bootstrap` 在 `internal/cmd` 入口显式装配。
 - `internal/router/router.go` 的 `Serve()` 仅负责 HTTP 路由与中间件，禁止在其中执行 `SyncEvents`、`InitLogWriter` 等进程级运行时初始化。
 - 核心业务模块（如 `oauth`、`user`）禁止直接 `import` `internal/apps/admin/push` 或 `custom_events` 触发通知；应通过 `internal/listener` 发射域事件，由 push 模块在 bootstrap 阶段订阅。
@@ -77,7 +81,7 @@
 - `internal/config/`：Viper 加载和配置结构体。运行时代码应使用 `config.Config.<Section>.<Field>`。
 - `internal/router/`：唯一的 HTTP 路由注册点。
 - `internal/apps/`：按功能（Feature-based）组织的 HTTP Handler、中间件、内部服务与模块逻辑。移除全局 service 层，模块内部业务逻辑（如验证码业务逻辑管理器 `internal/apps/cap/manager.go`）均收敛于各自模块中；管理端模块位于 `internal/apps/admin/`。
-- `internal/apps/upload/`：上传记录、文件访问控制、本地/S3 文件响应、下载及图片 WebP 压缩。业务应复用这些入口，不直接操作底层文件。
+- `internal/apps/upload/`：上传记录、文件访问控制、本地/S3 文件响应、下载及图片 WebP 压缩。业务应复用 `upload.Ingest` / `upload.Remove` 与 `GET /f/:id` 文件服务，不直接操作底层 storage 或旁路写 `w_uploads`。
 - `internal/model/`：GORM 实体和模型级业务方法。
 - `internal/db/`：PostgreSQL、Redis、ClickHouse、GORM 日志、ID 生成和 goose SQL 迁移的布线。
 - `internal/diskcache/`：平台级磁盘字节缓存，通过 `diskcache.GetGlobalCache()` 提供 TTL、最大空间限制、LRU 淘汰、清空、状态统计和配置热更新。写入时使用 `DefaultExpiration`（全局默认 TTL）、正数 `time.Duration`（业务 TTL）或 `NoExpiration`（无 TTL，仍受空间限制和 LRU 淘汰）。

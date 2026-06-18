@@ -15,12 +15,10 @@ import (
 	"time"
 
 	uploadapp "github.com/Rain-kl/Wavelet/internal/apps/upload"
-	uploadstats "github.com/Rain-kl/Wavelet/internal/apps/upload/stats"
 	"github.com/Rain-kl/Wavelet/internal/db"
 	"github.com/Rain-kl/Wavelet/pkg/logger"
 	"github.com/Rain-kl/Wavelet/internal/model"
 	pixezsvc "github.com/Rain-kl/Wavelet/internal/service/pixez"
-	"github.com/Rain-kl/Wavelet/internal/storage"
 	"github.com/Rain-kl/Wavelet/internal/task"
 	"github.com/Rain-kl/Wavelet/internal/common/response"
 	"github.com/gin-gonic/gin"
@@ -784,14 +782,8 @@ func deleteMirroredIllust(ctx context.Context, illustID int64) (bool, error) {
 	var files []model.PixezMirrorImageFile
 	_ = json.Unmarshal([]byte(record.ImageFilesJSON), &files)
 	for _, file := range files {
-		var upload model.Upload
-		if err := db.DB(ctx).Where("id = ?", file.UploadID).First(&upload).Error; err == nil {
-			uploadstats.RecordUploadStatsRemove(ctx, &upload)
-			_ = db.DB(ctx).Model(&upload).Update("status", model.UploadStatusDeleted).Error
-			_, backend, backendErr := storage.Active(ctx)
-			if backendErr == nil {
-				_ = backend.Delete(ctx, upload.FilePath)
-			}
+		if _, err := uploadapp.Remove(ctx, file.UploadID); err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
+			logger.WarnF(ctx, "failed to remove mirrored upload %d: %v", file.UploadID, err)
 		}
 	}
 	if err := db.DB(ctx).Where("illust_id = ?", illustID).Delete(&model.PixezMirrorIllust{}).Error; err != nil {

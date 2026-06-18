@@ -19,13 +19,10 @@ import (
 	"strings"
 	"time"
 
-	uploadstats "github.com/Rain-kl/Wavelet/internal/apps/upload/stats"
+	uploadapp "github.com/Rain-kl/Wavelet/internal/apps/upload"
 	"github.com/Rain-kl/Wavelet/internal/db"
-	"github.com/Rain-kl/Wavelet/internal/db/idgen"
 	"github.com/Rain-kl/Wavelet/internal/model"
 	"github.com/Rain-kl/Wavelet/internal/repository"
-	"github.com/Rain-kl/Wavelet/internal/storage"
-	"github.com/Rain-kl/Wavelet/pkg/logger"
 	"github.com/Rain-kl/Wavelet/internal/task"
 	"gorm.io/gorm"
 )
@@ -430,60 +427,37 @@ func registerMirrorUpload(ctx context.Context, pixivURL string, pageIndex int, d
 		mimeType = http.DetectContentType(data[:min(len(data), detectContentBytes)])
 	}
 
-	var existing model.Upload
-	if err := db.DB(ctx).
-		Where("hash = ? AND file_size = ? AND status IN (?, ?)", hash, size, model.UploadStatusPending, model.UploadStatusUsed).
-		First(&existing).Error; err == nil {
-		return imageFileRecord(pixivURL, pageIndex, existing), nil
-	} else if !errors.Is(err, gorm.ErrRecordNotFound) {
-		return model.PixezMirrorImageFile{}, err
-	}
-
 	ext := strings.TrimPrefix(strings.ToLower(path.Ext(fileName)), ".")
 	if ext == "" {
 		ext = extensionFromMime(mimeType)
 	}
-	id := idgen.NextUint64ID()
-	subPath := fmt.Sprintf("uploads/%s/%d.%s", time.Now().Format("2006/01/02"), id, ext)
-	_, backend, err := storage.Active(ctx)
-	if err != nil {
-		return model.PixezMirrorImageFile{}, fmt.Errorf("active storage configuration: %w", err)
-	}
 
-	result, err := backend.Put(ctx, subPath, bytes.NewReader(data), size, mimeType)
-	if err != nil {
-		return model.PixezMirrorImageFile{}, fmt.Errorf("store mirrored Pixiv image: %w", err)
-	}
-
-	upload := model.Upload{
-		ID:            id,
-		UserID:        firstUploadOwnerID(ctx),
-		FileName:      fileName,
-		FilePath:      result.Key,
-		FileSize:      size,
-		MimeType:      mimeType,
-		Extension:     ext,
-		Hash:          hash,
-		Type:          pixezMirrorUploadType,
-		Status:        model.UploadStatusUsed,
-		AccessMode:    1,
+	accessMode := 1
+	ingestResult, err := uploadapp.Ingest(ctx, uploadapp.IngestRequest{
+		UserID:     firstUploadOwnerID(ctx),
+		Reader:     bytes.NewReader(data),
+		Size:       size,
+		FileName:   fileName,
+		MimeType:   mimeType,
+		Extension:  ext,
+		Hash:       hash,
+		Type:       pixezMirrorUploadType,
+		AccessMode: &accessMode,
+		Status:     model.UploadStatusUsed,
 		Metadata: model.UploadMetadata{
 			OriginalMime: mimeType,
-			Bucket:       result.Bucket,
 			Extra: map[string]any{
 				"pixez_source_url": pixivURL,
 				"pixez_page":       pageIndex,
 			},
 		},
+		Policy:             uploadapp.PolicyResolveExisting,
+		SkipExtensionCheck: true,
+	})
+	if err != nil {
+		return model.PixezMirrorImageFile{}, fmt.Errorf("ingest mirrored Pixiv image: %w", err)
 	}
-	if err := db.DB(ctx).Create(&upload).Error; err != nil {
-		if deleteErr := backend.Delete(ctx, result.Key); deleteErr != nil {
-			logger.WarnF(ctx, "failed to delete mirrored file on database error: %v", deleteErr)
-		}
-		return model.PixezMirrorImageFile{}, fmt.Errorf("create upload record: %w", err)
-	}
-	uploadstats.RecordUploadStatsAdd(ctx, &upload)
-	return imageFileRecord(pixivURL, pageIndex, upload), nil
+	return imageFileRecord(pixivURL, pageIndex, ingestResult.Upload), nil
 }
 
 func firstUploadOwnerID(ctx context.Context) uint64 {

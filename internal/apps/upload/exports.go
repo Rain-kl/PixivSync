@@ -8,6 +8,7 @@ import (
 	"github.com/Rain-kl/Wavelet/internal/apps/upload/cache"
 	"github.com/Rain-kl/Wavelet/internal/apps/upload/filesrv"
 	"github.com/Rain-kl/Wavelet/internal/apps/upload/handler"
+	"github.com/Rain-kl/Wavelet/internal/apps/upload/ingest"
 	uploadstats "github.com/Rain-kl/Wavelet/internal/apps/upload/stats"
 	uploadtask "github.com/Rain-kl/Wavelet/internal/apps/upload/task"
 	"github.com/Rain-kl/Wavelet/internal/apps/upload/util"
@@ -30,6 +31,36 @@ var (
 	ServeUpload            = filesrv.ServeUpload
 )
 
+// Programmatic ingest API
+var (
+	Ingest      = ingest.Ingest
+	Remove      = ingest.Remove
+	RemoveOwned = ingest.RemoveOwned
+	FindByHash  = ingest.FindByHash
+)
+
+// Ingest policy constants
+const (
+	PolicyCreate          = ingest.PolicyCreate
+	PolicyDedupNewRecord  = ingest.PolicyDedupNewRecord
+	PolicyResolveExisting = ingest.PolicyResolveExisting
+)
+
+type (
+	// IngestRequest is the programmatic upload ingest payload.
+	IngestRequest = ingest.Request
+	// IngestResult reports ingest side effects.
+	IngestResult = ingest.Result
+	// IngestPolicy controls hash-collision behavior during ingest.
+	IngestPolicy = ingest.Policy
+)
+
+// Ingest errors
+var (
+	ErrIngestForbidden       = ingest.ErrForbidden
+	ErrIngestStorageReadOnly = ingest.ErrStorageReadOnly
+)
+
 // Cache management
 var (
 	ResetAccessCaches              = cache.ResetAccessCaches
@@ -38,7 +69,9 @@ var (
 
 // Stats
 var (
-	ApplyUploadStatsAdd    = uploadstats.ApplyUploadStatsAdd
+	// Deprecated: use upload.Ingest or upload.Remove; stats are applied internally.
+	ApplyUploadStatsAdd = uploadstats.ApplyUploadStatsAdd
+	// Deprecated: use upload.Ingest or upload.Remove; stats are applied internally.
 	ApplyUploadStatsRemove = uploadstats.ApplyUploadStatsRemove
 	RebuildUploadStats     = uploadstats.RebuildUploadStats
 )

@@ -63,6 +63,7 @@ func GetActiveUploadByID(ctx context.Context, id uint64) (model.Upload, error) {
 }
 
 // SoftDeleteUpload marks an upload as deleted.
+// External modules must use upload.Remove or upload.RemoveOwned; only internal/apps/upload may call this.
 func SoftDeleteUpload(ctx context.Context, upload *model.Upload) error {
 	return db.DB(ctx).Model(upload).Update("status", model.UploadStatusDeleted).Error
 }
@@ -97,6 +98,7 @@ func FindReusableUploadByHash(ctx context.Context, hash string, size int64) (mod
 }
 
 // CreateUpload persists a new upload record.
+// External modules must use upload.Ingest; only internal/apps/upload may call this.
 func CreateUpload(ctx context.Context, upload *model.Upload) error {
 	return db.DB(ctx).Create(upload).Error
 }

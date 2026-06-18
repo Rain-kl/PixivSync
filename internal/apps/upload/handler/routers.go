@@ -8,7 +8,6 @@ package handler
 import (
 	"archive/zip"
 	"bytes"
-	"context"
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
@@ -21,16 +20,15 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
-	"time"
 
 	"github.com/Rain-kl/Wavelet/internal/apps/oauth"
 	"github.com/Rain-kl/Wavelet/internal/apps/upload/filesrv"
+	"github.com/Rain-kl/Wavelet/internal/apps/upload/ingest"
 	"github.com/Rain-kl/Wavelet/internal/apps/upload/shared"
 	uploadstorage "github.com/Rain-kl/Wavelet/internal/apps/upload/storage"
 	"github.com/Rain-kl/Wavelet/internal/apps/upload/util"
 	"github.com/Rain-kl/Wavelet/internal/common"
 	"github.com/Rain-kl/Wavelet/internal/common/response"
-	"github.com/Rain-kl/Wavelet/internal/db/idgen"
 	"github.com/Rain-kl/Wavelet/internal/model"
 	"github.com/Rain-kl/Wavelet/pkg/logger"
 	"github.com/gin-gonic/gin"
@@ -91,11 +89,6 @@ func UploadFile(c *gin.Context) {
 		ext = "bin"
 	}
 
-	if errMsg := validateUploadAllowedExtension(ctx, ext); errMsg != "" {
-		response.AbortBadRequest(c, errMsg)
-		return
-	}
-
 	hashWriter := sha256.New()
 	var buf bytes.Buffer
 	size, err := io.Copy(&buf, io.TeeReader(file, hashWriter))
@@ -120,51 +113,43 @@ func UploadFile(c *gin.Context) {
 		return
 	}
 
-	handled, lookupErr := tryInstantUpload(ctx, c, currUser, fileHash, size, mimeType, ext, origName, accessMode)
-	if handled {
-		return
-	}
-	if lookupErr != nil && !errors.Is(lookupErr, gorm.ErrRecordNotFound) {
-		response.AbortBadRequest(c, shared.ErrFileValidationFailed)
-		return
-	}
-
 	meta, errMsg := parseUploadMetadata(c, mimeType)
 	if errMsg != "" {
 		response.AbortBadRequest(c, errMsg)
 		return
 	}
 
-	id := idgen.NextUint64ID()
-	subPath := fmt.Sprintf("uploads/%s/%d.%s", time.Now().Format("2006/01/02"), id, ext)
-
-	subPath, err = storeUploadObject(ctx, subPath, size, mimeType, &buf, &meta)
-	if err != nil {
-		response.AbortBadRequest(c, err.Error())
-		return
-	}
-
-	newUpload := model.Upload{
-		ID:         id,
+	result, err := ingest.Ingest(ctx, ingest.Request{
 		UserID:     currUser.ID,
+		Reader:     bytes.NewReader(buf.Bytes()),
+		Size:       size,
 		FileName:   origName,
-		FilePath:   subPath,
-		FileSize:   size,
 		MimeType:   mimeType,
 		Extension:  ext,
 		Hash:       fileHash,
 		Type:       uploadType,
-		Status:     model.UploadStatusUsed,
-		AccessMode: accessMode,
+		AccessMode: &accessMode,
 		Metadata:   meta,
-	}
-
-	if err := saveNewUploadRecord(ctx, &newUpload, subPath); err != nil {
+		Policy:     ingest.PolicyDedupNewRecord,
+	})
+	if err != nil {
+		if errors.Is(err, ingest.ErrStorageReadOnly) {
+			response.AbortConflict(c, shared.ErrStorageReadOnly)
+			return
+		}
+		if err.Error() == shared.ErrUnsupportedFormat {
+			response.AbortBadRequest(c, shared.ErrUnsupportedFormat)
+			return
+		}
+		if err.Error() == shared.ErrSaveFileFailed {
+			response.AbortBadRequest(c, shared.ErrSaveFileFailed)
+			return
+		}
 		response.AbortBadRequest(c, shared.ErrSaveUploadRecordFailed)
 		return
 	}
 
-	c.JSON(http.StatusOK, response.OK(newUpload))
+	c.JSON(http.StatusOK, response.OK(result.Upload))
 }
 
 // DownloadFile 通用单文件下载接口
@@ -318,34 +303,6 @@ func resolveUploadAccessMode(c *gin.Context, uploadType string) (int, string) {
 		return 0, "无效的 access_mode 参数"
 	}
 	return accessMode, ""
-}
-
-func tryInstantUpload(ctx context.Context, c *gin.Context, currUser *model.User, fileHash string, size int64, mimeType, ext, origName string, accessMode int) (bool, error) {
-	existing, err := findReusableUpload(ctx, fileHash, size)
-	if err != nil {
-		return false, err
-	}
-	if uploadstorage.ReadOnly(ctx) {
-		response.AbortConflict(c, shared.ErrStorageReadOnly)
-		return true, nil
-	}
-
-	newUpload, err := createInstantUpload(ctx, existing, instantUploadInput{
-		UserID:     currUser.ID,
-		FileHash:   fileHash,
-		Size:       size,
-		MimeType:   mimeType,
-		Extension:  ext,
-		OrigName:   origName,
-		UploadType: c.DefaultPostForm("type", "generic"),
-		AccessMode: accessMode,
-	})
-	if err != nil {
-		response.AbortBadRequest(c, shared.ErrSaveUploadRecordFailed)
-		return true, err
-	}
-	c.JSON(http.StatusOK, response.OK(newUpload))
-	return true, nil
 }
 
 func parseUploadMetadata(c *gin.Context, mimeType string) (model.UploadMetadata, string) {

@@ -8,6 +8,7 @@ import (
 	"strconv"
 
 	"github.com/Rain-kl/Wavelet/internal/apps/oauth"
+	"github.com/Rain-kl/Wavelet/internal/apps/upload/ingest"
 	"github.com/Rain-kl/Wavelet/internal/apps/upload/shared"
 	uploadstorage "github.com/Rain-kl/Wavelet/internal/apps/upload/storage"
 	"github.com/Rain-kl/Wavelet/internal/common/response"
@@ -235,7 +236,7 @@ func DeleteMyFile(c *gin.Context) {
 			c.AbortWithStatus(http.StatusNotFound)
 			return
 		}
-		if err == errUploadForbidden {
+		if err == ingest.ErrForbidden {
 			c.AbortWithStatus(http.StatusForbidden)
 			return
 		}
@@ -289,7 +290,7 @@ func UpdateMyFile(c *gin.Context) {
 			c.AbortWithStatus(http.StatusNotFound)
 			return
 		}
-		if err == errUploadForbidden {
+		if err == ingest.ErrForbidden {
 			c.AbortWithStatus(http.StatusForbidden)
 			return
 		}
