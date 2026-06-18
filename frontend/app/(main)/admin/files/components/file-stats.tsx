@@ -84,6 +84,8 @@ export function FileStats() {
   const statsQuery = useQuery({
     queryKey: ["files", "stats"],
     queryFn: () => services.adminUpload.getFileStats(),
+    staleTime: 0,
+    refetchOnMount: "always",
   })
 
   const stats = statsQuery.data
@@ -159,7 +161,7 @@ export function FileStats() {
     )
   }, [stats?.trend])
 
-  if (statsQuery.isPending) {
+  if (statsQuery.isLoading) {
     return (
       <div className="flex items-center justify-center py-32">
         <Loader2 className="size-8 animate-spin text-sky-500" />

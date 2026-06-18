@@ -42,16 +42,16 @@ export default function FilesPage() {
 
         {/* ──────── TAB 1: 统计看板 ──────── */}
         <TabsContent value="stats" className="outline-hidden">
-          <FileStats />
+          {activeTab === "stats" ? <FileStats /> : null}
         </TabsContent>
 
         {/* ──────── TAB 2: 文件列表 ──────── */}
         <TabsContent value="list" className="outline-hidden">
-          <FileList />
+          {activeTab === "list" ? <FileList /> : null}
         </TabsContent>
 
         <TabsContent value="storage" className="outline-hidden">
-          <StorageConfigTab />
+          {activeTab === "storage" ? <StorageConfigTab /> : null}
         </TabsContent>
       </Tabs>
     </motion.div>
