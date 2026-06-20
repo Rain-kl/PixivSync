@@ -1,6 +1,6 @@
 // Copyright 2025 linux.do
 // Copyright 2026 Arctel.net
-// SPDX-License-Identifier: AGPL-3.0-only
+// SPDX-License-Identifier: Apache-2.0
 
 package user
 
@@ -12,6 +12,7 @@ import (
 
 	"github.com/Rain-kl/Wavelet/internal/apps/oauth"
 	"github.com/Rain-kl/Wavelet/internal/model"
+	"github.com/Rain-kl/Wavelet/pkg/logger"
 	"github.com/gin-gonic/gin"
 	"gorm.io/gorm"
 
@@ -103,7 +104,8 @@ func abortUserLogicError(c *gin.Context, err error, notFoundMsg string, forbidde
 			return true
 		}
 	}
-	response.AbortInternal(c, msg)
+	logger.ErrorF(c.Request.Context(), "Admin user error: %v", err)
+	response.AbortInternal(c, "内部服务器错误")
 	return true
 }
 
@@ -129,7 +131,8 @@ func ListUsers(c *gin.Context) {
 
 	total, modelUsers, err := listUsers(c.Request.Context(), req)
 	if err != nil {
-		response.AbortInternal(c, err.Error())
+		logger.ErrorF(c.Request.Context(), "List admin users failed: %v", err)
+		response.AbortInternal(c, "获取用户列表失败")
 		return
 	}
 

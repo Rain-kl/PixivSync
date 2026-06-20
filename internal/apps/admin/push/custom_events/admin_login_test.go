@@ -165,7 +165,8 @@ func TestAdminLoginPushIntegration(t *testing.T) {
 
 		var event model.PushEvent
 		require.NoError(t, dbConn.Where("event_key = ?", AdminLogin.Key).First(&event).Error)
-		require.NoError(t, repository.UpdatePushEventEnabled(context.Background(), &event, false))
+		event.Enabled = false
+		require.NoError(t, repository.SavePushEvent(context.Background(), &event))
 
 		listener.EmitAdminLoggedIn(context.Background(), adminUser, "10.0.0.1")
 		waitForAsyncTrigger(t)

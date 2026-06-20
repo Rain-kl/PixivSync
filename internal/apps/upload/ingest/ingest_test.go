@@ -183,6 +183,52 @@ func TestIngestPolicyDedupNewRecordCreatesSecondRecord(t *testing.T) {
 	}
 }
 
+func TestCreateUploadWithStatsRollsBackOnCreateFailure(t *testing.T) {
+	dbConn, _, cleanup := testhelper.SetupTestEnvironment(t)
+	defer cleanup()
+	ctx := context.Background()
+
+	existing := model.Upload{
+		ID:        99001,
+		UserID:    1001,
+		FileName:  "existing.png",
+		FilePath:  "uploads/existing.png",
+		FileSize:  64,
+		MimeType:  "image/png",
+		Extension: "png",
+		Type:      "generic",
+		Status:    model.UploadStatusUsed,
+		CreatedAt: time.Now(),
+	}
+	if err := dbConn.Create(&existing).Error; err != nil {
+		t.Fatalf("seed upload failed: %v", err)
+	}
+
+	duplicate := &model.Upload{
+		ID:        existing.ID,
+		UserID:    1002,
+		FileName:  "duplicate.png",
+		FilePath:  "uploads/duplicate.png",
+		FileSize:  128,
+		MimeType:  "image/png",
+		Extension: "png",
+		Type:      "generic",
+		Status:    model.UploadStatusUsed,
+		CreatedAt: time.Now(),
+	}
+	if err := createUploadWithStats(ctx, duplicate); err == nil {
+		t.Fatal("createUploadWithStats with duplicate ID expected error")
+	}
+
+	stats, err := loadTotalStats(ctx)
+	if err != nil {
+		t.Fatalf("loadTotalStats returned error: %v", err)
+	}
+	if stats.TotalCount != 0 || stats.TotalSize != 0 {
+		t.Fatalf("loadTotalStats() = count %d size %d, want zero after rolled-back stats", stats.TotalCount, stats.TotalSize)
+	}
+}
+
 func TestRemoveDecrementsStats(t *testing.T) {
 	_, _, cleanup := testhelper.SetupTestEnvironment(t)
 	defer cleanup()

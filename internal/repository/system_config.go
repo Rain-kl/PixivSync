@@ -75,6 +75,22 @@ func ListSystemConfigsByKeys(ctx context.Context, keys []string) (map[string]mod
 		missing = append(missing, key)
 	}
 
+	if len(missing) > 0 && db.Redis != nil {
+		stillMissing := make([]string, 0, len(missing))
+		for _, key := range missing {
+			var sc model.SystemConfig
+			if err := db.HGetJSON(ctx, SystemConfigRedisHashKey, key, &sc); err == nil {
+				systemConfigRAMCache.Set(key, cloneSystemConfig(sc))
+				result[key] = sc
+				continue
+			} else if !errors.Is(err, redis.Nil) {
+				return nil, err
+			}
+			stillMissing = append(stillMissing, key)
+		}
+		missing = stillMissing
+	}
+
 	if len(missing) == 0 {
 		return result, nil
 	}

@@ -179,6 +179,8 @@ func handleCallbackLogin(ctx context.Context, c *gin.Context, source *model.Auth
 		return
 	}
 
+	SetCachedUser(ctx, user.ID, &user)
+
 	logger.InfoF(ctx, "[LoginAudit] successful OAuth login via source: %s, external ID: %s, user: %s, ID: %d, IP: %s", source.Name, userInfo.Sub, user.Username, user.ID, c.ClientIP())
 
 	listener.EmitAdminLoggedIn(ctx, &user, c.ClientIP())

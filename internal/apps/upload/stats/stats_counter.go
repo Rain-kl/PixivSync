@@ -37,7 +37,7 @@ func RebuildUploadStats(ctx context.Context) error {
 		}
 
 		for i := range uploads {
-			if err := applyUploadStatsDeltaTx(tx, &uploads[i], 1); err != nil {
+			if err := ApplyUploadStatsDeltaTx(tx, &uploads[i], 1); err != nil {
 				return err
 			}
 		}
@@ -50,11 +50,12 @@ func applyUploadStatsDelta(ctx context.Context, upload *model.Upload, sign int64
 		return nil
 	}
 	return db.DB(ctx).Transaction(func(tx *gorm.DB) error {
-		return applyUploadStatsDeltaTx(tx, upload, sign)
+		return ApplyUploadStatsDeltaTx(tx, upload, sign)
 	})
 }
 
-func applyUploadStatsDeltaTx(tx *gorm.DB, upload *model.Upload, sign int64) error {
+// ApplyUploadStatsDeltaTx applies incremental upload stats within an existing transaction.
+func ApplyUploadStatsDeltaTx(tx *gorm.DB, upload *model.Upload, sign int64) error {
 	if upload == nil || !isActiveUploadStatus(upload.Status) || sign == 0 {
 		return nil
 	}

@@ -26,8 +26,10 @@
 | `new-api` | 添加或修改自定义业务 API、Handler、服务层逻辑、自定义路由注册 |
 | `new-async-task` | 添加或修改 Asynq 任务、定时任务、TaskHandler、任务元数据 |
 | `new-setting` | 添加或修改系统/业务/公开设置、`/admin/system` 参数或 `/admin/settings` 图形化设置 |
-| `database-migration` | 数据库表结构变更、goose SQL 迁移、seed 数据 |
+| `database-migration` | 数据库表结构变更、goose SQL 迁移（PG/SQLite/ClickHouse）、seed 数据 |
+| `clickhouse-batchwriter` | ClickHouse 批量写入、`internal/db/batchwriter` 接入、分析表异步 flush、背压与写入路径改造 |
 | `file-upload` | 业务上传文件、Worker 程序化摄取、`upload.Ingest` 策略选型、文件访问与 `w_uploads` / 统计排查 |
+| `cache-framework` | 新增或修改业务缓存（RAM/Redis/DB 三层读路径）、缓存失效、多节点 pub/sub 同步、评估高频读是否应接入缓存 |
 | `push-notification` | 系统通知推送事件、统一触发器投递、带消息推送的业务功能 |
 | `release-guide` | 根据自上一正式版本 Tag 以来的提交整理 Version Bump 提交信息以触发双语 Release |
 | `shadcn` | 添加、修改或组合 shadcn/ui 组件 |

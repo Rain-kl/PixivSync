@@ -1,116 +1,111 @@
 // Copyright 2026 Arctel.net
-// SPDX-License-Identifier: AGPL-3.0-only
+// SPDX-License-Identifier: Apache-2.0
 
 package risk_control
 
 import (
 	"context"
-	"time"
+	"sync"
 
 	"github.com/Rain-kl/Wavelet/internal/config"
-	"github.com/Rain-kl/Wavelet/internal/db"
+	"github.com/Rain-kl/Wavelet/internal/db/batchwriter"
+	"github.com/Rain-kl/Wavelet/internal/lifecycle"
+	"github.com/Rain-kl/Wavelet/internal/model/analytics"
+	analyticsrepo "github.com/Rain-kl/Wavelet/internal/repository/analytics"
 	"github.com/Rain-kl/Wavelet/pkg/logger"
 )
 
-var logChan chan *UserAccessLog
-
-const (
-	defaultQueueSize = 10000
-	maxBatchSize     = 1000
-	flushInterval    = 1 * time.Second
+var (
+	logWriterMu sync.RWMutex
+	logWriter   *batchwriter.Writer[*analytics.UserAccessLog]
 )
 
-// InitLogWriter 初始化日志写入通道和后台写入协程
+// InitLogWriter initializes the ClickHouse access-log batch writer.
 func InitLogWriter(ctx context.Context) {
 	if !config.Config.ClickHouse.Enabled {
 		return
 	}
 
-	logChan = make(chan *UserAccessLog, defaultQueueSize)
-	go startBatchWorker(context.WithoutCancel(ctx))
-}
-
-// IsBufferFull 检查当前本地缓冲队列是否已满
-// 如果没有启用 ClickHouse，默认返回 false，不触发限流
-func IsBufferFull() bool {
-	if !config.Config.ClickHouse.Enabled || logChan == nil {
-		return false
-	}
-	return len(logChan) >= cap(logChan)
-}
-
-// QueueAccessLog 异步非阻塞地将日志推入缓冲队列
-func QueueAccessLog(logItem *UserAccessLog) {
-	if !config.Config.ClickHouse.Enabled || logChan == nil {
+	logWriterMu.Lock()
+	defer logWriterMu.Unlock()
+	if logWriter != nil {
 		return
 	}
 
-	select {
-	case logChan <- logItem:
-	default:
-		logger.WarnF(context.Background(), "[RiskControl] Log queue full, dropping log item for path: %s", logItem.Path)
+	cfg := batchwriter.DefaultConfig()
+	writer, err := batchwriter.New[*analytics.UserAccessLog](cfg, func(ctx context.Context, items []*analytics.UserAccessLog) error {
+		rows := make([]analytics.UserAccessLog, 0, len(items))
+		for _, item := range items {
+			if item == nil {
+				continue
+			}
+			rows = append(rows, *item)
+		}
+		return analyticsrepo.BatchInsert(ctx, rows)
+	},
+		batchwriter.WithDropHandler[*analytics.UserAccessLog](func(item *analytics.UserAccessLog) {
+			path := ""
+			if item != nil {
+				path = item.Path
+			}
+			logger.WarnF(context.Background(), "[RiskControl] Log queue full, dropping log item for path: %s", path)
+		}),
+		batchwriter.WithFlushErrorHandler[*analytics.UserAccessLog](func(ctx context.Context, batchSize int, err error) {
+			logger.ErrorF(ctx, "[RiskControl] Send ClickHouse batch failed (batch=%d): %v", batchSize, err)
+		}),
+	)
+	if err != nil {
+		logger.ErrorF(ctx, "[RiskControl] init log writer failed: %v", err)
+		return
+	}
+
+	writer.Start(ctx)
+	logWriter = writer
+	lifecycle.OnShutdown("risk_control_log_writer", StopLogWriter)
+}
+
+// StopLogWriter stops the ClickHouse access-log batch writer and drains pending logs.
+func StopLogWriter(ctx context.Context) error {
+	writer := currentLogWriter()
+	if writer == nil {
+		return nil
+	}
+	return writer.Stop(ctx)
+}
+
+// IsBufferFull reports whether the access-log queue has no remaining capacity.
+func IsBufferFull() bool {
+	writer := currentLogWriter()
+	if writer == nil {
+		return false
+	}
+	return writer.IsFull()
+}
+
+// QueueAccessLog enqueues an access log without blocking.
+func QueueAccessLog(logItem *analytics.UserAccessLog) {
+	writer := currentLogWriter()
+	if writer == nil || logItem == nil {
+		return
+	}
+	writer.TryEnqueue(logItem)
+}
+
+// SetLogWriterForTest swaps the access-log writer for unit tests.
+func SetLogWriterForTest(writer *batchwriter.Writer[*analytics.UserAccessLog]) func() {
+	logWriterMu.Lock()
+	previous := logWriter
+	logWriter = writer
+	logWriterMu.Unlock()
+	return func() {
+		logWriterMu.Lock()
+		logWriter = previous
+		logWriterMu.Unlock()
 	}
 }
 
-func startBatchWorker(ctx context.Context) {
-	ticker := time.NewTicker(flushInterval)
-	defer ticker.Stop()
-
-	var batch []*UserAccessLog
-
-	flush := func() {
-		if len(batch) == 0 {
-			return
-		}
-		if db.ChConn == nil {
-			batch = nil
-			return
-		}
-
-		b, err := db.ChConn.PrepareBatch(ctx, "INSERT INTO w_user_access_logs (id, user_id, path, method, ip, user_agent, headers, status, latency, created_at)")
-		if err != nil {
-			logger.ErrorF(ctx, "[RiskControl] Prepare ClickHouse batch failed: %v", err)
-			batch = nil
-			return
-		}
-
-		for _, item := range batch {
-			err = b.Append(
-				item.ID,
-				item.UserID,
-				item.Path,
-				item.Method,
-				item.IP,
-				item.UserAgent,
-				item.Headers,
-				item.Status,
-				item.Latency,
-				item.CreatedAt,
-			)
-			if err != nil {
-				logger.ErrorF(ctx, "[RiskControl] Append item to ClickHouse batch failed: %v", err)
-			}
-		}
-
-		if err := b.Send(); err != nil {
-			logger.ErrorF(ctx, "[RiskControl] Send ClickHouse batch failed: %v", err)
-		}
-		batch = nil
-	}
-
-	for {
-		select {
-		case item, ok := <-logChan:
-			if !ok {
-				flush()
-				return
-			}
-			batch = append(batch, item)
-			if len(batch) >= maxBatchSize {
-				flush()
-			}
-		case <-ticker.C:
-			flush()
-		}
-	}
+func currentLogWriter() *batchwriter.Writer[*analytics.UserAccessLog] {
+	logWriterMu.RLock()
+	defer logWriterMu.RUnlock()
+	return logWriter
 }

@@ -56,6 +56,7 @@ s3_cache
 /.idea/
 /uploads/
 /*-source/
+/*-source.zip
 /.cache/
 /internal/router/root/dist/
 .dmux/

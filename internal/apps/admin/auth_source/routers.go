@@ -1,5 +1,5 @@
 // Copyright 2026 Arctel.net
-// SPDX-License-Identifier: AGPL-3.0-only
+// SPDX-License-Identifier: Apache-2.0
 
 // Package auth_source 提供认证源管理功能
 package auth_source
@@ -13,6 +13,7 @@ import (
 	"github.com/Rain-kl/Wavelet/internal/apps/admin"
 	"github.com/Rain-kl/Wavelet/internal/apps/oauth"
 	"github.com/Rain-kl/Wavelet/internal/model"
+	"github.com/Rain-kl/Wavelet/internal/repository"
 	"github.com/gin-gonic/gin"
 
 	"github.com/Rain-kl/Wavelet/internal/common/response"
@@ -91,6 +92,7 @@ func CreateAuthSource(c *gin.Context) {
 		response.AbortBadRequest(c, err.Error())
 		return
 	}
+	_ = repository.InvalidateAuthSourceCache(c.Request.Context())
 	source.Sanitize()
 	c.JSON(http.StatusOK, response.OK(source))
 }
@@ -150,6 +152,7 @@ func UpdateAuthSource(c *gin.Context) {
 		oauth.InvalidateOIDCProviderCache(normalizeIssuer(existing.OpenIDDiscoveryURL))
 	}
 	oauth.InvalidateOIDCProviderCache(normalizeIssuer(req.OpenIDDiscoveryURL))
+	_ = repository.InvalidateAuthSourceCache(c.Request.Context())
 
 	updated, err := model.GetAuthSourceByID(c.Request.Context(), id)
 	if err != nil {
@@ -191,6 +194,7 @@ func ToggleAuthSource(c *gin.Context) {
 		response.AbortBadRequest(c, err.Error())
 		return
 	}
+	_ = repository.InvalidateAuthSourceCache(c.Request.Context())
 	c.JSON(http.StatusOK, response.OKNil())
 }
 
@@ -216,6 +220,7 @@ func DeleteAuthSource(c *gin.Context) {
 		response.AbortBadRequest(c, err.Error())
 		return
 	}
+	_ = repository.InvalidateAuthSourceCache(c.Request.Context())
 	c.JSON(http.StatusOK, response.OKNil())
 }
 

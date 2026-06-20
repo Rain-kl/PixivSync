@@ -12,6 +12,7 @@ import (
 	admin_push "github.com/Rain-kl/Wavelet/internal/apps/admin/push"
 	"github.com/Rain-kl/Wavelet/internal/apps/admin/push/custom_events"
 	"github.com/Rain-kl/Wavelet/internal/apps/risk_control"
+	"github.com/Rain-kl/Wavelet/internal/lifecycle"
 	taskhandlers "github.com/Rain-kl/Wavelet/internal/task/handlers"
 	"github.com/Rain-kl/Wavelet/pkg/logger"
 )
@@ -85,6 +86,11 @@ func Init(ctx context.Context, opts Options) {
 			risk_control.InitLogWriter(ctx)
 		}
 	})
+}
+
+// Stop stops all batch writers and background resources.
+func Stop(ctx context.Context) {
+	lifecycle.Stop(ctx)
 }
 
 // ResetInitRuntimeOnceForTest clears initRuntimeOnce so Init can run again in unit tests.

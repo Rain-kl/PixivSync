@@ -1,6 +1,6 @@
 // Copyright 2025 linux.do
 // Copyright 2026 Arctel.net
-// SPDX-License-Identifier: AGPL-3.0-only
+// SPDX-License-Identifier: Apache-2.0
 
 package cmd
 
@@ -40,6 +40,7 @@ var rootCmd = &cobra.Command{
 	},
 	PreRun: func(_ *cobra.Command, _ []string) {
 		migrator.Migrate()
+		migrator.MigrateClickHouse()
 	},
 	PersistentPostRun: func(_ *cobra.Command, _ []string) {
 		shutdownTraceProvider()

@@ -112,7 +112,7 @@ func DeleteFile(c *gin.Context) {
 
 	if _, err := softDeleteUpload(ctx, uploadID); err != nil {
 		if isRecordNotFound(err) {
-			c.AbortWithStatus(http.StatusNotFound)
+			response.AbortNotFound(c, "文件记录未找到")
 			return
 		}
 		response.AbortBadRequest(c, shared.ErrDeleteFileFailed)
@@ -233,11 +233,11 @@ func DeleteMyFile(c *gin.Context) {
 
 	if _, err := softDeleteOwnedUpload(ctx, currUser.ID, uploadID); err != nil {
 		if isRecordNotFound(err) {
-			c.AbortWithStatus(http.StatusNotFound)
+			response.AbortNotFound(c, "文件记录未找到")
 			return
 		}
 		if err == ingest.ErrForbidden {
-			c.AbortWithStatus(http.StatusForbidden)
+			response.AbortForbidden(c, "无权操作")
 			return
 		}
 		response.AbortBadRequest(c, shared.ErrDeleteFileFailed)
@@ -287,11 +287,11 @@ func UpdateMyFile(c *gin.Context) {
 	upload, err := updateOwnedUpload(ctx, currUser.ID, uploadID, updateMyUploadInput(req))
 	if err != nil {
 		if isRecordNotFound(err) {
-			c.AbortWithStatus(http.StatusNotFound)
+			response.AbortNotFound(c, "文件记录未找到")
 			return
 		}
 		if err == ingest.ErrForbidden {
-			c.AbortWithStatus(http.StatusForbidden)
+			response.AbortForbidden(c, "无权操作")
 			return
 		}
 		response.AbortBadRequest(c, "更新文件记录失败")

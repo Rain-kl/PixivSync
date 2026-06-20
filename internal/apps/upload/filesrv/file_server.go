@@ -22,10 +22,9 @@ import (
 	"github.com/Rain-kl/Wavelet/internal/apps/upload/util"
 	"github.com/Rain-kl/Wavelet/internal/common"
 	"github.com/Rain-kl/Wavelet/internal/common/response"
-	"github.com/Rain-kl/Wavelet/internal/db"
 	"github.com/Rain-kl/Wavelet/internal/diskcache"
 	"github.com/Rain-kl/Wavelet/internal/model"
-	
+
 	"github.com/Rain-kl/Wavelet/pkg/logger"
 	"github.com/gin-gonic/gin"
 	"golang.org/x/sync/singleflight"
@@ -66,14 +65,14 @@ func ServeFileByID(c *gin.Context) {
 	upload, err := GetUploadRecordByID(c)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
-			c.AbortWithStatus(http.StatusNotFound)
+			response.AbortNotFound(c, "文件记录未找到")
 			return
 		}
 		if _, ok := err.(*strconv.NumError); ok {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid upload ID"})
+			response.AbortBadRequest(c, "无效的上传ID")
 			return
 		}
-		c.AbortWithStatus(http.StatusInternalServerError)
+		response.AbortInternal(c, "服务器内部错误")
 		return
 	}
 
@@ -96,10 +95,8 @@ func GetUploadRecordByID(c *gin.Context) (*model.Upload, error) {
 		return nil, err
 	}
 
-	var upload model.Upload
-	if err := db.DB(c.Request.Context()).
-		Where("id = ? AND status IN (?, ?)", uploadID, model.UploadStatusPending, model.UploadStatusUsed).
-		First(&upload).Error; err != nil {
+	upload, err := cache.GetUploadByID(c.Request.Context(), uploadID)
+	if err != nil {
 		return nil, err
 	}
 
@@ -263,7 +260,7 @@ func ImageCompressionCacheKey(upload *model.Upload, quality string) string {
 func serveOriginal(c *gin.Context, upload *model.Upload) {
 	obj, err := uploadstorage.OpenStoredObject(c.Request.Context(), upload)
 	if err != nil {
-		c.AbortWithStatus(http.StatusNotFound)
+		response.AbortNotFound(c, "文件未找到")
 		return
 	}
 	defer func() { _ = obj.Body.Close() }()

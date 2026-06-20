@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"time"
 
+	uploadcache "github.com/Rain-kl/Wavelet/internal/apps/upload/cache"
 	"github.com/Rain-kl/Wavelet/internal/apps/upload/shared"
 	uploadstats "github.com/Rain-kl/Wavelet/internal/apps/upload/stats"
 	uploadstorage "github.com/Rain-kl/Wavelet/internal/apps/upload/storage"
@@ -100,6 +101,7 @@ func (h *SystemCleanupHandler) Execute(ctx context.Context, _ []byte) (*task.Tas
 			}
 
 			uploadstats.RecordUploadStatsRemove(ctx, &u)
+			uploadcache.InvalidateUploadMetaCache(ctx, u.ID)
 			totalDeleted++
 			lastID = u.ID
 		}

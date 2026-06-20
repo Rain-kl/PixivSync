@@ -11,7 +11,38 @@ import (
 	"github.com/Rain-kl/Wavelet/internal/db"
 	"github.com/Rain-kl/Wavelet/internal/model"
 	"github.com/Rain-kl/Wavelet/internal/testhelper"
+	"gorm.io/gorm"
 )
+
+func TestApplyUploadStatsDeltaTxWithinTransaction(t *testing.T) {
+	_, _, cleanup := testhelper.SetupTestEnvironment(t)
+	defer cleanup()
+	ctx := context.Background()
+
+	upload := &model.Upload{
+		ID:        42002,
+		FileSize:  256,
+		MimeType:  "image/jpeg",
+		Extension: "jpg",
+		Type:      "avatar",
+		Status:    model.UploadStatusUsed,
+		CreatedAt: time.Now(),
+	}
+
+	if err := db.DB(ctx).Transaction(func(tx *gorm.DB) error {
+		return ApplyUploadStatsDeltaTx(tx, upload, 1)
+	}); err != nil {
+		t.Fatalf("ApplyUploadStatsDeltaTx returned error: %v", err)
+	}
+
+	stats, err := loadUploadStats(ctx)
+	if err != nil {
+		t.Fatalf("loadUploadStats returned error: %v", err)
+	}
+	if stats.TotalCount != 1 || stats.TotalSize != 256 {
+		t.Fatalf("unexpected total stats: count=%d size=%d", stats.TotalCount, stats.TotalSize)
+	}
+}
 
 func TestApplyUploadStatsAddAndRemove(t *testing.T) {
 	_, _, cleanup := testhelper.SetupTestEnvironment(t)

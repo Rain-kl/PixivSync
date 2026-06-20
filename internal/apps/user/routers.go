@@ -1,5 +1,5 @@
 // Copyright 2026 Arctel.net
-// SPDX-License-Identifier: AGPL-3.0-only
+// SPDX-License-Identifier: Apache-2.0
 
 package user
 
@@ -13,7 +13,6 @@ import (
 	"github.com/Rain-kl/Wavelet/internal/common"
 	"github.com/Rain-kl/Wavelet/internal/common/response"
 	"github.com/Rain-kl/Wavelet/internal/config"
-	"github.com/Rain-kl/Wavelet/internal/db"
 	"github.com/Rain-kl/Wavelet/internal/db/idgen"
 	"github.com/Rain-kl/Wavelet/internal/listener"
 	"github.com/Rain-kl/Wavelet/internal/model"
@@ -117,8 +116,8 @@ func Login(c *gin.Context) {
 		return
 	}
 
-	var user model.User
-	if err := db.DB(ctx).Where("username = ? OR email = ?", req.Username, req.Username).First(&user).Error; err != nil {
+	user, err := getUserByUsernameOrEmail(ctx, req.Username)
+	if err != nil {
 		logger.WarnF(ctx, "[LoginAudit] failed login attempt (username not found) for input: %s, IP: %s", req.Username, c.ClientIP())
 		response.AbortBadRequest(c, errUsernameOrPasswordWrong)
 		return
@@ -139,7 +138,7 @@ func Login(c *gin.Context) {
 	}
 
 	if isEmailLoginVerificationEnabled(ctx) {
-		result, err := processLoginEmailVerification(ctx, req.Code, &user)
+		result, err := processLoginEmailVerification(ctx, req.Code, user)
 		if err != nil {
 			response.AbortBadRequest(c, err.Error())
 			return
@@ -160,20 +159,22 @@ func Login(c *gin.Context) {
 	}
 
 	user.LastLoginAt = time.Now()
-	if err := db.DB(ctx).Model(&user).Update("last_login_at", user.LastLoginAt).Error; err != nil {
-		response.AbortBadRequest(c, err.Error())
+	if err := updateLastLogin(ctx, user); err != nil {
+		response.AbortBadRequest(c, "更新登录时间失败，请稍后再试")
 		return
 	}
-	if err := setLoginSession(ctx, c, &user); err != nil {
+	if err := setLoginSession(ctx, c, user); err != nil {
 		response.AbortBadRequest(c, errSaveSessionFailed)
 		return
 	}
 
+	oauth.SetCachedUser(ctx, user.ID, user)
+
 	logger.InfoF(ctx, "[LoginAudit] successful login for user: %s, ID: %d, IP: %s", user.Username, user.ID, c.ClientIP())
 
-	listener.EmitAdminLoggedIn(ctx, &user, c.ClientIP())
+	listener.EmitAdminLoggedIn(ctx, user, c.ClientIP())
 
-	c.JSON(http.StatusOK, response.OK(oauth.BuildBasicUserInfo(&user, needChangePassword)))
+	c.JSON(http.StatusOK, response.OK(oauth.BuildBasicUserInfo(user, needChangePassword)))
 }
 
 // Register 用户注册
@@ -247,7 +248,7 @@ func Register(c *gin.Context) {
 		return
 	}
 
-	if err := user.RegisterUser(ctx, db.DB(ctx)); err != nil {
+	if err := registerUserLogic(ctx, &user); err != nil {
 		response.AbortBadRequest(c, err.Error())
 		return
 	}
@@ -275,6 +276,13 @@ func Logout(c *gin.Context) {
 	username := session.Get(oauth.UserNameKey)
 	if userID != nil {
 		logger.InfoF(c.Request.Context(), "[LoginAudit] user logged out: %v, ID: %v, IP: %s", username, userID, c.ClientIP())
+		if id, ok := userID.(uint64); ok {
+			oauth.InvalidateCachedUser(c.Request.Context(), id)
+		} else if idFloat, ok := userID.(float64); ok {
+			oauth.InvalidateCachedUser(c.Request.Context(), uint64(idFloat))
+		} else if idInt, ok := userID.(int); ok && idInt >= 0 {
+			oauth.InvalidateCachedUser(c.Request.Context(), uint64(idInt))
+		}
 	}
 	session.Options(oauth.GetSessionOptions(-1))
 	session.Clear()
@@ -327,32 +335,8 @@ func ChangePassword(c *gin.Context) {
 	}
 
 	ctx := c.Request.Context()
-	var dbUser model.User
-	if err := db.DB(ctx).Where("id = ?", userObj.ID).First(&dbUser).Error; err != nil {
-		response.AbortBadRequest(c, errUserNotFound)
-		return
-	}
-
-	// 校验旧密码
-	if !dbUser.CheckPassword(req.OldPassword) {
-		response.AbortBadRequest(c, errOldPasswordIncorrect)
-		return
-	}
-
-	// 加密并更新为新密码
-	if err := dbUser.SetEncryptedPassword(req.NewPassword); err != nil {
-		response.AbortBadRequest(c, errPasswordEncryptFailed)
-		return
-	}
-
-	if err := db.DB(ctx).Model(&dbUser).Update("password", dbUser.Password).Error; err != nil {
+	if err := changePasswordLogic(ctx, userObj.ID, req.OldPassword, req.NewPassword); err != nil {
 		response.AbortBadRequest(c, err.Error())
-		return
-	}
-
-	// 吊销该用户所有的 Access Token
-	if err := db.DB(ctx).Where("user_id = ?", dbUser.ID).Delete(&model.AccessToken{}).Error; err != nil {
-		response.AbortBadRequest(c, "吊销 Access Token 失败: "+err.Error())
 		return
 	}
 
@@ -431,6 +415,7 @@ func UpdateProfile(c *gin.Context) {
 		response.AbortBadRequest(c, err.Error())
 		return
 	}
+	oauth.InvalidateCachedUser(ctx, userObj.ID)
 
 	session := sessions.Default(c)
 	needChange := session.Get("need_change_password") == true

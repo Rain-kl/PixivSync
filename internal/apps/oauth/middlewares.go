@@ -1,6 +1,6 @@
 // Copyright 2025 linux.do
 // Copyright 2026 Arctel.net
-// SPDX-License-Identifier: AGPL-3.0-only
+// SPDX-License-Identifier: Apache-2.0
 
 package oauth
 
@@ -31,15 +31,26 @@ type loginRequiredAuditLog struct {
 
 func getUserByToken(ctx context.Context, tokenStr string) (*model.User, *model.AccessToken, error) {
 	tokenHash := model.HashToken(tokenStr)
-	var tokenRecord model.AccessToken
-	if err := db.DB(ctx).Where("token_hash = ?", tokenHash).First(&tokenRecord).Error; err != nil {
-		return nil, nil, err
+	tokenRecord, err := GetCachedToken(ctx, tokenHash)
+	if err != nil {
+		var dbToken model.AccessToken
+		if err := db.DB(ctx).Where("token_hash = ?", tokenHash).First(&dbToken).Error; err != nil {
+			return nil, nil, err
+		}
+		tokenRecord = &dbToken
+		SetCachedToken(ctx, tokenHash, tokenRecord)
 	}
-	var user model.User
-	if err := db.DB(ctx).Where("id = ? AND is_active = ?", tokenRecord.UserID, true).First(&user).Error; err != nil {
-		return nil, nil, err
+
+	user, err := GetCachedUser(ctx, tokenRecord.UserID)
+	if err != nil || !user.IsActive {
+		var dbUser model.User
+		if err := db.DB(ctx).Where("id = ? AND is_active = ?", tokenRecord.UserID, true).First(&dbUser).Error; err != nil {
+			return nil, nil, err
+		}
+		user = &dbUser
+		SetCachedUser(ctx, tokenRecord.UserID, user)
 	}
-	return &user, &tokenRecord, nil
+	return user, tokenRecord, nil
 }
 
 // GetUserFromRequest 校验 Access Token 或 Session 并返回用户对象，如果未登录或用户失效则返回 error
@@ -74,11 +85,16 @@ func GetUserFromRequest(c *gin.Context) (*model.User, error) {
 		return nil, errors.New("unauthorized")
 	}
 
-	var user model.User
-	// load user from db to make sure is active
-	tx := db.DB(ctx).Where("id = ? AND is_active = ?", userID, true).First(&user)
-	if tx.Error != nil {
-		return nil, tx.Error
+	user, err := GetCachedUser(ctx, userID)
+	if err != nil || !user.IsActive {
+		var dbUser model.User
+		// load user from db to make sure is active
+		tx := db.DB(ctx).Where("id = ? AND is_active = ?", userID, true).First(&dbUser)
+		if tx.Error != nil {
+			return nil, tx.Error
+		}
+		user = &dbUser
+		SetCachedUser(ctx, userID, user)
 	}
 
 	// 密码哈希校验：当用户存在本地密码时，要求 Session 中的密码哈希必须与当前数据库中一致
@@ -99,7 +115,7 @@ func GetUserFromRequest(c *gin.Context) (*model.User, error) {
 		return nil, errors.New("system user is not allowed to login")
 	}
 
-	return &user, nil
+	return user, nil
 }
 
 // LoginRequired 返回登录鉴权中间件，校验 Access Token 或 Session

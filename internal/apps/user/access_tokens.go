@@ -1,6 +1,6 @@
 // Copyright 2025 linux.do
 // Copyright 2026 Arctel.net
-// SPDX-License-Identifier: AGPL-3.0-only
+// SPDX-License-Identifier: Apache-2.0
 
 // Package user 提供用户认证与帐户管理功能
 package user
@@ -11,7 +11,6 @@ import (
 	"strings"
 
 	"github.com/Rain-kl/Wavelet/internal/apps/oauth"
-	"github.com/Rain-kl/Wavelet/internal/db"
 	"github.com/Rain-kl/Wavelet/internal/model"
 	"github.com/Rain-kl/Wavelet/internal/repository"
 	"github.com/gin-gonic/gin"
@@ -43,8 +42,8 @@ func ListAccessTokens(c *gin.Context) {
 	currUser, _ := oauth.GetFromContext[*model.User](c, oauth.UserObjKey)
 	ctx := c.Request.Context()
 
-	var tokens []model.AccessToken
-	if err := db.DB(ctx).Where("user_id = ?", currUser.ID).Order("created_at desc").Find(&tokens).Error; err != nil {
+	tokens, err := listAccessTokensLogic(ctx, currUser.ID)
+	if err != nil {
 		response.AbortBadRequest(c, err.Error())
 		return
 	}
@@ -91,8 +90,8 @@ func CreateAccessToken(c *gin.Context) {
 		maxLimit = val
 	}
 
-	var count int64
-	if err := db.DB(ctx).Model(&model.AccessToken{}).Where("user_id = ?", currUser.ID).Count(&count).Error; err != nil {
+	count, err := countAccessTokensLogic(ctx, currUser.ID)
+	if err != nil {
 		response.AbortBadRequest(c, err.Error())
 		return
 	}
@@ -120,7 +119,7 @@ func CreateAccessToken(c *gin.Context) {
 		IsAdmin:     req.IsAdmin,
 	}
 
-	if err := db.DB(ctx).Create(&tokenRecord).Error; err != nil {
+	if err := createAccessTokenLogic(ctx, &tokenRecord); err != nil {
 		response.AbortBadRequest(c, err.Error())
 		return
 	}
@@ -152,14 +151,8 @@ func DeleteAccessToken(c *gin.Context) {
 		return
 	}
 
-	tx := db.DB(ctx).Where("id = ? AND user_id = ?", id, currUser.ID).Delete(&model.AccessToken{})
-	if tx.Error != nil {
-		response.AbortBadRequest(c, tx.Error.Error())
-		return
-	}
-
-	if tx.RowsAffected == 0 {
-		response.AbortBadRequest(c, errTokenNotFoundOrForbidden)
+	if err := deleteAccessTokenLogic(ctx, id, currUser.ID); err != nil {
+		response.AbortBadRequest(c, err.Error())
 		return
 	}
 
@@ -187,32 +180,14 @@ func RotateAccessToken(c *gin.Context) {
 		return
 	}
 
-	var tokenRecord model.AccessToken
-	if err := db.DB(ctx).Where("id = ? AND user_id = ?", id, currUser.ID).First(&tokenRecord).Error; err != nil {
-		response.AbortBadRequest(c, errTokenNotFoundOrForbidden)
-		return
-	}
-
-	// 生成新的 Token
-	newTokenStr, err := model.GenerateTokenString()
+	newTokenStr, tokenRecord, err := rotateAccessTokenLogic(ctx, id, currUser.ID)
 	if err != nil {
-		response.AbortBadRequest(c, errGenerateTokenFailed)
-		return
-	}
-
-	newTokenHash := model.HashToken(newTokenStr)
-	newMaskedToken := model.MaskTokenString(newTokenStr)
-
-	tokenRecord.TokenHash = newTokenHash
-	tokenRecord.MaskedToken = newMaskedToken
-
-	if err := db.DB(ctx).Save(&tokenRecord).Error; err != nil {
 		response.AbortBadRequest(c, err.Error())
 		return
 	}
 
 	c.JSON(http.StatusOK, response.OK(tokenResponse{
 		Token:  newTokenStr,
-		Record: tokenRecord,
+		Record: *tokenRecord,
 	}))
 }

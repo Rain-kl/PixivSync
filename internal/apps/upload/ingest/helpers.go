@@ -11,9 +11,11 @@ import (
 	"strings"
 	"time"
 
+	uploadcache "github.com/Rain-kl/Wavelet/internal/apps/upload/cache"
 	"github.com/Rain-kl/Wavelet/internal/apps/upload/shared"
 	uploadstats "github.com/Rain-kl/Wavelet/internal/apps/upload/stats"
 	uploadstorage "github.com/Rain-kl/Wavelet/internal/apps/upload/storage"
+	"github.com/Rain-kl/Wavelet/internal/db"
 	"github.com/Rain-kl/Wavelet/internal/db/idgen"
 	"github.com/Rain-kl/Wavelet/internal/model"
 	"github.com/Rain-kl/Wavelet/internal/repository"
@@ -99,7 +101,7 @@ func storeObject(ctx context.Context, objectKey string, reader io.Reader, size i
 }
 
 func persistUploadRecord(ctx context.Context, upload *model.Upload, objectKey string) error {
-	if err := repository.CreateUpload(ctx, upload); err != nil {
+	if err := createUploadWithStats(ctx, upload); err != nil {
 		_, backend, backendErr := storage.Active(ctx)
 		if backendErr == nil {
 			if deleteErr := backend.Delete(ctx, objectKey); deleteErr != nil {
@@ -108,8 +110,17 @@ func persistUploadRecord(ctx context.Context, upload *model.Upload, objectKey st
 		}
 		return err
 	}
-	uploadstats.RecordUploadStatsAdd(ctx, upload)
+	uploadcache.SetUploadMetaCache(ctx, upload)
 	return nil
+}
+
+func createUploadWithStats(ctx context.Context, upload *model.Upload) error {
+	return db.DB(ctx).Transaction(func(tx *gorm.DB) error {
+		if err := repository.CreateUploadTx(tx, upload); err != nil {
+			return err
+		}
+		return uploadstats.ApplyUploadStatsDeltaTx(tx, upload, 1)
+	})
 }
 
 func createDedupRecord(ctx context.Context, existing model.Upload, req Request) (Result, error) {

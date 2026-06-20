@@ -1,5 +1,5 @@
 // Copyright 2026 Arctel.net
-// SPDX-License-Identifier: AGPL-3.0-only
+// SPDX-License-Identifier: Apache-2.0
 
 package push
 
@@ -15,6 +15,7 @@ import (
 	"time"
 
 	"github.com/Rain-kl/Wavelet/internal/apps/oauth"
+	"github.com/Rain-kl/Wavelet/internal/common/response"
 	"github.com/Rain-kl/Wavelet/internal/model"
 	"github.com/Rain-kl/Wavelet/internal/repository"
 	"github.com/Rain-kl/Wavelet/internal/task"
@@ -26,8 +27,6 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"gorm.io/gorm"
-
-	"github.com/Rain-kl/Wavelet/internal/common/response"
 )
 
 var adminLoginEvent = EventMetadata{
@@ -106,7 +105,7 @@ func setupTestRouter(authUser *model.User) *gin.Engine {
 
 	adminGroup.Use(func(c *gin.Context) {
 		if authUser != nil {
-			oauth.SetToContext(c, oauth.UserObjKey, authUser)
+			oauth.SetToContext(c, "user_obj", authUser)
 		}
 		c.Next()
 	})
@@ -248,7 +247,7 @@ func TestEventTrigger(t *testing.T) {
 
 		event.Enabled = true
 		event.Channels = []string{"mock_channel"}
-		event.Targets = []string{"user.username"} // 动态目标
+		event.Targets = []string{"user.username"}
 		err = repository.SavePushEvent(context.Background(), &event)
 		require.NoError(t, err)
 
@@ -373,7 +372,7 @@ func TestPushRouters(t *testing.T) {
 
 		// 2. 为该事件关联渠道后，再切换开启，应当成功
 		event.Channels = []string{"email"}
-		dbConn.Save(&event)
+		_ = repository.SavePushEvent(context.Background(), &event)
 
 		req2, _ := http.NewRequest("POST", "/api/v1/admin/push/events/"+strconv.FormatUint(event.ID, 10)+"/toggle", nil)
 		w2 := httptest.NewRecorder()

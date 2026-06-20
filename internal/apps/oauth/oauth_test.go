@@ -1,6 +1,6 @@
 // Copyright 2025 linux.do
 // Copyright 2026 Arctel.net
-// SPDX-License-Identifier: AGPL-3.0-only
+// SPDX-License-Identifier: Apache-2.0
 
 package oauth
 
@@ -95,6 +95,28 @@ func (m *mockRedisClient) Del(ctx context.Context, keys ...string) *redis.IntCmd
 	return cmd
 }
 
+func (m *mockRedisClient) Scan(ctx context.Context, cursor uint64, match string, count int64) *redis.ScanCmd {
+	cmd := redis.NewScanCmd(ctx, nil, cursor, match, count)
+	var keys []string
+	for key := range m.store {
+		if redisMatchPattern(key, match) {
+			keys = append(keys, key)
+		}
+	}
+	cmd.SetVal(keys, 0)
+	return cmd
+}
+
+func redisMatchPattern(key, pattern string) bool {
+	if pattern == "" || pattern == "*" {
+		return true
+	}
+	if strings.HasSuffix(pattern, "*") {
+		return strings.HasPrefix(key, strings.TrimSuffix(pattern, "*"))
+	}
+	return key == pattern
+}
+
 func (m *mockRedisClient) HSet(ctx context.Context, key string, values ...interface{}) *redis.IntCmd {
 	cmd := redis.NewIntCmd(ctx)
 	if len(values) >= 2 {
@@ -126,6 +148,12 @@ func (m *mockRedisClient) HGet(ctx context.Context, key string, field string) *r
 	} else {
 		cmd.SetVal(val)
 	}
+	return cmd
+}
+
+func (m *mockRedisClient) Publish(ctx context.Context, channel string, message interface{}) *redis.IntCmd {
+	cmd := redis.NewIntCmd(ctx)
+	cmd.SetVal(1)
 	return cmd
 }
 
@@ -310,6 +338,7 @@ func newMockOIDCClient(issuer, clientID string, expectedState *string, sub, user
 
 func setupTestDB(t *testing.T) *gorm.DB {
 	repository.ResetSystemConfigRAMCacheForTest()
+	repository.ResetAuthSourceRAMCacheForTest()
 
 	dbConn, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
 	if err != nil {
@@ -635,6 +664,7 @@ func TestAuthorize(t *testing.T) {
 
 	// Case 2: Inactive Source Authorize
 	dbConn.Model(&model.AuthSource{}).Where("id = ?", 101).Update("is_active", false)
+	_ = repository.InvalidateAuthSourceCache(context.Background())
 	w2 := performRequest(router, http.MethodGet, "/api/v1/oauth/github/authorize", nil, nil, nil)
 	if w2.Code != http.StatusBadRequest {
 		t.Errorf("expected 400 for inactive source, got %d", w2.Code)
@@ -1122,6 +1152,7 @@ func TestOIDCPolicyEnforcement(t *testing.T) {
 	repository.ResetSystemConfigRAMCacheForTest()
 	mockRedis.Del(context.Background(), db.PrefixedKey(repository.SystemConfigRedisHashKey)+":"+model.ConfigKeyOIDCLoginEnabled)
 	dbConn.Model(&model.AuthSource{}).Where("name = ?", testSourceName).Update("is_active", false)
+	_ = repository.InvalidateAuthSourceCache(context.Background())
 
 	wSourceInactive := performRequest(router, http.MethodGet, "/api/v1/oauth/login?source="+testSourceName, nil, nil, nil)
 	if wSourceInactive.Code != http.StatusBadRequest {
@@ -1134,6 +1165,7 @@ func TestOIDCPolicyEnforcement(t *testing.T) {
 	repository.ResetSystemConfigRAMCacheForTest()
 	mockRedis.Del(context.Background(), db.PrefixedKey(repository.SystemConfigRedisHashKey)+":"+model.ConfigKeyOIDCLoginEnabled)
 	dbConn.Model(&model.AuthSource{}).Where("name = ?", testSourceName).Update("is_active", true)
+	_ = repository.InvalidateAuthSourceCache(context.Background())
 
 	wAuthDisabled := performRequest(router, http.MethodGet, "/api/v1/oauth/"+testSourceName+"/authorize", nil, nil, nil)
 	if wAuthDisabled.Code != http.StatusBadRequest {
@@ -1146,6 +1178,7 @@ func TestOIDCPolicyEnforcement(t *testing.T) {
 	repository.ResetSystemConfigRAMCacheForTest()
 	mockRedis.Del(context.Background(), db.PrefixedKey(repository.SystemConfigRedisHashKey)+":"+model.ConfigKeyOIDCLoginEnabled)
 	dbConn.Model(&model.AuthSource{}).Where("name = ?", testSourceName).Update("is_active", true)
+	_ = repository.InvalidateAuthSourceCache(context.Background())
 
 	wLogin := performRequest(router, http.MethodGet, "/api/v1/oauth/login?source="+testSourceName, nil, nil, nil)
 
@@ -1187,6 +1220,7 @@ func TestOIDCPolicyEnforcement(t *testing.T) {
 
 	// Since callback deletes state, we need to generate state again
 	dbConn.Model(&model.AuthSource{}).Where("name = ?", testSourceName).Update("is_active", true)
+	_ = repository.InvalidateAuthSourceCache(context.Background())
 	wLogin2 := performRequest(router, http.MethodGet, "/api/v1/oauth/login?source="+testSourceName, nil, nil, nil)
 	_ = json.Unmarshal(wLogin2.Body.Bytes(), &loginUrlResp)
 	parsedURL, _ = url.Parse(loginUrlResp.Data.AuthorizeURL)
@@ -1201,6 +1235,7 @@ func TestOIDCPolicyEnforcement(t *testing.T) {
 
 	// Deactivate source
 	dbConn.Model(&model.AuthSource{}).Where("name = ?", testSourceName).Update("is_active", false)
+	_ = repository.InvalidateAuthSourceCache(context.Background())
 	reqBody2 := fmt.Sprintf(`{"state":"%s","code":"test_auth_code"}`, state)
 	wCallbackSourceInactive := performRequest(router, http.MethodPost, "/api/v1/oauth/callback", []byte(reqBody2), map[string]string{
 		"Content-Type": "application/json",

@@ -1,5 +1,5 @@
 // Copyright 2026 Arctel.net
-// SPDX-License-Identifier: AGPL-3.0-only
+// SPDX-License-Identifier: Apache-2.0
 
 // Package risk_control 提供风险控制中间件
 package risk_control
@@ -14,6 +14,7 @@ import (
 	"github.com/Rain-kl/Wavelet/internal/config"
 	"github.com/Rain-kl/Wavelet/internal/db/idgen"
 	"github.com/Rain-kl/Wavelet/internal/model"
+	"github.com/Rain-kl/Wavelet/internal/model/analytics"
 	"github.com/gin-gonic/gin"
 )
 
@@ -68,7 +69,7 @@ func RiskControlMiddleware() gin.HandlerFunc {
 			status = maxHTTPStatus
 		}
 
-		logItem := &UserAccessLog{
+		logItem := &analytics.UserAccessLog{
 			ID:        idgen.NextUint64ID(),
 			UserID:    userObj.ID, // 直接从 Context 获取已登录用户ID，避免数据库查询
 			Path:      c.Request.URL.Path,

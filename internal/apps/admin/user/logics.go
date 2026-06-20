@@ -9,6 +9,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/Rain-kl/Wavelet/internal/apps/oauth"
+	"github.com/Rain-kl/Wavelet/internal/db"
 	"github.com/Rain-kl/Wavelet/internal/db/idgen"
 	"github.com/Rain-kl/Wavelet/internal/model"
 	"github.com/Rain-kl/Wavelet/internal/repository"
@@ -35,7 +37,22 @@ func updateUserStatus(ctx context.Context, id uint64, active bool) error {
 	if !active && flags.IsAdmin {
 		return errors.New(cannotDisable)
 	}
-	return repository.UpdateUserActive(ctx, id, active)
+
+	var tokens []model.AccessToken
+	if !active {
+		_ = db.DB(ctx).Where("user_id = ?", id).Find(&tokens).Error
+	}
+
+	err = repository.UpdateUserActive(ctx, id, active)
+	if err == nil {
+		oauth.InvalidateCachedUser(ctx, id)
+		if !active {
+			for _, token := range tokens {
+				oauth.InvalidateCachedToken(ctx, token.TokenHash)
+			}
+		}
+	}
+	return err
 }
 
 func deleteUser(ctx context.Context, currentUserID, targetID uint64) error {
@@ -49,7 +66,18 @@ func deleteUser(ctx context.Context, currentUserID, targetID uint64) error {
 	if flags.IsAdmin {
 		return errors.New(cannotDelete)
 	}
-	return repository.DeleteUserWithRelations(ctx, targetID)
+
+	var tokens []model.AccessToken
+	_ = db.DB(ctx).Where("user_id = ?", targetID).Find(&tokens).Error
+
+	err = repository.DeleteUserWithRelations(ctx, targetID)
+	if err == nil {
+		oauth.InvalidateCachedUser(ctx, targetID)
+		for _, token := range tokens {
+			oauth.InvalidateCachedToken(ctx, token.TokenHash)
+		}
+	}
+	return err
 }
 
 func createUser(ctx context.Context, req createUserRequest) (model.User, error) {

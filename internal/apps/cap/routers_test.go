@@ -1,5 +1,5 @@
 // Copyright 2026 Arctel.net
-// SPDX-License-Identifier: AGPL-3.0-only
+// SPDX-License-Identifier: Apache-2.0
 
 package cap
 
@@ -46,10 +46,14 @@ func TestCapEndpointsAndMiddleware(t *testing.T) {
 		t.Fatalf("expected 200 OK, got %d. Body: %s", w.Code, w.Body.String())
 	}
 
-	var challengeResp pkgcap.ChallengeResponse
-	if err := json.Unmarshal(w.Body.Bytes(), &challengeResp); err != nil {
+	var envelope struct {
+		ErrorMsg string                   `json:"error_msg"`
+		Data     pkgcap.ChallengeResponse `json:"data"`
+	}
+	if err := json.Unmarshal(w.Body.Bytes(), &envelope); err != nil {
 		t.Fatalf("failed to unmarshal challenge response: %v", err)
 	}
+	challengeResp := envelope.Data
 
 	if challengeResp.Token == "" {
 		t.Fatalf("expected token in challenge response")
@@ -99,10 +103,14 @@ func TestCapEndpointsAndMiddleware(t *testing.T) {
 		t.Fatalf("expected 200 OK for redeem, got %d. Body: %s", w.Code, w.Body.String())
 	}
 
-	var redeemResp RedeemResponse
-	if err := json.Unmarshal(w.Body.Bytes(), &redeemResp); err != nil {
+	var redeemEnvelope struct {
+		ErrorMsg string         `json:"error_msg"`
+		Data     RedeemResponse `json:"data"`
+	}
+	if err := json.Unmarshal(w.Body.Bytes(), &redeemEnvelope); err != nil {
 		t.Fatalf("failed to unmarshal redeem response: %v", err)
 	}
+	redeemResp := redeemEnvelope.Data
 
 	if !redeemResp.Success || redeemResp.Token == "" {
 		t.Fatalf("redeem failed or returned empty token: %+v", redeemResp)

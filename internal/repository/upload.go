@@ -65,7 +65,12 @@ func GetActiveUploadByID(ctx context.Context, id uint64) (model.Upload, error) {
 // SoftDeleteUpload marks an upload as deleted.
 // External modules must use upload.Remove or upload.RemoveOwned; only internal/apps/upload may call this.
 func SoftDeleteUpload(ctx context.Context, upload *model.Upload) error {
-	return db.DB(ctx).Model(upload).Update("status", model.UploadStatusDeleted).Error
+	return SoftDeleteUploadTx(db.DB(ctx), upload)
+}
+
+// SoftDeleteUploadTx marks an upload as deleted within an existing transaction.
+func SoftDeleteUploadTx(tx *gorm.DB, upload *model.Upload) error {
+	return tx.Model(upload).Update("status", model.UploadStatusDeleted).Error
 }
 
 // UpdateUpload applies partial field updates to an upload record.
@@ -100,7 +105,12 @@ func FindReusableUploadByHash(ctx context.Context, hash string, size int64) (mod
 // CreateUpload persists a new upload record.
 // External modules must use upload.Ingest; only internal/apps/upload may call this.
 func CreateUpload(ctx context.Context, upload *model.Upload) error {
-	return db.DB(ctx).Create(upload).Error
+	return CreateUploadTx(db.DB(ctx), upload)
+}
+
+// CreateUploadTx persists a new upload record within an existing transaction.
+func CreateUploadTx(tx *gorm.DB, upload *model.Upload) error {
+	return tx.Create(upload).Error
 }
 
 // ListUploadsByIDs returns active uploads matching the given IDs.

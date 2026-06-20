@@ -30,8 +30,10 @@ type systemConfigInvalidationMessage struct {
 }
 
 var (
-	systemConfigRAMCache     = ram.MustNew[string, model.SystemConfig](ram.Options{MaximumSize: systemConfigRAMMaximumSize})
-	systemConfigListenerOnce sync.Once
+	systemConfigRAMCache       = ram.MustNew[string, model.SystemConfig](ram.Options{MaximumSize: systemConfigRAMMaximumSize})
+	systemConfigListenerOnce   sync.Once
+	systemConfigListenerCtx    context.Context
+	systemConfigListenerCancel context.CancelFunc
 )
 
 func ensureSystemConfigCacheListener() {
@@ -43,9 +45,16 @@ func startSystemConfigCacheInvalidationListener() {
 		return
 	}
 
+	systemConfigListenerCtx, systemConfigListenerCancel = context.WithCancel(context.Background())
+
 	go func() {
-		pubsub := db.Redis.Subscribe(context.Background(), SystemConfigInvalidationChannel)
+		pubsub := db.Redis.Subscribe(systemConfigListenerCtx, SystemConfigInvalidationChannel)
 		defer func() {
+			_ = pubsub.Close()
+		}()
+
+		go func() {
+			<-systemConfigListenerCtx.Done()
 			_ = pubsub.Close()
 		}()
 
@@ -62,6 +71,15 @@ func startSystemConfigCacheInvalidationListener() {
 			systemConfigRAMCache.Invalidate(payload.Key)
 		}
 	}()
+}
+
+// StopSystemConfigCacheListener stops the Redis Pub/Sub subscription listener and resets the sync.Once guard.
+func StopSystemConfigCacheListener() {
+	if systemConfigListenerCancel != nil {
+		systemConfigListenerCancel()
+		systemConfigListenerCancel = nil
+	}
+	systemConfigListenerOnce = sync.Once{}
 }
 
 func cloneSystemConfig(sc model.SystemConfig) model.SystemConfig {

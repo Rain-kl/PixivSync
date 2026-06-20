@@ -1,5 +1,5 @@
 // Copyright 2026 Arctel.net
-// SPDX-License-Identifier: AGPL-3.0-only
+// SPDX-License-Identifier: Apache-2.0
 
 package user
 
@@ -12,6 +12,7 @@ import (
 	"math/big"
 	"strings"
 
+	"github.com/Rain-kl/Wavelet/internal/apps/oauth"
 	"github.com/Rain-kl/Wavelet/internal/db"
 	"github.com/Rain-kl/Wavelet/internal/model"
 	"github.com/Rain-kl/Wavelet/internal/repository"
@@ -284,4 +285,128 @@ func updateUserProfile(ctx context.Context, userID uint64, input updateProfileIn
 		return nil, err
 	}
 	return &dbUser, nil
+}
+
+func getUserByUsernameOrEmail(ctx context.Context, input string) (*model.User, error) {
+	var user model.User
+	if err := db.DB(ctx).Where("username = ? OR email = ?", input, input).First(&user).Error; err != nil {
+		return nil, err
+	}
+	return &user, nil
+}
+
+func updateLastLogin(ctx context.Context, user *model.User) error {
+	return db.DB(ctx).Model(user).Update("last_login_at", user.LastLoginAt).Error
+}
+
+func registerUserLogic(ctx context.Context, u *model.User) error {
+	if err := u.RegisterUser(ctx, db.DB(ctx)); err != nil {
+		if strings.Contains(err.Error(), "duplicate key") || strings.Contains(err.Error(), "UNIQUE") {
+			return errors.New("用户名或邮箱已被占用")
+		}
+		return errors.New("注册失败，请稍后再试")
+	}
+	return nil
+}
+
+func changePasswordLogic(ctx context.Context, userID uint64, oldPass, newPass string) error {
+	var dbUser model.User
+	if err := db.DB(ctx).Where("id = ?", userID).First(&dbUser).Error; err != nil {
+		return errors.New(errUserNotFound)
+	}
+
+	if !dbUser.CheckPassword(oldPass) {
+		return errors.New(errOldPasswordIncorrect)
+	}
+
+	if err := dbUser.SetEncryptedPassword(newPass); err != nil {
+		return errors.New(errPasswordEncryptFailed)
+	}
+
+	if err := db.DB(ctx).Model(&dbUser).Update("password", dbUser.Password).Error; err != nil {
+		return errors.New("更新密码失败，请稍后再试")
+	}
+
+	// 吊销该用户所有的 Access Token
+	var tokens []model.AccessToken
+	if err := db.DB(ctx).Where("user_id = ?", dbUser.ID).Find(&tokens).Error; err == nil {
+		for _, token := range tokens {
+			oauth.InvalidateCachedToken(ctx, token.TokenHash)
+		}
+	}
+	if err := db.DB(ctx).Where("user_id = ?", dbUser.ID).Delete(&model.AccessToken{}).Error; err != nil {
+		return errors.New("吊销 Access Token 失败，请稍后再试")
+	}
+
+	oauth.InvalidateCachedUser(ctx, dbUser.ID)
+	return nil
+}
+
+func listAccessTokensLogic(ctx context.Context, userID uint64) ([]model.AccessToken, error) {
+	var tokens []model.AccessToken
+	if err := db.DB(ctx).Where("user_id = ?", userID).Order("created_at desc").Find(&tokens).Error; err != nil {
+		return nil, errors.New("获取令牌列表失败，请稍后再试")
+	}
+	return tokens, nil
+}
+
+func countAccessTokensLogic(ctx context.Context, userID uint64) (int64, error) {
+	var count int64
+	if err := db.DB(ctx).Model(&model.AccessToken{}).Where("user_id = ?", userID).Count(&count).Error; err != nil {
+		return 0, errors.New("查询令牌数量失败，请稍后再试")
+	}
+	return count, nil
+}
+
+func createAccessTokenLogic(ctx context.Context, record *model.AccessToken) error {
+	if err := db.DB(ctx).Create(record).Error; err != nil {
+		return errors.New("创建令牌失败，请稍后再试")
+	}
+	oauth.SetCachedToken(ctx, record.TokenHash, record)
+	return nil
+}
+
+func deleteAccessTokenLogic(ctx context.Context, id, userID uint64) error {
+	var tokenRecord model.AccessToken
+	if err := db.DB(ctx).Where("id = ? AND user_id = ?", id, userID).First(&tokenRecord).Error; err != nil {
+		return errors.New(errTokenNotFoundOrForbidden)
+	}
+	oauth.InvalidateCachedToken(ctx, tokenRecord.TokenHash)
+
+	tx := db.DB(ctx).Where("id = ? AND user_id = ?", id, userID).Delete(&model.AccessToken{})
+	if tx.Error != nil {
+		return errors.New("删除令牌失败，请稍后再试")
+	}
+	if tx.RowsAffected == 0 {
+		return errors.New(errTokenNotFoundOrForbidden)
+	}
+	return nil
+}
+
+func rotateAccessTokenLogic(ctx context.Context, id, userID uint64) (string, *model.AccessToken, error) {
+	var tokenRecord model.AccessToken
+	if err := db.DB(ctx).Where("id = ? AND user_id = ?", id, userID).First(&tokenRecord).Error; err != nil {
+		return "", nil, errors.New(errTokenNotFoundOrForbidden)
+	}
+
+	oauth.InvalidateCachedToken(ctx, tokenRecord.TokenHash)
+
+	newTokenStr, err := model.GenerateTokenString()
+	if err != nil {
+		return "", nil, errors.New(errGenerateTokenFailed)
+	}
+
+	newTokenHash := model.HashToken(newTokenStr)
+	newMaskedToken := model.MaskTokenString(newTokenStr)
+
+	tokenRecord.TokenHash = newTokenHash
+	tokenRecord.MaskedToken = newMaskedToken
+
+	if err := db.DB(ctx).Save(&tokenRecord).Error; err != nil {
+		return "", nil, errors.New("轮换令牌失败，请稍后再试")
+	}
+
+	oauth.SetCachedToken(ctx, tokenRecord.TokenHash, &tokenRecord)
+
+	return newTokenStr, &tokenRecord, nil
 }

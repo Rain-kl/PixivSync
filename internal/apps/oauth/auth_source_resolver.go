@@ -25,16 +25,16 @@ func isOIDCLoginEnabled(ctx context.Context) bool {
 func resolveAuthSource(ctx context.Context, sourceName string) (*model.AuthSource, error) {
 	name := strings.TrimSpace(strings.ToLower(sourceName))
 	if name == "" {
-		sources, err := model.GetActiveAuthSources(ctx)
+		sources, err := repository.GetActiveAuthSourcesCached(ctx)
 		if err != nil {
 			return nil, err
 		}
 		if len(sources) == 0 {
 			return nil, errors.New(errNoActiveAuthSource)
 		}
-		return &sources[0], nil
+		return repository.GetAuthSourceByNameCached(ctx, sources[0].Name)
 	}
-	return model.GetAuthSourceByName(ctx, name)
+	return repository.GetAuthSourceByNameCached(ctx, name)
 }
 
 func activeLoginSources(ctx context.Context) []AuthSourceView {
@@ -43,7 +43,7 @@ func activeLoginSources(ctx context.Context) []AuthSourceView {
 		return nil
 	}
 
-	dbSources, err := model.GetActiveAuthSources(ctx)
+	dbSources, err := repository.GetActiveAuthSourcesCached(ctx)
 	if err != nil {
 		return nil
 	}

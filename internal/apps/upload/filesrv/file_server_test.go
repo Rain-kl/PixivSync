@@ -6,6 +6,7 @@ package filesrv
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"image"
 	"image/color"
@@ -13,6 +14,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"path/filepath"
 	"testing"
 
 	"github.com/Rain-kl/Wavelet/internal/apps/upload/cache"
@@ -20,21 +22,29 @@ import (
 	"github.com/Rain-kl/Wavelet/internal/apps/upload/util"
 	"github.com/Rain-kl/Wavelet/internal/common"
 	"github.com/Rain-kl/Wavelet/internal/common/response"
+	"github.com/Rain-kl/Wavelet/internal/db"
 	"github.com/Rain-kl/Wavelet/internal/diskcache"
 	"github.com/Rain-kl/Wavelet/internal/model"
+	"github.com/Rain-kl/Wavelet/internal/repository"
+	"github.com/Rain-kl/Wavelet/internal/storage"
 	"github.com/Rain-kl/Wavelet/internal/testhelper"
 	"github.com/gin-contrib/sessions"
 	"github.com/gin-contrib/sessions/cookie"
 	"github.com/gin-gonic/gin"
+	"gorm.io/gorm"
 )
+
+func init() {
+	testhelper.RegisterCleanup(cache.ResetUploadMetaCacheForTest)
+}
 
 func TestServeFileByIDAccessControl(t *testing.T) {
 	dbConn, _, cleanup := testhelper.SetupTestEnvironment(t)
 	defer cleanup()
 	cache.ResetAccessCaches()
 
-	// Ensure uploads dir is cleaned up
-	defer func() { _ = os.RemoveAll("uploads") }()
+	tempDir := t.TempDir()
+	configureLocalStorageRoot(t, dbConn, tempDir)
 
 	// Create a user in DB
 	user := model.User{
@@ -60,33 +70,36 @@ func TestServeFileByIDAccessControl(t *testing.T) {
 
 	// Create two files: one in whitelist (avatar), one not in whitelist (attachment)
 	avatarFile := model.Upload{
-		ID:            8001,
-		UserID:        user.ID,
-		FileName:      "avatar.png",
-		FilePath:      "uploads/avatar.png",
-		FileSize:      5,
-		MimeType:      "image/png",
-		Extension:     "png",
-		Type:          "avatar",
-		Status:        model.UploadStatusUsed,
-		AccessMode:    1,
+		ID:         8001,
+		UserID:     user.ID,
+		FileName:   "avatar.png",
+		FilePath:   "avatar.png",
+		FileSize:   5,
+		MimeType:   "image/png",
+		Extension:  "png",
+		Type:       "avatar",
+		Status:     model.UploadStatusUsed,
+		AccessMode: 1,
 	}
 	attachmentFile := model.Upload{
-		ID:            8002,
-		UserID:        user.ID,
-		FileName:      "doc.pdf",
-		FilePath:      "uploads/doc.pdf",
-		FileSize:      5,
-		MimeType:      "application/pdf",
-		Extension:     "pdf",
-		Type:          "attachment",
-		Status:        model.UploadStatusUsed,
-		AccessMode:    1,
+		ID:         8002,
+		UserID:     user.ID,
+		FileName:   "doc.pdf",
+		FilePath:   "doc.pdf",
+		FileSize:   5,
+		MimeType:   "application/pdf",
+		Extension:  "pdf",
+		Type:       "attachment",
+		Status:     model.UploadStatusUsed,
+		AccessMode: 1,
 	}
 
-	_ = os.MkdirAll("uploads", 0755)
-	_ = os.WriteFile(avatarFile.FilePath, []byte("image"), 0644)
-	_ = os.WriteFile(attachmentFile.FilePath, []byte("bytes"), 0644)
+	if err := os.WriteFile(filepath.Join(tempDir, "avatar.png"), []byte("image"), 0644); err != nil {
+		t.Fatalf("failed to write avatar file: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(tempDir, "doc.pdf"), []byte("bytes"), 0644); err != nil {
+		t.Fatalf("failed to write attachment file: %v", err)
+	}
 
 	dbConn.Create(&avatarFile)
 	dbConn.Create(&attachmentFile)
@@ -159,15 +172,14 @@ func TestImageCompression(t *testing.T) {
 	dbConn, _, cleanup := testhelper.SetupTestEnvironment(t)
 	defer cleanup()
 
+	tempDir := t.TempDir()
+	configureLocalStorageRoot(t, dbConn, tempDir)
+
 	cache := diskcache.GetGlobalCache()
 	if err := cache.Clear(); err != nil {
 		t.Fatalf("failed to clear disk cache before test: %v", err)
 	}
 
-	// Ensure uploads dir is cleaned up
-	defer func() {
-		_ = os.RemoveAll("uploads")
-	}()
 	defer func() {
 		if err := cache.Clear(); err != nil {
 			t.Errorf("failed to clear disk cache after test: %v", err)
@@ -190,24 +202,23 @@ func TestImageCompression(t *testing.T) {
 		t.Fatalf("failed to encode test png: %v", err)
 	}
 
-	_ = os.MkdirAll("uploads", 0755)
-	filePath := "uploads/test_image.png"
+	filePath := filepath.Join(tempDir, "test_image.png")
 	if err := os.WriteFile(filePath, pngBuf.Bytes(), 0644); err != nil {
 		t.Fatalf("failed to write test png: %v", err)
 	}
 
 	// Save upload record to DB
 	uploadRecord := model.Upload{
-		ID:            3001,
-		UserID:        user.ID,
-		FileName:      "test_image.png",
-		FilePath:      filePath,
-		FileSize:      int64(pngBuf.Len()),
-		MimeType:      "image/png",
-		Extension:     "png",
-		Type:          "avatar", // Whitelisted by default
-		Status:        model.UploadStatusUsed,
-		AccessMode:    1,
+		ID:         3001,
+		UserID:     user.ID,
+		FileName:   "test_image.png",
+		FilePath:   "test_image.png",
+		FileSize:   int64(pngBuf.Len()),
+		MimeType:   "image/png",
+		Extension:  "png",
+		Type:       "avatar", // Whitelisted by default
+		Status:     model.UploadStatusUsed,
+		AccessMode: 1,
 	}
 	dbConn.Create(&uploadRecord)
 
@@ -343,4 +354,27 @@ func TestNormalizeImageQuality(t *testing.T) {
 			}
 		})
 	}
+}
+
+func configureLocalStorageRoot(t *testing.T, dbConn *gorm.DB, tempDir string) {
+	var sc model.SystemConfig
+	if err := dbConn.Where("key = ?", model.ConfigKeyStorageConfig).First(&sc).Error; err != nil {
+		t.Fatalf("failed to find storage config: %v", err)
+	}
+	var cfg storage.Config
+	if err := json.Unmarshal([]byte(sc.Value), &cfg); err != nil {
+		t.Fatalf("failed to unmarshal storage config: %v", err)
+	}
+	cfg.Local.Root = tempDir
+	newVal, err := json.Marshal(cfg)
+	if err != nil {
+		t.Fatalf("failed to marshal storage config: %v", err)
+	}
+	sc.Value = string(newVal)
+	if err := dbConn.Save(&sc).Error; err != nil {
+		t.Fatalf("failed to save storage config: %v", err)
+	}
+	_ = db.HSetJSON(context.Background(), repository.SystemConfigRedisHashKey, sc.Key, &sc)
+	repository.ResetSystemConfigRAMCacheForTest()
+	storage.ResetCache()
 }
