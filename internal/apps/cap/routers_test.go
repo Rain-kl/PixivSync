@@ -20,6 +20,21 @@ import (
 	pkgcap "github.com/Rain-kl/Wavelet/pkg/cap"
 )
 
+func decodeAPIResponse[T any](t *testing.T, body []byte) T {
+	t.Helper()
+	var envelope struct {
+		ErrorMsg string `json:"error_msg"`
+		Data     T      `json:"data"`
+	}
+	if err := json.Unmarshal(body, &envelope); err != nil {
+		t.Fatalf("failed to unmarshal API envelope: %v", err)
+	}
+	if envelope.ErrorMsg != "" {
+		t.Fatalf("unexpected API error_msg: %s", envelope.ErrorMsg)
+	}
+	return envelope.Data
+}
+
 func TestCapEndpointsAndMiddleware(t *testing.T) {
 	sqliteDB, _, cleanup := testhelper.SetupTestEnvironment(t)
 	defer cleanup()
@@ -37,6 +52,15 @@ func TestCapEndpointsAndMiddleware(t *testing.T) {
 		c.JSON(http.StatusOK, response.OK("login success"))
 	})
 
+	// Ensure CAPTCHA is disabled initially for step 2
+	if err := sqliteDB.Model(&model.SystemConfig{}).Where("key = ?", model.ConfigKeyCapLoginEnabled).Update("value", "false").Error; err != nil {
+		t.Fatalf("failed to disable cap_login_enabled in DB: %v", err)
+	}
+	if err := repository.InvalidateSystemConfigCache(context.Background(), model.ConfigKeyCapLoginEnabled); err != nil {
+		t.Fatalf("InvalidateSystemConfigCache() error = %v", err)
+	}
+	InvalidateRuntimeSettings()
+
 	// 1. Test challenge generation
 	w := httptest.NewRecorder()
 	req, _ := http.NewRequest("POST", "/api/cap/challenge", nil)
@@ -46,14 +70,7 @@ func TestCapEndpointsAndMiddleware(t *testing.T) {
 		t.Fatalf("expected 200 OK, got %d. Body: %s", w.Code, w.Body.String())
 	}
 
-	var envelope struct {
-		ErrorMsg string                   `json:"error_msg"`
-		Data     pkgcap.ChallengeResponse `json:"data"`
-	}
-	if err := json.Unmarshal(w.Body.Bytes(), &envelope); err != nil {
-		t.Fatalf("failed to unmarshal challenge response: %v", err)
-	}
-	challengeResp := envelope.Data
+	challengeResp := decodeAPIResponse[pkgcap.ChallengeResponse](t, w.Body.Bytes())
 
 	if challengeResp.Token == "" {
 		t.Fatalf("expected token in challenge response")
@@ -103,14 +120,7 @@ func TestCapEndpointsAndMiddleware(t *testing.T) {
 		t.Fatalf("expected 200 OK for redeem, got %d. Body: %s", w.Code, w.Body.String())
 	}
 
-	var redeemEnvelope struct {
-		ErrorMsg string         `json:"error_msg"`
-		Data     RedeemResponse `json:"data"`
-	}
-	if err := json.Unmarshal(w.Body.Bytes(), &redeemEnvelope); err != nil {
-		t.Fatalf("failed to unmarshal redeem response: %v", err)
-	}
-	redeemResp := redeemEnvelope.Data
+	redeemResp := decodeAPIResponse[RedeemResponse](t, w.Body.Bytes())
 
 	if !redeemResp.Success || redeemResp.Token == "" {
 		t.Fatalf("redeem failed or returned empty token: %+v", redeemResp)

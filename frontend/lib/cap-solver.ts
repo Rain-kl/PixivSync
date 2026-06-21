@@ -7,6 +7,8 @@
 
 // ——— Challenge / Redeem API types ———
 
+import {readApiData} from '@/lib/api-envelope';
+
 export interface ChallengeResponse {
   challenge: { c: number; s: number; d: number };
   token: string;
@@ -138,10 +140,10 @@ export async function getCapToken(scope = 'login'): Promise<string> {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ scope }),
   });
-  if (!challengeRes.ok) {
-    throw new Error('获取人机验证难题失败');
-  }
-  const challenge: ChallengeResponse = await challengeRes.json();
+  const challenge = await readApiData<ChallengeResponse>(
+    challengeRes,
+    '获取人机验证难题失败',
+  );
   const { c: count, s: size, d: difficulty } = challenge.challenge;
 
   console.groupCollapsed('[Cap] 人机验证 PoW 求解开始');
@@ -174,7 +176,10 @@ export async function getCapToken(scope = 'login'): Promise<string> {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ token: challenge.token, solutions, scope }),
   });
-  const redeemData: RedeemResponse = await redeemRes.json();
+  const redeemData = await readApiData<RedeemResponse>(
+    redeemRes,
+    '人机验证失败',
+  );
   if (!redeemData.success || !redeemData.token) {
     throw new Error(redeemData.error || '人机验证失败');
   }
