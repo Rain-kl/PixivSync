@@ -257,7 +257,6 @@ func markBookmarkIllustRemoved(ctx context.Context, pixivUserID string, restrict
 	err := db.DB(ctx).Where("pixiv_user_id = ? AND restrict = ? AND illust_id = ?", pixivUserID, restrict, illustID).First(&existing).Error
 	if err == nil {
 		updates := map[string]any{
-			"illust_json":      illustJSON,
 			keyLastExportRunID: runID,
 			keyLastSeenAt:      now,
 			keyRemoved:         true,
@@ -352,7 +351,6 @@ func markBookmarkNovelRemoved(ctx context.Context, pixivUserID string, restrict 
 	err := db.DB(ctx).Where("pixiv_user_id = ? AND restrict = ? AND novel_id = ?", pixivUserID, restrict, novelID).First(&existing).Error
 	if err == nil {
 		updates := map[string]any{
-			"novel_json":       novelJSON,
 			keyLastExportRunID: runID,
 			keyLastSeenAt:      now,
 			keyRemoved:         true,

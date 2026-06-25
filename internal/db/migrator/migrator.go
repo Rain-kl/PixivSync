@@ -42,19 +42,6 @@ func gooseDialect() string {
 	return dialectPostgres
 }
 
-func tableExistsSQL(dialect string) string {
-	if dialect == dialectSqlite {
-		return "SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name=?"
-	}
-	return "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = 'public' AND table_name = $1"
-}
-
-func tablesWithPrefixSQL(dialect string) string {
-	if dialect == dialectSqlite {
-		return "SELECT name FROM sqlite_master WHERE type='table' AND name LIKE ?"
-	}
-	return "SELECT table_name FROM information_schema.tables WHERE table_schema='public' AND table_name LIKE $1"
-}
 
 func migrationDir() string {
 	if !config.Config.Database.Enabled {

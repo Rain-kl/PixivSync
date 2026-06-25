@@ -242,7 +242,7 @@ func importLegacyBookmarks(ctx context.Context, legacyDB *gorm.DB, dryRun bool, 
 	if len(illusts) > 0 {
 		if err := db.DB(ctx).Clauses(clause.OnConflict{
 			Columns:   []clause.Column{{Name: keyPixivUserID}, {Name: "restrict"}, {Name: "illust_id"}},
-			UpdateAll: true,
+			DoNothing: true,
 		}).Create(&illusts).Error; err != nil {
 			return err
 		}
@@ -250,7 +250,7 @@ func importLegacyBookmarks(ctx context.Context, legacyDB *gorm.DB, dryRun bool, 
 	if len(novels) > 0 {
 		if err := db.DB(ctx).Clauses(clause.OnConflict{
 			Columns:   []clause.Column{{Name: keyPixivUserID}, {Name: "restrict"}, {Name: "novel_id"}},
-			UpdateAll: true,
+			DoNothing: true,
 		}).Create(&novels).Error; err != nil {
 			return err
 		}

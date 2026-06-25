@@ -50,6 +50,7 @@
 - 核心业务模块（如 `oauth`、`user`）禁止直接 `import` `internal/apps/admin/push` 或 `custom_events` 触发通知；应通过 `internal/listener` 发射域事件，由 push 模块在 bootstrap 阶段订阅。
 - 编写依赖任务注册或推送事件同步的测试时，必须在测试 setup 中显式调用 `bootstrap.RegisterTasks()`、`bootstrap.RegisterPushDomainEvents()` 等，不得依赖 `init()` 副作用。
 - API 错误响应必须通过 `response.Abort*` 中断请求，由 `ErrorHandlerMiddleware` 统一写出 JSON；禁止 `c.JSON(http.StatusOK, response.Err(...))` 及 Handler 直接 `c.JSON(status, response.Err(...))`。
+- 严格禁止在任何更新、标记删除或数据导入流程中覆盖或修改已存在收藏记录的原始元数据（如 `Title`、`UserName`、`PageCount` 等字段）以及 `illust_json` 和 `novel_json`，只有在记录首次新建入库时方可写入。
 
 ## 项目介绍
 
