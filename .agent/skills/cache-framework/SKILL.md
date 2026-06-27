@@ -118,7 +118,7 @@ func startThingCacheInvalidationListener() {
 
 | 域 | 文件 | L1 | L2 | pub/sub |
 | :--- | :--- | :--- | :--- | :--- |
-| 系统配置 | `repository/system_config_cache.go` | Otter | Redis Hash | `system:config_invalidation` ✅ |
+| 系统配置 | `repository/system_config_cache.go` | `pkg/cache/store` | ❌ 无 Redis 缓存 | `system:config_broadcast` (别名 `system:config_invalidation`) ✅ |
 | CAPTCHA 运行时 | `apps/cap/runtime_settings.go` | atomic.Pointer | （借配置 Redis） | 订阅 `system:config_invalidation` ✅ |
 | 上传元数据 | `apps/upload/cache/meta_cache.go` | Otter | Redis JSON | `upload:meta_invalidation` ✅ |
 | 上传访问白名单 | `apps/upload/cache/access_cache.go` | 进程内 TTL | （借配置读路径） | `upload:file_access_invalidation` ✅ |

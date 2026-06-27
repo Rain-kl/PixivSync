@@ -11,36 +11,60 @@ import (
 	"fmt"
 	"strconv"
 
-	"github.com/redis/go-redis/v9"
 	"github.com/shopspring/decimal"
 
 	"github.com/Rain-kl/Wavelet/internal/db"
 	"github.com/Rain-kl/Wavelet/internal/model"
+	"github.com/Rain-kl/Wavelet/pkg/cache/ram"
 )
 
 const (
+	configTypeSystem                = "system"
 	errDatabaseNotInitialized       = "database not initialized"
-	errConfigIntParseFailed           = "配置 %s 的值 '%s' 无法转换为整数: %w"
-	errConfigDecimalParseFailed       = "配置 %s 的值 '%s' 无法转换为decimal: %w"
-	errConfigBoolParseFailed          = "配置 %s 的值 '%s' 无法转换为布尔值: %w"
-	errParseMenuDisplayConfigFailed   = "解析目录显示配置失败: %w"
+	errConfigIntParseFailed         = "配置 %s 的值 '%s' 无法转换为整数: %w"
+	errConfigDecimalParseFailed     = "配置 %s 的值 '%s' 无法转换为decimal: %w"
+	errConfigBoolParseFailed        = "配置 %s 的值 '%s' 无法转换为布尔值: %w"
+	errParseMenuDisplayConfigFailed = "解析目录显示配置失败: %w"
 )
 
-// GetSystemConfigByKey 通过 key 查询配置（带 RAM + Redis 缓存）。
-func GetSystemConfigByKey(ctx context.Context, key string) (model.SystemConfig, error) {
-	ensureSystemConfigCacheListener()
+// PreheatSystemConfigs loads all system configs from database.
+// This function strictly performs database read and does not perform any cache read or write operations.
+func PreheatSystemConfigs(ctx context.Context) ([]model.SystemConfig, error) {
+	database := db.DB(ctx)
+	if database == nil {
+		return nil, errors.New(errDatabaseNotInitialized)
+	}
 
-	if cached, ok := systemConfigRAMCache.GetIfPresent(key); ok {
-		return cloneSystemConfig(cached), nil
+	var configs []model.SystemConfig
+	if err := database.Find(&configs).Error; err != nil {
+		return nil, err
+	}
+	return configs, nil
+}
+
+// PreheatSystemConfigByKey loads a single config key from database.
+// This function strictly performs database read and does not perform any cache read or write operations.
+func PreheatSystemConfigByKey(ctx context.Context, key string) (model.SystemConfig, error) {
+	database := db.DB(ctx)
+	if database == nil {
+		return model.SystemConfig{}, errors.New(errDatabaseNotInitialized)
 	}
 
 	var sc model.SystemConfig
-	if db.Redis != nil {
-		if err := db.HGetJSON(ctx, SystemConfigRedisHashKey, key, &sc); err == nil {
-			systemConfigRAMCache.Set(key, cloneSystemConfig(sc))
+	if err := database.Where("key = ?", key).First(&sc).Error; err != nil {
+		return model.SystemConfig{}, err
+	}
+	return sc, nil
+}
+
+// GetSystemConfigByGroup queries a configuration by Type and Key.
+func GetSystemConfigByGroup(ctx context.Context, configType string, key string) (model.SystemConfig, error) {
+	ensureSystemConfigCacheListener()
+
+	if item, ok := ram.Get(configType, key); ok {
+		var sc model.SystemConfig
+		if err := json.Unmarshal([]byte(item.Value), &sc); err == nil {
 			return sc, nil
-		} else if !errors.Is(err, redis.Nil) {
-			return model.SystemConfig{}, err
 		}
 	}
 
@@ -49,15 +73,31 @@ func GetSystemConfigByKey(ctx context.Context, key string) (model.SystemConfig, 
 		return model.SystemConfig{}, errors.New(errDatabaseNotInitialized)
 	}
 
+	var sc model.SystemConfig
 	if err := database.Where("key = ?", key).First(&sc).Error; err != nil {
 		return model.SystemConfig{}, err
 	}
 
-	populateSystemConfigCache(ctx, sc)
+	// Populate local cache directly on query miss
+	valBytes, err := json.Marshal(sc)
+	if err == nil {
+		ram.Set(ram.CacheItem{
+			Key:   sc.Key,
+			Value: string(valBytes),
+			Type:  configType,
+			TTL:   determineTTL(sc.Key),
+		})
+	}
+
 	return sc, nil
 }
 
-// ListSystemConfigsByKeys loads multiple config keys in one database round trip.
+// GetSystemConfigByKey queries config by key (delegates to Type "config").
+func GetSystemConfigByKey(ctx context.Context, key string) (model.SystemConfig, error) {
+	return GetSystemConfigByGroup(ctx, ConfigCacheType, key)
+}
+
+// ListSystemConfigsByKeys loads multiple config keys.
 func ListSystemConfigsByKeys(ctx context.Context, keys []string) (map[string]model.SystemConfig, error) {
 	if len(keys) == 0 {
 		return map[string]model.SystemConfig{}, nil
@@ -67,28 +107,16 @@ func ListSystemConfigsByKeys(ctx context.Context, keys []string) (map[string]mod
 
 	result := make(map[string]model.SystemConfig, len(keys))
 	missing := make([]string, 0, len(keys))
-	for _, key := range keys {
-		if cached, ok := systemConfigRAMCache.GetIfPresent(key); ok {
-			result[key] = cloneSystemConfig(cached)
-			continue
-		}
-		missing = append(missing, key)
-	}
 
-	if len(missing) > 0 && db.Redis != nil {
-		stillMissing := make([]string, 0, len(missing))
-		for _, key := range missing {
+	for _, key := range keys {
+		if item, ok := ram.Get(ConfigCacheType, key); ok {
 			var sc model.SystemConfig
-			if err := db.HGetJSON(ctx, SystemConfigRedisHashKey, key, &sc); err == nil {
-				systemConfigRAMCache.Set(key, cloneSystemConfig(sc))
+			if err := json.Unmarshal([]byte(item.Value), &sc); err == nil {
 				result[key] = sc
 				continue
-			} else if !errors.Is(err, redis.Nil) {
-				return nil, err
 			}
-			stillMissing = append(stillMissing, key)
 		}
-		missing = stillMissing
+		missing = append(missing, key)
 	}
 
 	if len(missing) == 0 {
@@ -106,8 +134,16 @@ func ListSystemConfigsByKeys(ctx context.Context, keys []string) (map[string]mod
 	}
 
 	for i := range configs {
-		populateSystemConfigCache(ctx, configs[i])
-		result[configs[i].Key] = cloneSystemConfig(configs[i])
+		valBytes, err := json.Marshal(configs[i])
+		if err == nil {
+			ram.Set(ram.CacheItem{
+				Key:   configs[i].Key,
+				Value: string(valBytes),
+				Type:  ConfigCacheType,
+				TTL:   determineTTL(configs[i].Key),
+			})
+		}
+		result[configs[i].Key] = configs[i]
 	}
 
 	return result, nil
@@ -115,21 +151,25 @@ func ListSystemConfigsByKeys(ctx context.Context, keys []string) (map[string]mod
 
 // InvalidateVisibleSystemConfigsCache clears the cached public config list.
 func InvalidateVisibleSystemConfigsCache(ctx context.Context) error {
-	if db.Redis == nil {
-		return nil
-	}
-	return db.Redis.Del(ctx, db.PrefixedKey(SystemConfigVisibleListRedisKey)).Err()
+	return InvalidateAllSystemConfigCaches(ctx)
 }
 
-// ListVisibleSystemConfigs 查询所有可通过公共配置接口暴露的配置（带 Redis 列表缓存）。
+// ListVisibleSystemConfigs queries visible configs using local cache store.
 func ListVisibleSystemConfigs(ctx context.Context) ([]model.SystemConfig, error) {
-	if db.Redis != nil {
-		var cached []model.SystemConfig
-		if err := db.GetJSON(ctx, SystemConfigVisibleListRedisKey, &cached); err == nil {
-			return cached, nil
-		} else if !errors.Is(err, redis.Nil) {
-			return nil, err
+	ensureSystemConfigCacheListener()
+
+	items := ram.GetTypeItems(ConfigCacheType)
+	if len(items) > 0 {
+		var list []model.SystemConfig
+		for _, item := range items {
+			var sc model.SystemConfig
+			if err := json.Unmarshal([]byte(item.Value), &sc); err == nil {
+				if sc.Visibility == model.ConfigVisibilityVisible {
+					list = append(list, sc)
+				}
+			}
 		}
+		return list, nil
 	}
 
 	database := db.DB(ctx)
@@ -142,14 +182,23 @@ func ListVisibleSystemConfigs(ctx context.Context) ([]model.SystemConfig, error)
 		return nil, err
 	}
 
-	if db.Redis != nil {
-		_ = db.SetJSON(ctx, SystemConfigVisibleListRedisKey, configs, 0)
+	// Populate visible configs to local cache store
+	for _, cfg := range configs {
+		valBytes, err := json.Marshal(cfg)
+		if err == nil {
+			ram.Set(ram.CacheItem{
+				Key:   cfg.Key,
+				Value: string(valBytes),
+				Type:  ConfigCacheType,
+				TTL:   determineTTL(cfg.Key),
+			})
+		}
 	}
 
 	return configs, nil
 }
 
-// GetIntByKey 通过 key 查询配置并转换为 int 类型。
+// GetIntByKey queries config and converts to int.
 func GetIntByKey(ctx context.Context, key string) (int, error) {
 	sc, err := GetSystemConfigByKey(ctx, key)
 	if err != nil {
@@ -164,7 +213,7 @@ func GetIntByKey(ctx context.Context, key string) (int, error) {
 	return value, nil
 }
 
-// GetDecimalByKey 通过 key 查询配置并转换为 decimal.Decimal 类型。
+// GetDecimalByKey queries config and converts to decimal.Decimal.
 func GetDecimalByKey(ctx context.Context, key string, precision int32) (decimal.Decimal, error) {
 	sc, err := GetSystemConfigByKey(ctx, key)
 	if err != nil {
@@ -179,7 +228,7 @@ func GetDecimalByKey(ctx context.Context, key string, precision int32) (decimal.
 	return value.Truncate(precision), nil
 }
 
-// GetBoolByKey 通过 key 查询配置并转换为 bool 类型。
+// GetBoolByKey queries config and converts to bool.
 func GetBoolByKey(ctx context.Context, key string) (bool, error) {
 	sc, err := GetSystemConfigByKey(ctx, key)
 	if err != nil {
@@ -194,7 +243,7 @@ func GetBoolByKey(ctx context.Context, key string) (bool, error) {
 	return value, nil
 }
 
-// GetMenuDisplayConfig 获取目录显示配置，解析为 map[string]bool。
+// GetMenuDisplayConfig queries and parses menu config.
 func GetMenuDisplayConfig(ctx context.Context) (map[string]bool, error) {
 	sc, err := GetSystemConfigByKey(ctx, model.ConfigKeyMenuDisplayConfig)
 	if err != nil {

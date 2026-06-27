@@ -69,7 +69,7 @@ func SaveOrUpdateSystemConfig(ctx context.Context, key, value string) error {
 		sc = model.SystemConfig{
 			Key:        key,
 			Value:      value,
-			Type:       "system",
+			Type:       configTypeSystem,
 			Visibility: model.ConfigVisibilityHidden,
 		}
 		if err := db.DB(ctx).Create(&sc).Error; err != nil {

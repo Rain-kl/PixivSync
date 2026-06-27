@@ -32,12 +32,12 @@ func GetUserByUsername(ctx context.Context, username string) (model.User, error)
 // GetSystemUser loads the built-in system user, or returns a synthetic fallback.
 func GetSystemUser(ctx context.Context) model.User {
 	var user model.User
-	if err := db.DB(ctx).Where("username = ?", "system").First(&user).Error; err == nil {
+	if err := db.DB(ctx).Where("username = ?", configTypeSystem).First(&user).Error; err == nil {
 		return user
 	}
 	return model.User{
 		ID:       999,
-		Username: "system",
+		Username: configTypeSystem,
 		Nickname: "系统",
 	}
 }

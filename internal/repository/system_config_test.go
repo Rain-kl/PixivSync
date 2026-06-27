@@ -6,14 +6,16 @@ package repository
 import (
 	"context"
 	"testing"
+	"time"
 
-	"github.com/Rain-kl/Wavelet/internal/db"
-	"github.com/Rain-kl/Wavelet/internal/model"
 	"github.com/alicebob/miniredis/v2"
 	"github.com/glebarez/sqlite"
 	"github.com/redis/go-redis/v9"
 	"github.com/redis/go-redis/v9/maintnotifications"
 	"gorm.io/gorm"
+
+	"github.com/Rain-kl/Wavelet/internal/db"
+	"github.com/Rain-kl/Wavelet/internal/model"
 )
 
 func setupSystemConfigTest(t *testing.T) (*gorm.DB, func()) {
@@ -76,16 +78,14 @@ func TestListSystemConfigsByKeys_EmptyKeys(t *testing.T) {
 	}
 }
 
-func TestListSystemConfigsByKeys_LoadsFromRedisBeforeDB(t *testing.T) {
+func TestListSystemConfigsByKeys_LoadsFromRAMCache(t *testing.T) {
 	dbConn, cleanup := setupSystemConfigTest(t)
 	defer cleanup()
 	ctx := context.Background()
 
 	ResetSystemConfigRAMCacheForTest()
-	if err := InvalidateAllSystemConfigCaches(ctx); err != nil {
-		t.Fatalf("InvalidateAllSystemConfigCaches() error = %v", err)
-	}
 
+	// Initial load
 	warm, err := GetSystemConfigByKey(ctx, model.ConfigKeySiteName)
 	if err != nil {
 		t.Fatalf("GetSystemConfigByKey(site_name) warm error = %v", err)
@@ -94,14 +94,14 @@ func TestListSystemConfigsByKeys_LoadsFromRedisBeforeDB(t *testing.T) {
 		t.Fatalf("GetSystemConfigByKey(site_name).Value = %q, want %q", warm.Value, "Wavelet")
 	}
 
+	// Update DB directly
 	if err := dbConn.Model(&model.SystemConfig{}).
 		Where("key = ?", model.ConfigKeySiteName).
 		Update("value", "db_only_value").Error; err != nil {
 		t.Fatalf("Update(site_name) error = %v", err)
 	}
 
-	ResetSystemConfigRAMCacheForTest()
-
+	// Fetch via ListSystemConfigsByKeys should serve from local store (meaning the old value "Wavelet")
 	configs, err := ListSystemConfigsByKeys(ctx, []string{model.ConfigKeySiteName})
 	if err != nil {
 		t.Fatalf("ListSystemConfigsByKeys(site_name) error = %v", err)
@@ -112,35 +112,47 @@ func TestListSystemConfigsByKeys_LoadsFromRedisBeforeDB(t *testing.T) {
 		t.Fatal("ListSystemConfigsByKeys(site_name) missing site_name entry")
 	}
 	if sc.Value != "Wavelet" {
-		t.Fatalf("ListSystemConfigsByKeys(site_name).Value = %q, want redis value %q", sc.Value, "Wavelet")
+		t.Fatalf("ListSystemConfigsByKeys(site_name).Value = %q, want cached value %q", sc.Value, "Wavelet")
 	}
 }
 
-func TestListSystemConfigsByKeys_PopulatesRAMFromRedis(t *testing.T) {
-	_, cleanup := setupSystemConfigTest(t)
+func TestGetSystemConfigByGroupAndInvalidation(t *testing.T) {
+	dbConn, cleanup := setupSystemConfigTest(t)
 	defer cleanup()
 	ctx := context.Background()
 
 	ResetSystemConfigRAMCacheForTest()
-	if err := InvalidateAllSystemConfigCaches(ctx); err != nil {
-		t.Fatalf("InvalidateAllSystemConfigCaches() error = %v", err)
+
+	// Get via specific group/type
+	cfg, err := GetSystemConfigByGroup(ctx, ConfigCacheType, model.ConfigKeySiteName)
+	if err != nil {
+		t.Fatalf("GetSystemConfigByGroup error = %v", err)
+	}
+	if cfg.Value != "Wavelet" {
+		t.Fatalf("value = %q, want %q", cfg.Value, "Wavelet")
 	}
 
-	if _, err := GetSystemConfigByKey(ctx, model.ConfigKeySiteName); err != nil {
-		t.Fatalf("GetSystemConfigByKey(site_name) warm error = %v", err)
+	// Direct DB update
+	if err := dbConn.Model(&model.SystemConfig{}).
+		Where("key = ?", model.ConfigKeySiteName).
+		Update("value", "new_site_name").Error; err != nil {
+		t.Fatalf("DB Update error = %v", err)
 	}
 
-	ResetSystemConfigRAMCacheForTest()
-
-	if _, err := ListSystemConfigsByKeys(ctx, []string{model.ConfigKeySiteName}); err != nil {
-		t.Fatalf("ListSystemConfigsByKeys(site_name) error = %v", err)
+	// Invalidate
+	if err := InvalidateSystemConfigCache(ctx, model.ConfigKeySiteName); err != nil {
+		t.Fatalf("InvalidateSystemConfigCache error = %v", err)
 	}
 
-	cached, ok := systemConfigRAMCache.GetIfPresent(model.ConfigKeySiteName)
-	if !ok {
-		t.Fatal("expected RAM cache to be populated after redis hit")
+	// Wait for broadcast execution
+	time.Sleep(100 * time.Millisecond)
+
+	// Fetch again
+	updated, err := GetSystemConfigByKey(ctx, model.ConfigKeySiteName)
+	if err != nil {
+		t.Fatalf("GetSystemConfigByKey error = %v", err)
 	}
-	if cached.Value != "Wavelet" {
-		t.Fatalf("RAM cache value = %q, want %q", cached.Value, "Wavelet")
+	if updated.Value != "new_site_name" {
+		t.Fatalf("value = %q, want %q", updated.Value, "new_site_name")
 	}
 }

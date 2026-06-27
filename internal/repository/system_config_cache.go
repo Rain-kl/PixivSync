@@ -6,31 +6,87 @@ package repository
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"sync"
+	"time"
+
+	"gorm.io/gorm"
 
 	"github.com/Rain-kl/Wavelet/internal/db"
-	"github.com/Rain-kl/Wavelet/internal/model"
 	"github.com/Rain-kl/Wavelet/pkg/cache/ram"
 )
 
 const (
-	// SystemConfigInvalidationChannel broadcasts RAM cache eviction across nodes.
-	SystemConfigInvalidationChannel = "system:config_invalidation"
-	// SystemConfigRedisHashKey Redis Hash key，存储所有系统配置。
+	// SystemConfigBroadcastChannel broadcasts system config cache updates across nodes.
+	SystemConfigBroadcastChannel = "system:config_broadcast"
+
+	// SystemConfigInvalidationChannel is kept as an alias for backward compatibility.
+	SystemConfigInvalidationChannel = SystemConfigBroadcastChannel
+
+	// SystemConfigRedisHashKey is kept for backward compatibility in tests.
 	SystemConfigRedisHashKey = "system:system_configs"
-	// SystemConfigVisibleListRedisKey Redis key，缓存所有 visibility=1 的公共配置列表。
+	// SystemConfigVisibleListRedisKey is kept for backward compatibility in tests.
 	SystemConfigVisibleListRedisKey = "system:visible_configs"
 
-	systemConfigInvalidateAllToken = "*"
-	systemConfigRAMMaximumSize     = 512
+	// ConfigCacheType is the cache type for all system configs.
+	ConfigCacheType = "config"
 )
 
-type systemConfigInvalidationMessage struct {
-	Key string `json:"key"`
+type systemConfigBroadcastMessage struct {
+	Type string `json:"type"`
+	Key  string `json:"key"`
+}
+
+// ConfigLoader loads configuration data from the database.
+type ConfigLoader struct{}
+
+// LoadAll loads all system configs from database as CacheItems.
+func (ConfigLoader) LoadAll(ctx context.Context, configType string) ([]ram.CacheItem, error) {
+	configs, err := PreheatSystemConfigs(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	items := make([]ram.CacheItem, len(configs))
+	for i, cfg := range configs {
+		valBytes, err := json.Marshal(cfg)
+		if err != nil {
+			return nil, err
+		}
+		items[i] = ram.CacheItem{
+			Key:   cfg.Key,
+			Value: string(valBytes),
+			Type:  configType,
+			TTL:   determineTTL(cfg.Key),
+		}
+	}
+	return items, nil
+}
+
+// LoadOne loads a single system config from database as a CacheItem.
+func (ConfigLoader) LoadOne(ctx context.Context, configType string, key string) (ram.CacheItem, error) {
+	cfg, err := PreheatSystemConfigByKey(ctx, key)
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return ram.CacheItem{}, ram.ErrNotFound
+		}
+		return ram.CacheItem{}, err
+	}
+
+	valBytes, err := json.Marshal(cfg)
+	if err != nil {
+		return ram.CacheItem{}, err
+	}
+
+	return ram.CacheItem{
+		Key:   cfg.Key,
+		Value: string(valBytes),
+		Type:  configType,
+		TTL:   determineTTL(cfg.Key),
+	}, nil
 }
 
 var (
-	systemConfigRAMCache       = ram.MustNew[string, model.SystemConfig](ram.Options{MaximumSize: systemConfigRAMMaximumSize})
 	systemConfigListenerOnce   sync.Once
 	systemConfigListenerCtx    context.Context
 	systemConfigListenerCancel context.CancelFunc
@@ -48,7 +104,7 @@ func startSystemConfigCacheInvalidationListener() {
 	systemConfigListenerCtx, systemConfigListenerCancel = context.WithCancel(context.Background())
 
 	go func() {
-		pubsub := db.Redis.Subscribe(systemConfigListenerCtx, SystemConfigInvalidationChannel)
+		pubsub := db.Redis.Subscribe(systemConfigListenerCtx, SystemConfigBroadcastChannel)
 		defer func() {
 			_ = pubsub.Close()
 		}()
@@ -59,16 +115,18 @@ func startSystemConfigCacheInvalidationListener() {
 		}()
 
 		for msg := range pubsub.Channel() {
-			var payload systemConfigInvalidationMessage
+			var payload systemConfigBroadcastMessage
 			if err := json.Unmarshal([]byte(msg.Payload), &payload); err != nil {
-				systemConfigRAMCache.InvalidateAll()
+				ram.UpdateTypeItems(ConfigCacheType, nil)
 				continue
 			}
-			if payload.Key == "" || payload.Key == systemConfigInvalidateAllToken {
-				systemConfigRAMCache.InvalidateAll()
-				continue
+
+			key := payload.Key
+			if key == "*" || key == "" {
+				ram.UpdateTypeItems(payload.Type, nil)
+			} else {
+				ram.Delete(payload.Type, key)
 			}
-			systemConfigRAMCache.Invalidate(payload.Key)
 		}
 	}()
 }
@@ -82,57 +140,53 @@ func StopSystemConfigCacheListener() {
 	systemConfigListenerOnce = sync.Once{}
 }
 
-func cloneSystemConfig(sc model.SystemConfig) model.SystemConfig {
-	return sc
+func determineTTL(_ string) time.Duration {
+	// Program-determined TTL: -1 means never expire for all configs by default
+	return -1
 }
 
-func populateSystemConfigCache(ctx context.Context, sc model.SystemConfig) {
-	systemConfigRAMCache.Set(sc.Key, cloneSystemConfig(sc))
-	if db.Redis != nil {
-		_ = db.HSetJSON(ctx, SystemConfigRedisHashKey, sc.Key, &sc)
-	}
-}
-
-func publishSystemConfigRAMInvalidation(ctx context.Context, key string) {
-	if db.Redis == nil {
-		return
-	}
-	payload, err := json.Marshal(systemConfigInvalidationMessage{Key: key})
-	if err != nil {
-		return
-	}
-	_ = db.Redis.Publish(ctx, SystemConfigInvalidationChannel, payload).Err()
-}
-
-// InvalidateSystemConfigCache evicts one config key from local RAM and Redis.
+// InvalidateSystemConfigCache triggers a broadcast to refresh the cache for key.
 func InvalidateSystemConfigCache(ctx context.Context, key string) error {
 	ensureSystemConfigCacheListener()
 
-	systemConfigRAMCache.Invalidate(key)
+	// Invalidate local cache synchronously first
+	ram.Delete(ConfigCacheType, key)
+
+	// Broadcast to other nodes and clean legacy Redis cache key
 	if db.Redis != nil {
-		if err := db.HDel(ctx, SystemConfigRedisHashKey, key); err != nil {
-			return err
-		}
+		_ = db.HDel(ctx, SystemConfigRedisHashKey, key)
+		publishSystemConfigBroadcast(ctx, ConfigCacheType, key)
 	}
-	publishSystemConfigRAMInvalidation(ctx, key)
 	return nil
 }
 
-// InvalidateAllSystemConfigCaches evicts all config entries from local RAM and Redis.
+// InvalidateAllSystemConfigCaches triggers a broadcast to refresh the entire config cache.
 func InvalidateAllSystemConfigCaches(ctx context.Context) error {
 	ensureSystemConfigCacheListener()
 
-	systemConfigRAMCache.InvalidateAll()
+	// Invalidate all items of type ConfigCacheType synchronously first
+	ram.UpdateTypeItems(ConfigCacheType, nil)
+
+	// Broadcast to other nodes and clean legacy Redis cache keys
 	if db.Redis != nil {
-		if err := db.Redis.Del(ctx, db.PrefixedKey(SystemConfigRedisHashKey)).Err(); err != nil {
-			return err
-		}
+		_ = db.Redis.Del(ctx, db.PrefixedKey(SystemConfigRedisHashKey), db.PrefixedKey(SystemConfigVisibleListRedisKey)).Err()
+		publishSystemConfigBroadcast(ctx, ConfigCacheType, "*")
 	}
-	publishSystemConfigRAMInvalidation(ctx, systemConfigInvalidateAllToken)
 	return nil
+}
+
+func publishSystemConfigBroadcast(ctx context.Context, configType string, key string) {
+	if db.Redis == nil {
+		return
+	}
+	payload, err := json.Marshal(systemConfigBroadcastMessage{Type: configType, Key: key})
+	if err != nil {
+		return
+	}
+	_ = db.Redis.Publish(ctx, SystemConfigBroadcastChannel, payload).Err()
 }
 
 // ResetSystemConfigRAMCacheForTest clears only the process-local RAM cache.
 func ResetSystemConfigRAMCacheForTest() {
-	systemConfigRAMCache.InvalidateAll()
+	ram.ResetForTest()
 }

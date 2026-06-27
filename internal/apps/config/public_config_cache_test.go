@@ -6,26 +6,29 @@ package config
 import (
 	"context"
 	"testing"
+	"time"
 
-	"github.com/Rain-kl/Wavelet/internal/db"
 	"github.com/Rain-kl/Wavelet/internal/model"
 	"github.com/Rain-kl/Wavelet/internal/repository"
 	"github.com/Rain-kl/Wavelet/internal/testhelper"
 )
 
-func TestListVisibleSystemConfigsUsesRedisCache(t *testing.T) {
+func TestListVisibleSystemConfigsUsesStoreCache(t *testing.T) {
 	dbConn, _, cleanup := testhelper.SetupTestEnvironment(t)
 	defer cleanup()
 	ctx := context.Background()
 
+	repository.ResetSystemConfigRAMCacheForTest()
 	if err := repository.InvalidateVisibleSystemConfigsCache(ctx); err != nil {
 		t.Fatalf("InvalidateVisibleSystemConfigsCache() error = %v", err)
 	}
 
+	// Warm cache
 	if _, err := repository.ListVisibleSystemConfigs(ctx); err != nil {
 		t.Fatalf("ListVisibleSystemConfigs() warm cache error = %v", err)
 	}
 
+	// Directly insert a new config in DB (bypassing caching layer)
 	if err := dbConn.Create(&model.SystemConfig{
 		Key:         "cache_probe_public_key",
 		Value:       "cache_probe_public_value",
@@ -36,6 +39,7 @@ func TestListVisibleSystemConfigsUsesRedisCache(t *testing.T) {
 		t.Fatalf("Create(cache_probe_public_key) error = %v", err)
 	}
 
+	// Cached call: shouldn't return the new key yet
 	cached, err := repository.ListVisibleSystemConfigs(ctx)
 	if err != nil {
 		t.Fatalf("ListVisibleSystemConfigs() cached call error = %v", err)
@@ -46,18 +50,15 @@ func TestListVisibleSystemConfigsUsesRedisCache(t *testing.T) {
 		}
 	}
 
-	exists, err := db.Redis.Exists(ctx, db.PrefixedKey(repository.SystemConfigVisibleListRedisKey)).Result()
-	if err != nil {
-		t.Fatalf("Redis.Exists() error = %v", err)
-	}
-	if exists == 0 {
-		t.Fatal("expected visible config list cache key to exist")
-	}
-
+	// Invalidate: triggers reload
 	if err := repository.InvalidateVisibleSystemConfigsCache(ctx); err != nil {
 		t.Fatalf("InvalidateVisibleSystemConfigsCache() error = %v", err)
 	}
 
+	// Wait for Pub/Sub delivery in test environment
+	time.Sleep(100 * time.Millisecond)
+
+	// Refreshed call: should return the new key
 	refreshed, err := repository.ListVisibleSystemConfigs(ctx)
 	if err != nil {
 		t.Fatalf("ListVisibleSystemConfigs() refreshed call error = %v", err)

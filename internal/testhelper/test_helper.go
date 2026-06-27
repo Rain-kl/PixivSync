@@ -37,6 +37,11 @@ func SetupTestEnvironment(t *testing.T) (*gorm.DB, *miniredis.Miniredis, func())
 		t.Fatalf("failed to open in-memory SQLite db: %v", err)
 	}
 
+	// Limit to 1 open connection for SQLite :memory: to keep the database in one shared connection
+	if sqlDB, err := sqliteDB.DB(); err == nil {
+		sqlDB.SetMaxOpenConns(1)
+	}
+
 	// AutoMigrate all tables
 	err = sqliteDB.AutoMigrate(
 		&model.User{},
@@ -90,6 +95,8 @@ func SetupTestEnvironment(t *testing.T) (*gorm.DB, *miniredis.Miniredis, func())
 	// Cleanup function
 	cleanup := func() {
 		runExtraCleanups()
+		repository.StopSystemConfigCacheListener()
+		repository.StopAuthSourceCacheListener()
 		repository.ResetSystemConfigRAMCacheForTest()
 		_ = redisClient.Close()
 		mr.Close()

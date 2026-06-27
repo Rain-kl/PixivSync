@@ -13,7 +13,9 @@ import (
 	"github.com/Rain-kl/Wavelet/internal/apps/admin/push/custom_events"
 	"github.com/Rain-kl/Wavelet/internal/apps/risk_control"
 	"github.com/Rain-kl/Wavelet/internal/lifecycle"
+	"github.com/Rain-kl/Wavelet/internal/repository"
 	taskhandlers "github.com/Rain-kl/Wavelet/internal/task/handlers"
+	"github.com/Rain-kl/Wavelet/pkg/cache/ram"
 	"github.com/Rain-kl/Wavelet/pkg/logger"
 )
 
@@ -23,12 +25,58 @@ type Options struct {
 	API bool
 }
 
+// CacheRegistry holds settings for a registered cache type.
+type CacheRegistry struct {
+	Loader ram.Loader
+}
+
 var (
 	registerTasksOnce            sync.Once
 	registerPushDomainEventsOnce sync.Once
 	registerTaskListenersOnce    sync.Once
 	initRuntimeOnce              sync.Once
+
+	cacheRegistries   = make(map[string]CacheRegistry)
+	cacheRegistriesMu sync.RWMutex
+
+	refreshLocks   = make(map[string]*sync.Mutex)
+	refreshLocksMu sync.Mutex
 )
+
+// RegisterCache registers a cache type with its Loader for unified preheating and refreshing.
+func RegisterCache(configType string, reg CacheRegistry) {
+	cacheRegistriesMu.Lock()
+	defer cacheRegistriesMu.Unlock()
+	cacheRegistries[configType] = reg
+}
+
+func getRefreshLock(configType string) *sync.Mutex {
+	refreshLocksMu.Lock()
+	defer refreshLocksMu.Unlock()
+	lock, found := refreshLocks[configType]
+	if !found {
+		lock = &sync.Mutex{}
+		refreshLocks[configType] = lock
+	}
+	return lock
+}
+
+// PreheatAllCaches preheats all registered caches.
+func PreheatAllCaches(ctx context.Context) error {
+	cacheRegistriesMu.RLock()
+	defer cacheRegistriesMu.RUnlock()
+
+	for configType, reg := range cacheRegistries {
+		lock := getRefreshLock(configType)
+		lock.Lock()
+		err := ram.Refresh(ctx, configType, "", reg.Loader)
+		lock.Unlock()
+		if err != nil {
+			logger.ErrorF(ctx, "[Bootstrap] preheating cache type %s failed: %v", configType, err)
+		}
+	}
+	return nil
+}
 
 // RegisterTasks registers all built-in task handlers and metadata.
 func RegisterTasks() {
@@ -79,6 +127,16 @@ func RegisterAll() {
 // Call from cmd entry points after wiring registration and database migration, not from router.
 func Init(ctx context.Context, opts Options) {
 	initRuntimeOnce.Do(func() {
+		// Register config cache loader
+		RegisterCache(repository.ConfigCacheType, CacheRegistry{
+			Loader: repository.ConfigLoader{},
+		})
+
+		// Preheat config cache initially (using PreheatAllCaches)
+		if err := PreheatAllCaches(ctx); err != nil {
+			logger.ErrorF(ctx, "[Bootstrap] preheating all caches failed: %v", err)
+		}
+
 		if err := admin_push.SyncEvents(ctx); err != nil {
 			logger.ErrorF(ctx, "[Bootstrap] sync push events failed: %v", err)
 		}
