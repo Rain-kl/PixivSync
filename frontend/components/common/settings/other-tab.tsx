@@ -1,6 +1,6 @@
 "use client"
 
-import {useMemo, ComponentType} from "react"
+import {ComponentType, useMemo} from "react"
 import {useMutation, useQueryClient} from "@tanstack/react-query"
 import {
   Bell,
@@ -113,7 +113,7 @@ export function OtherTab({ configs }: OtherTabProps) {
     <Card className="border border-dashed shadow-sm">
       <CardHeader className="border-b border-dashed pb-4">
         <div className="flex items-center gap-2">
-          <div className="p-1.5 rounded-lg bg-indigo-500/10 text-indigo-500">
+          <div className="p-1.5 rounded-lg bg-primary/10 text-primary">
             <LayoutList className="size-4" />
           </div>
           <div>
@@ -142,11 +142,11 @@ export function OtherTab({ configs }: OtherTabProps) {
                 return (
                   <div
                     key={item.path}
-                    className="flex items-center justify-between gap-4 rounded-xl border border-dashed p-4 bg-card hover:bg-muted/10 hover:border-indigo-500/30 transition-all duration-300 shadow-sm"
+                    className="flex items-center justify-between gap-4 rounded-xl border border-dashed p-4 bg-card hover:bg-muted/10 hover:border-primary/30 transition-all duration-300 shadow-sm"
                   >
                     <div className="space-y-1.5 flex-1 min-w-0 pr-2">
                       <div className="flex items-center gap-2">
-                        {Icon && <Icon className="size-4 text-indigo-500 shrink-0" />}
+                        {Icon && <Icon className="size-4 text-primary shrink-0" />}
                         <span className="font-medium text-sm text-foreground truncate">{item.label}</span>
                         {isReadOnly && (
                           <span className="text-[9px] px-1.5 py-0.5 rounded bg-muted text-muted-foreground border shrink-0">
@@ -172,8 +172,8 @@ export function OtherTab({ configs }: OtherTabProps) {
           </div>
         ))}
 
-        <div className="p-3.5 rounded-lg border border-dashed border-indigo-500/20 bg-indigo-500/5 flex items-start gap-2.5">
-          <Info className="size-4 text-indigo-500 shrink-0 mt-0.5" />
+        <div className="p-3.5 rounded-lg border border-dashed border-primary/20 bg-primary/5 flex items-start gap-2.5">
+          <Info className="size-4 text-primary shrink-0 mt-0.5" />
           <div className="text-xs text-muted-foreground leading-relaxed">
             <span className="font-semibold text-foreground">安全提示：</span>
             为了防止管理员在关闭“系统设置”后导致无法重新访问此配置页，系统限制了“系统设置”的关闭权限。其它所有菜单均可自由开关，隐藏后对应的分组标题在为空时也会自动隐藏。

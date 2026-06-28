@@ -124,7 +124,7 @@ export function TemplatesManager() {
       <Card className="border border-dashed shadow-sm">
         <CardHeader className="border-b border-dashed pb-4 flex flex-row items-center justify-between gap-4">
           <div className="flex items-center gap-2">
-            <div className="p-1.5 rounded-lg bg-indigo-500/10 text-indigo-500">
+            <div className="p-1.5 rounded-lg bg-primary/10 text-primary">
               <FileText className="size-4" />
             </div>
             <div>
@@ -154,14 +154,14 @@ export function TemplatesManager() {
               {(templatesQuery.data ?? []).map((tmpl) => (
                 <div
                   key={tmpl.id}
-                  className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 rounded-xl border border-dashed p-4 bg-card hover:bg-muted/10 hover:border-indigo-500/30 transition-all duration-300 shadow-sm"
+                  className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 rounded-xl border border-dashed p-4 bg-card hover:bg-muted/10 hover:border-primary/30 transition-all duration-300 shadow-sm"
                 >
                   <div className="space-y-1.5">
                     <div className="flex items-center gap-2 flex-wrap">
                       <span className="font-semibold text-sm text-foreground">{tmpl.name}</span>
                       <span className={`text-[10px] px-2 py-0.5 rounded-full border font-medium ${
                         tmpl.is_system
-                          ? "bg-indigo-500/10 text-indigo-500 border-indigo-500/20"
+                          ? "bg-primary/10 text-primary border-primary/20"
                           : "bg-amber-500/10 text-amber-500 border-amber-500/20"
                       }`}>
                         {tmpl.is_system ? "系统内置" : "自定义"}
@@ -171,7 +171,7 @@ export function TemplatesManager() {
                       </span>
                     </div>
                     <div className="text-xs text-muted-foreground">
-                      标识符: <span className="font-mono text-indigo-500 bg-indigo-500/5 px-1.5 py-0.5 rounded">{tmpl.key}</span>
+                      标识符: <span className="font-mono text-primary bg-primary/5 px-1.5 py-0.5 rounded">{tmpl.key}</span>
                       {tmpl.subject && ` · 主题: ${tmpl.subject}`}
                     </div>
                     {tmpl.description && (
@@ -185,7 +185,7 @@ export function TemplatesManager() {
                       type="button"
                       variant="ghost"
                       size="icon"
-                      className="size-8 text-muted-foreground hover:text-indigo-500 hover:bg-indigo-500/10 rounded-lg transition-colors"
+                      className="size-8 text-muted-foreground hover:text-primary hover:bg-primary/10 rounded-lg transition-colors"
                       onClick={() => handleOpenEdit(tmpl)}
                     >
                       <Pencil className="size-4" />

@@ -99,6 +99,7 @@ func registerAdminIAMRoutes(adminRouter *gin.RouterGroup) {
 		users.POST("", admin_user.CreateUser)
 		users.GET("/:id", admin_user.GetUser)
 		users.PUT("/:id/status", admin_user.UpdateUserStatus)
+		users.PUT("/:id", admin_user.UpdateUser)
 		users.DELETE("/:id", admin_user.DeleteUser)
 	}
 

@@ -310,6 +310,8 @@ export interface ListUsersRequest {
   user_id?: string;
   /** 用户名前缀过滤（可选） */
   username?: string;
+  /** 邮箱前缀过滤（可选） */
+  email?: string;
 }
 
 /**
@@ -346,6 +348,20 @@ export interface CreateUserRequest {
   is_active?: boolean;
   /** 是否管理员 */
   is_admin?: boolean;
+}
+
+/**
+ * 更新用户请求参数
+ */
+export interface UpdateUserRequest {
+  /** 昵称 */
+  nickname?: string;
+  /** 邮箱 */
+  email: string;
+  /** 是否管理员 */
+  is_admin?: boolean;
+  /** 密码（可选重置） */
+  password?: string;
 }
 
 /**

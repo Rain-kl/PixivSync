@@ -194,7 +194,7 @@ export function AccessTokenMain() {
         <CardContent className="pt-6 space-y-4">
           {accessTokensQuery.isPending ? (
             <div className="flex items-center justify-center py-8">
-              <Loader2 className="size-6 animate-spin text-indigo-500" />
+              <Loader2 className="size-6 animate-spin text-primary" />
             </div>
           ) : (accessTokensQuery.data ?? []).length > 0 ? (
             <div className="space-y-3">
@@ -231,7 +231,7 @@ export function AccessTokenMain() {
                       type="button"
                       variant="outline"
                       size="sm"
-                      className="text-xs border-dashed text-muted-foreground hover:text-indigo-500 hover:bg-indigo-500/5 rounded-lg h-8 px-2.5"
+                      className="text-xs border-dashed text-muted-foreground hover:text-primary hover:bg-primary/5 rounded-lg h-8 px-2.5"
                       onClick={() => handleRotateToken(token.id, token.name)}
                       disabled={rotateTokenMutation.isPending}
                     >
@@ -291,7 +291,7 @@ export function AccessTokenMain() {
                   value={tokenName}
                   onChange={(e) => setTokenName(e.target.value)}
                   disabled={createTokenMutation.isPending}
-                  className="rounded-xl border border-dashed focus:border-indigo-500 focus:ring-0 focus-visible:ring-0"
+                  className="rounded-xl border border-dashed focus:border-primary focus:ring-0 focus-visible:ring-0"
                 />
               </div>
               {user?.is_admin && (
@@ -361,15 +361,15 @@ export function AccessTokenMain() {
           {newCreatedToken && (
             <div className="space-y-4 py-2">
               {/* 明文 Token 文本框 */}
-              <div className="flex items-center gap-2 rounded-xl bg-indigo-500/5 border border-dashed border-indigo-500/30 p-3">
-                <span className="font-mono text-xs select-all break-all flex-1 text-indigo-600 font-semibold leading-relaxed">
+              <div className="flex items-center gap-2 rounded-xl bg-primary/5 border border-dashed border-primary/30 p-3">
+                <span className="font-mono text-xs select-all break-all flex-1 text-primary font-semibold leading-relaxed">
                   {newCreatedToken.token}
                 </span>
                 <Button
                   type="button"
                   size="icon"
                   variant="outline"
-                  className="size-8 rounded-lg shrink-0 border-dashed text-indigo-500 hover:bg-indigo-500/10 hover:border-indigo-500/30 transition-colors"
+                  className="size-8 rounded-lg shrink-0 border-dashed text-primary hover:bg-primary/10 hover:border-primary/30 transition-colors"
                   onClick={() => handleCopyText(newCreatedToken.token, 9999)}
                 >
                   {copiedId === 9999 ? (

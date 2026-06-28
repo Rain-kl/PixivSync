@@ -20,6 +20,7 @@ func listUsers(ctx context.Context, req listUsersRequest) (int64, []model.User, 
 	return repository.ListAdminUsers(ctx, repository.AdminUserListFilter{
 		UserID:   req.UserID,
 		Username: strings.TrimSpace(req.Username),
+		Email:    strings.TrimSpace(req.Email),
 		Page:     req.Page,
 		PageSize: req.PageSize,
 	})
@@ -131,4 +132,81 @@ func createUser(ctx context.Context, req createUserRequest) (model.User, error) 
 		return model.User{}, err
 	}
 	return newUser, nil
+}
+
+type updateUserParam struct {
+	ID       uint64
+	Nickname string
+	Email    string
+	IsAdmin  bool
+	Password string
+}
+
+func updateUser(ctx context.Context, currentUserID uint64, param updateUserParam) error {
+	param.Nickname = strings.TrimSpace(param.Nickname)
+	param.Email = strings.TrimSpace(param.Email)
+	param.Password = strings.TrimSpace(param.Password)
+
+	if param.Email == "" {
+		return errors.New(emailRequired)
+	}
+
+	targetUser, err := repository.GetAdminUserDetail(ctx, param.ID)
+	if err != nil {
+		return err
+	}
+
+	// 不能撤销当前登录用户的管理员权限
+	if currentUserID == param.ID && !param.IsAdmin && targetUser.IsAdmin {
+		return errors.New(cannotRevokeSelfAdmin)
+	}
+
+	// 如果修改了邮箱，检查邮箱是否被其他用户占用
+	if targetUser.Email != param.Email {
+		count, err := repository.CountUsersByEmail(ctx, param.Email)
+		if err != nil {
+			return err
+		}
+		if count > 0 {
+			return errors.New(emailExists)
+		}
+	}
+
+	// 密码强度校验（如果输入了新密码）
+	if param.Password != "" && len(param.Password) < minPasswordLength {
+		return errors.New(passwordTooShort)
+	}
+
+	// 是否需要撤销 Token (重置密码或取消管理员)
+	needRevokeTokens := (param.Password != "") || (targetUser.IsAdmin && !param.IsAdmin)
+	var tokens []model.AccessToken
+	if needRevokeTokens {
+		_ = db.DB(ctx).Where("user_id = ?", param.ID).Find(&tokens).Error
+	}
+
+	// 更新字段
+	targetUser.Nickname = param.Nickname
+	if targetUser.Nickname == "" {
+		targetUser.Nickname = targetUser.Username
+	}
+	targetUser.Email = param.Email
+	targetUser.IsAdmin = param.IsAdmin
+
+	if param.Password != "" {
+		if err := targetUser.SetEncryptedPassword(param.Password); err != nil {
+			return err
+		}
+	}
+
+	// 执行更新
+	err = repository.UpdateUser(ctx, &targetUser)
+	if err == nil {
+		oauth.InvalidateCachedUser(ctx, param.ID)
+		if needRevokeTokens {
+			for _, token := range tokens {
+				oauth.InvalidateCachedToken(ctx, token.TokenHash)
+			}
+		}
+	}
+	return err
 }

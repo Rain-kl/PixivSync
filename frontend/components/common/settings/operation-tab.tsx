@@ -88,7 +88,7 @@ export function OperationTab({ configs, systemConfigsQuery }: OperationTabProps)
       <Card className="border border-dashed shadow-sm">
         <CardHeader className="border-b border-dashed pb-4">
           <div className="flex items-center gap-2">
-            <div className="p-1.5 rounded-lg bg-indigo-500/10 text-indigo-500">
+            <div className="p-1.5 rounded-lg bg-primary/10 text-primary">
               <KeyRound className="size-4" />
             </div>
             <div>
@@ -125,9 +125,9 @@ export function OperationTab({ configs, systemConfigsQuery }: OperationTabProps)
             </div>
 
             {/* 当前白名单列表 */}
-            <div className="rounded-xl border border-dashed p-4 bg-card hover:bg-muted/10 hover:border-indigo-500/30 transition-all duration-300 shadow-sm space-y-3">
+            <div className="rounded-xl border border-dashed p-4 bg-card hover:bg-muted/10 hover:border-primary/30 transition-all duration-300 shadow-sm space-y-3">
               <div className="flex items-center gap-2">
-                <ShieldAlert className="size-4 text-indigo-500" />
+                <ShieldAlert className="size-4 text-primary" />
                 <span className="font-medium text-sm text-foreground">当前免鉴权列表</span>
               </div>
 
@@ -137,14 +137,14 @@ export function OperationTab({ configs, systemConfigsQuery }: OperationTabProps)
                     <Badge
                       key={type}
                       variant="secondary"
-                      className="px-2.5 py-1 text-xs gap-1.5 flex items-center bg-indigo-500/10 text-indigo-700 dark:text-indigo-300 dark:bg-indigo-500/20 border border-indigo-500/20"
+                      className="px-2.5 py-1 text-xs gap-1.5 flex items-center bg-primary/10 text-primary dark:bg-primary/20 border border-primary/20"
                     >
                       {availableTypes.find(t => t.value === type)?.label || type}
                       <button
                         type="button"
                         onClick={() => handleRemoveType(type)}
                         disabled={updateWhitelistMutation.isPending || systemConfigsQuery.isPending}
-                        className="rounded-full outline-hidden hover:bg-indigo-500/20 p-0.5 text-indigo-600 dark:text-indigo-400 cursor-pointer disabled:cursor-not-allowed"
+                        className="rounded-full outline-hidden hover:bg-primary/20 p-0.5 text-primary cursor-pointer disabled:cursor-not-allowed"
                       >
                         <X className="size-3" />
                       </button>

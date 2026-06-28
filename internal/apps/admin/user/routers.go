@@ -28,6 +28,7 @@ type listUsersRequest struct {
 	PageSize int     `form:"page_size" binding:"min=1,max=100"`
 	UserID   *uint64 `form:"user_id" binding:"omitempty,gt=0"`
 	Username string  `form:"username"`
+	Email    string  `form:"email"`
 }
 
 type user struct {
@@ -288,4 +289,60 @@ func CreateUser(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, response.OK(toUser(newUser)))
+}
+
+// updateUserRequest 更新用户信息请求
+type updateUserRequest struct {
+	Nickname string `json:"nickname" binding:"max=64"`
+	Email    string `json:"email" binding:"required,email,max=255"`
+	IsAdmin  bool   `json:"is_admin"`
+	Password string `json:"password" binding:"omitempty,min=8,max=64"`
+}
+
+// UpdateUser 更新用户信息
+// @Summary 更新用户信息
+// @Description 更新指定用户的昵称、邮箱、管理员权限，并可选重置密码，需要管理员权限
+// @Tags admin
+// @Accept json
+// @Produce json
+// @Security SessionCookie
+// @Param id path int true "用户 ID"
+// @Param request body user.updateUserRequest true "更新参数"
+// @Success 200 {object} response.Any{data=string} "更新成功"
+// @Failure 400 {object} response.Any "参数错误"
+// @Failure 401 {object} response.Any "未登录"
+// @Failure 403 {object} response.Any "无管理员权限或尝试修改自身权限"
+// @Failure 404 {object} response.Any "用户不存在"
+// @Failure 500 {object} response.Any "内部错误"
+// @Router /api/v1/admin/users/{id} [put]
+func UpdateUser(c *gin.Context) {
+	var req updateUserRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		response.AbortBadRequest(c, err.Error())
+		return
+	}
+
+	id, ok := parseUserID(c)
+	if !ok {
+		return
+	}
+
+	currUser, _ := oauth.GetFromContext[*model.User](c, oauth.UserObjKey)
+	err := updateUser(c.Request.Context(), currUser.ID, updateUserParam{
+		ID:       id,
+		Nickname: req.Nickname,
+		Email:    req.Email,
+		IsAdmin:  req.IsAdmin,
+		Password: req.Password,
+	})
+
+	if err != nil {
+		if abortUserLogicError(c, err, userNotFound, []string{cannotRevokeSelfAdmin}, []string{emailRequired, emailExists, passwordTooShort}) {
+			return
+		}
+		response.AbortInternal(c, updateUserInfoFailed)
+		return
+	}
+
+	c.JSON(http.StatusOK, response.OKNil())
 }

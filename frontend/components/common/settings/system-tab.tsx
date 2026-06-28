@@ -193,7 +193,7 @@ export function SystemTab({ configs, systemConfigsQuery }: SystemTabProps) {
       <Card className="border border-dashed shadow-sm">
         <CardHeader className="border-b border-dashed pb-4">
           <div className="flex items-center gap-2">
-            <div className="rounded-lg bg-indigo-500/10 p-1.5 text-indigo-500">
+            <div className="rounded-lg bg-primary/10 p-1.5 text-primary">
               <Server className="size-4" />
             </div>
             <div>
@@ -310,7 +310,7 @@ export function SystemTab({ configs, systemConfigsQuery }: SystemTabProps) {
       <Card className="border border-dashed shadow-sm">
         <CardHeader className="border-b border-dashed pb-4">
           <div className="flex items-center gap-2">
-            <div className="p-1.5 rounded-lg bg-indigo-500/10 text-indigo-500">
+            <div className="p-1.5 rounded-lg bg-primary/10 text-primary">
               <Mail className="size-4" />
             </div>
             <div>

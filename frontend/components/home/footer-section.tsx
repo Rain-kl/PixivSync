@@ -1,7 +1,7 @@
 import * as React from "react";
 import {cn} from "@/lib/utils";
 import Link from "next/link";
-import {Github, LucideIcon} from "lucide-react";
+import {Github, LucideIcon, WavesIcon} from "lucide-react";
 
 export interface FooterSectionProps {
   className?: string;
@@ -19,10 +19,10 @@ export const FooterSection = React.memo(function FooterSection({ className }: Fo
 
           <div className="lg:col-span-2 space-y-6">
             <Link href="/" className="flex items-center gap-2">
-              <div className="w-10 h-10 p-2 rounded bg-primary text-sm text-primary-foreground flex items-center justify-center font-bold">
-                MP
-              </div>
-              <span className="text-2xl font-bold tracking-tight text-foreground">Modern Platform</span>
+              <span className="flex size-9 items-center justify-center rounded-full bg-foreground text-background [@media(max-height:700px)]:size-8">
+                <WavesIcon aria-hidden="true" />
+              </span>
+              <span className="text-2xl font-bold tracking-tight text-foreground">Wavelet</span>
             </Link>
             <p className="text-muted-foreground text-base leading-relaxed max-w-sm">
               通用的、现代化的后台管理系统脚手架。基于 Go + React 构建，开箱即用、完整基建、极易扩展。

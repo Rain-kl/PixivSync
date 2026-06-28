@@ -1,14 +1,14 @@
 "use client"
 
 import * as React from "react"
-import {Globe, Loader2, Mail, MapPin, ShieldCheck, Smartphone, Trash2, UserCheck,} from "lucide-react"
+import {Globe, Loader2, Mail, MapPin, ShieldCheck, Smartphone, UserCheck,} from "lucide-react"
 
 import {Button} from "@/components/ui/button"
 import {Badge} from "@/components/ui/badge"
 import {Avatar, AvatarFallback, AvatarImage} from "@/components/ui/avatar"
 import {Sheet, SheetContent, SheetTitle} from "@/components/ui/sheet"
 import type {AdminUser} from "@/lib/services/admin"
-import {cn, formatDateTime} from "@/lib/utils"
+import {formatDateTime} from "@/lib/utils"
 
 interface UserDetailSheetProps {
   selectedUser: AdminUser | null
@@ -16,7 +16,6 @@ interface UserDetailSheetProps {
   onOpenChange: (open: boolean) => void
   detailLoading: boolean
   onStatusToggle: (user: AdminUser) => Promise<void>
-  onDeleteTarget: (user: AdminUser) => void
 }
 
 export function UserDetailSheet({
@@ -25,7 +24,6 @@ export function UserDetailSheet({
   onOpenChange,
   detailLoading,
   onStatusToggle,
-  onDeleteTarget,
 }: UserDetailSheetProps) {
 
   const displayValue = (value?: string) => value && value.trim() ? value : "-"
@@ -56,7 +54,7 @@ export function UserDetailSheet({
                           UID: {selectedUser.id}
                         </Badge>
                         {selectedUser.is_admin && (
-                          <Badge className="h-4.5 px-1.5 text-[9px] uppercase font-medium bg-primary text-primary-foreground">
+                          <Badge className="h-4.5 px-1.5 text-[9px] uppercase font-medium">
                             Admin
                           </Badge>
                         )}
@@ -156,15 +154,10 @@ export function UserDetailSheet({
               </div>
 
               {!selectedUser.is_admin && (
-                <div className="p-4 border-t bg-background/80 backdrop-blur-md shrink-0 flex flex-col gap-2">
+                <div className="p-4 border-t bg-background/80 backdrop-blur-md shrink-0">
                   <Button
                     variant={selectedUser.is_active ? "destructive" : "default"}
-                    className={cn(
-                      "w-full h-9 text-xs font-medium transition-all active:scale-[0.98]",
-                      selectedUser.is_active
-                        ? "bg-red-500 hover:bg-red-600 text-white"
-                        : "bg-primary text-primary-foreground hover:bg-primary/90"
-                    )}
+                    className="w-full h-9 text-xs font-medium transition-all active:scale-[0.98]"
                     onClick={() => onStatusToggle(selectedUser)}
                   >
                     {selectedUser.is_active ? (
@@ -178,14 +171,6 @@ export function UserDetailSheet({
                         解除封禁
                       </>
                     )}
-                  </Button>
-                  <Button
-                    variant="outline"
-                    className="w-full h-9 text-xs font-medium"
-                    onClick={() => onDeleteTarget(selectedUser)}
-                  >
-                    <Trash2 className="size-3 mr-1" />
-                    删除用户
                   </Button>
                 </div>
               )}

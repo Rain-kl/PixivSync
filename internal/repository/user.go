@@ -55,6 +55,7 @@ func GetFirstAdminUser(ctx context.Context) (model.User, error) {
 type AdminUserListFilter struct {
 	UserID   *uint64
 	Username string
+	Email    string
 	Page     int
 	PageSize int
 }
@@ -68,6 +69,9 @@ func ListAdminUsers(ctx context.Context, filter AdminUserListFilter) (int64, []m
 	if filter.Username != "" {
 		query = query.Where("username LIKE ?", filter.Username+"%")
 	}
+	if filter.Email != "" {
+		query = query.Where("email LIKE ?", filter.Email+"%")
+	}
 
 	var total int64
 	if err := query.Count(&total).Error; err != nil {
@@ -77,7 +81,7 @@ func ListAdminUsers(ctx context.Context, filter AdminUserListFilter) (int64, []m
 	var users []model.User
 	offset := (filter.Page - 1) * filter.PageSize
 	if err := query.
-		Select("id, username, nickname, avatar_url, is_active, is_admin, last_login_at, created_at, updated_at").
+		Select("id, username, nickname, email, avatar_url, is_active, is_admin, last_login_at, created_at, updated_at").
 		Order("id ASC").
 		Offset(offset).
 		Limit(filter.PageSize).
@@ -169,4 +173,9 @@ func ListUsersByIDs(ctx context.Context, ids []uint64) ([]model.User, error) {
 		return nil, err
 	}
 	return users, nil
+}
+
+// UpdateUser updates all fields of an existing user.
+func UpdateUser(ctx context.Context, user *model.User) error {
+	return db.DB(ctx).Save(user).Error
 }

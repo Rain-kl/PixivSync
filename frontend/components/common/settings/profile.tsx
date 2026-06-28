@@ -45,8 +45,8 @@ import {
 } from "@/components/ui/dialog"
 import {Select, SelectContent, SelectItem, SelectTrigger, SelectValue,} from "@/components/ui/select"
 import {Label} from "@/components/ui/label"
-import {AuthService} from "@/lib/services/auth"
 import type {ChangePasswordRequest, UpdateProfileRequest} from "@/lib/services/auth"
+import {AuthService} from "@/lib/services/auth"
 import services from "@/lib/services"
 import {ImageCrop, ImageCropApply, ImageCropContent, ImageCropReset} from "@/components/ui/image-crop"
 import {toast} from "sonner"
@@ -275,7 +275,7 @@ export function ProfileMain() {
           >
             <Avatar className="size-20 md:size-24 border-2 border-primary/10 shadow-md">
               <AvatarImage src={user.avatar_url} alt={user.nickname || user.username} />
-              <AvatarFallback className="text-2xl bg-indigo-600 text-white font-bold">
+              <AvatarFallback className="text-2xl bg-primary text-primary-foreground font-bold">
                 {(user.nickname || user.username).slice(0, 2).toUpperCase()}
               </AvatarFallback>
             </Avatar>
@@ -342,7 +342,7 @@ export function ProfileMain() {
                       href={user.website.startsWith("http") ? user.website : `http://${user.website}`}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="text-indigo-600 hover:underline"
+                      className="text-primary hover:underline"
                     >
                       {user.website}
                     </a>
@@ -473,7 +473,7 @@ export function ProfileMain() {
         <div className="space-y-6 bg-card border border-dashed rounded-lg p-6 flex flex-col justify-between">
           <div>
             <div className="border-b pb-4 flex items-center gap-2">
-              <div className="p-1.5 rounded-lg bg-indigo-500/10 text-indigo-500">
+              <div className="p-1.5 rounded-lg bg-primary/10 text-primary">
                 <Link2 className="size-4" />
               </div>
               <div>
@@ -487,7 +487,7 @@ export function ProfileMain() {
               <h3 className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">已绑定账号</h3>
               {externalAccountBindingsQuery.isPending ? (
                 <div className="flex items-center justify-center py-4">
-                  <Loader2 className="size-4 animate-spin text-indigo-500" />
+                  <Loader2 className="size-4 animate-spin text-primary" />
                 </div>
               ) : (externalAccountBindingsQuery.data ?? []).length > 0 ? (
                 <div className="space-y-2">
@@ -534,7 +534,7 @@ export function ProfileMain() {
               <h3 className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">绑定新账号</h3>
               {publicAuthSourcesQuery.isPending ? (
                 <div className="flex items-center justify-center py-4">
-                  <Loader2 className="size-4 animate-spin text-indigo-500" />
+                  <Loader2 className="size-4 animate-spin text-primary" />
                 </div>
               ) : (publicAuthSourcesQuery.data ?? []).length > 0 ? (
                 <div className="grid grid-cols-1 gap-2">
@@ -543,16 +543,16 @@ export function ProfileMain() {
                       key={source.id}
                       type="button"
                       variant="outline"
-                      className="flex items-center justify-between w-full border border-dashed rounded-xl px-3 py-2 text-left font-normal text-xs hover:bg-indigo-500/5 hover:text-indigo-500 hover:border-indigo-500/30 transition-all duration-300 group h-8"
+                      className="flex items-center justify-between w-full border border-dashed rounded-xl px-3 py-2 text-left font-normal text-xs hover:bg-primary/5 hover:text-primary hover:border-primary/30 transition-all duration-300 group h-8"
                       onClick={() => {
                         void bindSourceMutation.mutateAsync(source.name)
                       }}
                     >
                       <div className="flex items-center gap-1.5">
-                        <Link2 className="size-3 text-muted-foreground group-hover:text-indigo-500" />
+                        <Link2 className="size-3 text-muted-foreground group-hover:text-primary" />
                         <span>绑定 {source.display_name || source.name}</span>
                       </div>
-                      <ArrowRight className="size-3 opacity-0 -translate-x-1 group-hover:opacity-100 group-hover:translate-x-0 transition-all text-indigo-500" />
+                      <ArrowRight className="size-3 opacity-0 -translate-x-1 group-hover:opacity-100 group-hover:translate-x-0 transition-all text-primary" />
                     </Button>
                   ))}
                 </div>
@@ -583,7 +583,7 @@ export function ProfileMain() {
               >
                 <Avatar className="size-20 border-2 border-primary/5 shadow-md">
                   <AvatarImage src={avatarUrl} alt={nickname} />
-                  <AvatarFallback className="text-xl bg-indigo-600 text-white font-bold">
+                  <AvatarFallback className="text-xl bg-primary text-primary-foreground font-bold">
                     {(nickname || "U").slice(0, 2).toUpperCase()}
                   </AvatarFallback>
                 </Avatar>

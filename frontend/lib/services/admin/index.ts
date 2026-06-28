@@ -27,6 +27,7 @@ export type {
   ListUsersRequest,
   ListUsersResponse,
   UpdateUserStatusRequest,
+  UpdateUserRequest,
   SystemStatus,
   AppUpdateStatus,
   Schedule,

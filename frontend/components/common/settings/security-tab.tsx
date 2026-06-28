@@ -245,7 +245,7 @@ export function SecurityTab({ configs, systemConfigsQuery }: SecurityTabProps) {
       <Card className="border border-dashed shadow-sm">
         <CardHeader className="border-b border-dashed pb-4">
           <div className="flex items-center gap-2">
-            <div className="p-1.5 rounded-lg bg-indigo-500/10 text-indigo-500">
+            <div className="p-1.5 rounded-lg bg-primary/10 text-primary">
               <Settings className="size-4" />
             </div>
             <div>
@@ -263,11 +263,11 @@ export function SecurityTab({ configs, systemConfigsQuery }: SecurityTabProps) {
               return (
                 <div
                   key={item.key}
-                  className="flex items-center justify-between gap-4 rounded-xl border border-dashed p-4 bg-card hover:bg-muted/10 hover:border-indigo-500/30 transition-all duration-300 shadow-sm"
+                  className="flex items-center justify-between gap-4 rounded-xl border border-dashed p-4 bg-card hover:bg-muted/10 hover:border-primary/30 transition-all duration-300 shadow-sm"
                 >
                   <div className="space-y-1">
                     <div className="flex items-center gap-2">
-                      {Icon && <Icon className="size-4 text-indigo-500" />}
+                      {Icon && <Icon className="size-4 text-primary" />}
                       <span className="font-medium text-sm text-foreground">{item.title}</span>
                     </div>
                     <p className="text-xs text-muted-foreground leading-relaxed pr-2">{item.description}</p>
@@ -283,11 +283,11 @@ export function SecurityTab({ configs, systemConfigsQuery }: SecurityTabProps) {
 
             {/* 登录状态保持时间 (选择后立即更改) */}
             <div
-              className="flex items-center justify-between gap-4 rounded-xl border border-dashed p-4 bg-card hover:bg-muted/10 hover:border-indigo-500/30 transition-all duration-300 shadow-sm md:col-span-2"
+              className="flex items-center justify-between gap-4 rounded-xl border border-dashed p-4 bg-card hover:bg-muted/10 hover:border-primary/30 transition-all duration-300 shadow-sm md:col-span-2"
             >
               <div className="space-y-1 pr-4">
                 <div className="flex items-center gap-2">
-                  <Clock className="size-4 text-indigo-500" />
+                  <Clock className="size-4 text-primary" />
                   <span className="font-medium text-sm text-foreground">登录状态保持时间</span>
                 </div>
                 <p className="text-xs text-muted-foreground leading-relaxed pr-2">
@@ -340,7 +340,7 @@ export function SecurityTab({ configs, systemConfigsQuery }: SecurityTabProps) {
       <Card className="border border-dashed shadow-sm">
         <CardHeader className="border-b border-dashed pb-4 flex flex-row items-center justify-between gap-4">
           <div className="flex items-center gap-2">
-            <div className="p-1.5 rounded-lg bg-indigo-500/10 text-indigo-500">
+            <div className="p-1.5 rounded-lg bg-primary/10 text-primary">
               <Globe className="size-4" />
             </div>
             <div>
@@ -390,7 +390,7 @@ export function SecurityTab({ configs, systemConfigsQuery }: SecurityTabProps) {
                 <div className="flex items-center gap-4">
                   <span className={`text-xs px-2.5 py-1 rounded-lg border font-medium hidden sm:inline-block ${
                     source.client_secret_configured
-                      ? "bg-indigo-500/5 text-indigo-500 border-indigo-500/10"
+                      ? "bg-primary/5 text-primary border-primary/10"
                       : "bg-rose-500/5 text-rose-500 border-rose-500/10"
                   }`}>
                     {source.client_secret_configured ? "Secret 已配置" : "Secret 未配置"}
@@ -407,7 +407,7 @@ export function SecurityTab({ configs, systemConfigsQuery }: SecurityTabProps) {
                       type="button"
                       variant="ghost"
                       size="icon"
-                      className="size-8 text-muted-foreground hover:text-indigo-500 hover:bg-indigo-500/10 rounded-lg transition-colors"
+                      className="size-8 text-muted-foreground hover:text-primary hover:bg-primary/10 rounded-lg transition-colors"
                       onClick={() => {
                         setSelectedSource(source)
                         setAuthSourceModalOpen(true)
@@ -458,7 +458,7 @@ export function SecurityTab({ configs, systemConfigsQuery }: SecurityTabProps) {
       <Card className="border border-dashed shadow-sm">
         <CardHeader className="border-b border-dashed pb-4 flex flex-row items-center justify-between gap-4">
           <div className="flex items-center gap-2">
-            <div className="p-1.5 rounded-lg bg-indigo-500/10 text-indigo-500">
+            <div className="p-1.5 rounded-lg bg-primary/10 text-primary">
               <Shield className="size-4" />
             </div>
             <div>

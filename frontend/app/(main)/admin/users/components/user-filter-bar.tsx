@@ -18,17 +18,19 @@ export function UserFilterBar() {
     pageSize,
     searchUserId,
     searchUsername,
+    searchEmail,
     statusFilter,
     setPage,
     setPageSize,
     setSearchUserId,
     setSearchUsername,
+    setSearchEmail,
     setStatusFilter,
     fetchUsers
   } = useAdminUsers()
 
   const totalPages = Math.ceil(total / pageSize)
-  const hasSearchFilter = Boolean(searchUserId || searchUsername)
+  const hasSearchFilter = Boolean(searchUserId || searchUsername || searchEmail)
 
   return (
     <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-3">
@@ -49,8 +51,8 @@ export function UserFilterBar() {
                 <>
                   <Separator orientation="vertical" className="mx-1" />
                   <Badge
-                    variant="secondary"
-                    className="text-[10px] h-3 px-1 rounded-full bg-primary text-primary-foreground"
+                    variant="default"
+                    className="text-[10px] h-3 px-1 rounded-full"
                   >
                     !
                   </Badge>
@@ -72,6 +74,12 @@ export function UserFilterBar() {
                 value={searchUsername}
                 onChange={(e) => setSearchUsername(e.target.value)}
               />
+              <input
+                className="w-full h-7 px-2 text-xs border border-dashed rounded-md outline-none focus:border-primary bg-background"
+                placeholder="输入邮箱..."
+                value={searchEmail}
+                onChange={(e) => setSearchEmail(e.target.value)}
+              />
               {hasSearchFilter && (
                 <Button
                   variant="ghost"
@@ -80,6 +88,7 @@ export function UserFilterBar() {
                   onClick={() => {
                     setSearchUserId("")
                     setSearchUsername("")
+                    setSearchEmail("")
                   }}
                 >
                   清除
@@ -105,8 +114,8 @@ export function UserFilterBar() {
                 <>
                   <Separator orientation="vertical" className="mx-1" />
                   <Badge
-                    variant="secondary"
-                    className="text-[10px] h-3 px-1 rounded-full bg-primary text-primary-foreground"
+                    variant="default"
+                    className="text-[10px] h-3 px-1 rounded-full"
                   >
                     1
                   </Badge>
@@ -160,6 +169,7 @@ export function UserFilterBar() {
               onClick={() => {
                 setSearchUserId("")
                 setSearchUsername("")
+                setSearchEmail("")
                 setStatusFilter('all')
               }}
               className="h-5 px-2 lg:px-3 text-[11px] font-medium text-muted-foreground hover:text-foreground"

@@ -6,18 +6,8 @@ import {Switch} from "@/components/ui/switch"
 import {Table, TableBody, TableCell, TableHead, TableHeader, TableRow} from "@/components/ui/table"
 import {Badge} from "@/components/ui/badge"
 import {Avatar, AvatarFallback, AvatarImage} from "@/components/ui/avatar"
-import {Eye, Layers, Loader2, Plus, Trash2, UserRound, UserX,} from "lucide-react"
+import {Eye, Layers, Pencil, Plus, UserRound, UserX,} from "lucide-react"
 import {Tooltip, TooltipContent, TooltipProvider, TooltipTrigger} from "@/components/ui/tooltip"
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle
-} from "@/components/ui/alert-dialog"
 
 import type {AdminUser} from "@/lib/services/admin"
 import {formatDateTime} from "@/lib/utils"
@@ -28,6 +18,7 @@ import {useAdminUsers} from "@/contexts/admin-users-context"
 import {CreateUserModal} from "./components/create-user-modal"
 import {UserFilterBar} from "./components/user-filter-bar"
 import {UserDetailSheet} from "./components/user-detail-sheet"
+import {EditUserModal} from "./components/edit-user-modal"
 
 export default function UsersPage() {
   const {
@@ -36,16 +27,14 @@ export default function UsersPage() {
     error,
     fetchUsers,
     getUserDetail,
-    updateUserStatus,
-    deleteUser
+    updateUserStatus
   } = useAdminUsers()
 
   const [selectedUser, setSelectedUser] = useState<AdminUser | null>(null)
   const [detailOpen, setDetailOpen] = useState(false)
   const [detailLoading, setDetailLoading] = useState(false)
-  const [deleteTarget, setDeleteTarget] = useState<AdminUser | null>(null)
-  const [deleteLoading, setDeleteLoading] = useState(false)
   const [createModalOpen, setCreateModalOpen] = useState(false)
+  const [editTarget, setEditTarget] = useState<AdminUser | null>(null)
 
   useEffect(() => {
     fetchUsers()
@@ -74,21 +63,7 @@ export default function UsersPage() {
     }
   }
 
-  const handleDeleteUser = async () => {
-    if (!deleteTarget) return
 
-    setDeleteLoading(true)
-    try {
-      await deleteUser(deleteTarget)
-      if (selectedUser?.id === deleteTarget.id) {
-        setDetailOpen(false)
-        setSelectedUser(null)
-      }
-      setDeleteTarget(null)
-    } finally {
-      setDeleteLoading(false)
-    }
-  }
 
   return (
     <div className="py-6 space-y-4">
@@ -125,7 +100,8 @@ export default function UsersPage() {
               <TableRow className="border-b border-dashed hover:bg-transparent">
                 <TableHead className="w-[90px] whitespace-nowrap py-2 h-8">ID</TableHead>
                 <TableHead className="w-[120px] whitespace-nowrap py-2 h-8">用户</TableHead>
-                <TableHead className="whitespace-nowrap min-w-[140px] py-2 h-8 pl-4">上次登陆</TableHead>
+                <TableHead className="whitespace-nowrap min-w-[160px] py-2 h-8 pl-4">邮箱</TableHead>
+                <TableHead className="whitespace-nowrap min-w-[140px] py-2 h-8">上次登陆</TableHead>
                 <TableHead className="whitespace-nowrap min-w-[140px] py-2 h-8">注册时间</TableHead>
                 <TableHead className="whitespace-nowrap min-w-[140px] py-2 h-8">上次更新</TableHead>
                 <TableHead className="sticky right-0 text-center bg-background z-10 w-[110px] py-2 h-8">操作</TableHead>
@@ -164,6 +140,10 @@ export default function UsersPage() {
                   </TableCell>
 
                   <TableCell className="text-[10px] text-muted-foreground font-mono whitespace-nowrap py-1 pl-4">
+                    {user.email || "-"}
+                  </TableCell>
+
+                  <TableCell className="text-[10px] text-muted-foreground font-mono whitespace-nowrap py-1 pl-4">
                     {formatDateTime(user.last_login_at)}
                   </TableCell>
                   <TableCell className="text-[10px] text-muted-foreground font-mono whitespace-nowrap py-1">
@@ -181,7 +161,7 @@ export default function UsersPage() {
                                 checked={user.is_active}
                                 onCheckedChange={() => handleStatusToggle(user)}
                                 disabled={user.is_admin}
-                                className="scale-75 data-[state=checked]:bg-green-600 h-4 w-7"
+                                className="scale-75"
                               />
                             </div>
                           </TooltipTrigger>
@@ -201,23 +181,18 @@ export default function UsersPage() {
                           </TooltipContent>
                         </Tooltip>
 
-                      {!user.is_admin && (
-                          <Tooltip>
-                            <TooltipTrigger asChild>
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                className="h-6 w-6 text-muted-foreground hover:text-destructive"
-                                onClick={() => setDeleteTarget(user)}
-                              >
-                                <Trash2 className="size-3" />
-                              </Button>
-                            </TooltipTrigger>
-                            <TooltipContent side="top" className="text-xs">
-                              删除用户
-                            </TooltipContent>
-                          </Tooltip>
-                      )}
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Button variant="ghost" size="icon" className="h-6 w-6 text-muted-foreground hover:text-foreground" onClick={() => setEditTarget(user)}>
+                              <Pencil className="size-3" />
+                            </Button>
+                          </TooltipTrigger>
+                          <TooltipContent side="top" className="text-xs">
+                            编辑用户
+                          </TooltipContent>
+                        </Tooltip>
+
+
                     </div>
                   </TableCell>
                 </TableRow>
@@ -235,27 +210,16 @@ export default function UsersPage() {
         onOpenChange={setDetailOpen}
         detailLoading={detailLoading}
         onStatusToggle={handleStatusToggle}
-        onDeleteTarget={setDeleteTarget}
       />
 
-      {/* 删除确认警告弹窗 */}
-      <AlertDialog open={!!deleteTarget} onOpenChange={(open) => !open && !deleteLoading && setDeleteTarget(null)}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>确认删除用户</AlertDialogTitle>
-            <AlertDialogDescription>
-              确定要删除用户 {deleteTarget?.nickname || deleteTarget?.username} 吗？该操作会移除用户账号，删除后无法撤销。
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel disabled={deleteLoading}>取消</AlertDialogCancel>
-            <AlertDialogAction onClick={handleDeleteUser} disabled={deleteLoading}>
-              {deleteLoading && <Loader2 className="size-3 animate-spin" />}
-              确认删除
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+      {/* 编辑用户弹窗 */}
+      <EditUserModal
+        user={editTarget}
+        isOpen={!!editTarget}
+        onClose={() => setEditTarget(null)}
+      />
+
+
 
       {/* 新建用户模态弹窗 */}
       <CreateUserModal isOpen={createModalOpen} onClose={() => setCreateModalOpen(false)} />
