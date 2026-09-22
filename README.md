@@ -40,7 +40,7 @@ Pixiv Sync 是专为 Pixiv 和 PixEz 用户打造的云端数据伴侣。从此�
 ```yaml
 services:
   wavelet:
-    image: ghcr.io/rain-kl/pixezsync:latest
+    image: ghcr.io/rain-kl/pixivsync:latest
     restart: unless-stopped
     env_file: .env
     environment:
@@ -200,8 +200,8 @@ This project is licensed under the [GNU Affero General Public License v3.0](LICE
 
 <a href="https://www.star-history.com/?repos=Rain-kl%2FPixezSync&type=date&legend=top-left">
  <picture>
-   <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/chart?repos=Rain-kl/PixezSync&type=date&theme=dark&legend=bottom-right" />
-   <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/chart?repos=Rain-kl/PixezSync&type=date&legend=bottom-right" />
-   <img alt="Star History Chart" src="https://api.star-history.com/chart?repos=Rain-kl/PixezSync&type=date&legend=bottom-right" />
+   <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/chart?repos=Rain-kl/PixivSync&type=date&theme=dark&legend=bottom-right" />
+   <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/chart?repos=Rain-kl/PixivSync&type=date&legend=bottom-right" />
+   <img alt="Star History Chart" src="https://api.star-history.com/chart?repos=Rain-kl/PixivSync&type=date&legend=bottom-right" />
  </picture>
 </a>
