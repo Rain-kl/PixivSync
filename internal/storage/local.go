@@ -90,30 +90,32 @@ func (b *localBackend) Test(_ context.Context) error {
 	return os.MkdirAll(b.root, storageDirPerm)
 }
 
+func isWithinRoot(root, target string) bool {
+	absRoot, err := filepath.Abs(root)
+	if err != nil {
+		return false
+	}
+	absTarget, err := filepath.Abs(target)
+	if err != nil {
+		return false
+	}
+	rel, err := filepath.Rel(absRoot, absTarget)
+	return err == nil && !strings.HasPrefix(rel, "..")
+}
+
 func (b *localBackend) path(key string) (string, error) {
 	if filepath.IsAbs(key) {
 		cleanPath := filepath.Clean(key)
-		absRoot, err := filepath.Abs(b.root)
-		if err != nil {
-			return "", err
+		if isWithinRoot(b.root, cleanPath) {
+			return cleanPath, nil
 		}
-		absPath, err := filepath.Abs(cleanPath)
-		if err != nil {
-			return "", err
-		}
-		rel, err := filepath.Rel(absRoot, absPath)
-		if err != nil || strings.HasPrefix(rel, "..") {
-			return "", fmt.Errorf("storage key escapes local root")
-		}
-		return cleanPath, nil
 	}
 	cleanKey := filepath.Clean(filepath.FromSlash(strings.TrimPrefix(key, "/")))
 	if cleanKey == "." || cleanKey == "" || strings.HasPrefix(cleanKey, "..") {
 		return "", fmt.Errorf("invalid local storage key %q", key)
 	}
 	path := filepath.Join(b.root, cleanKey)
-	rel, err := filepath.Rel(b.root, path)
-	if err != nil || strings.HasPrefix(rel, "..") {
+	if !isWithinRoot(b.root, path) {
 		return "", fmt.Errorf("storage key escapes local root")
 	}
 	return path, nil

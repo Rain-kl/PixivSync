@@ -48,4 +48,20 @@ func TestLocalBackendRoundTrip(t *testing.T) {
 	if _, err := backend.Get(ctx, key); err == nil {
 		t.Errorf("Get(%q) after Delete() returned nil error", key)
 	}
+
+	// Test key with leading slash
+	slashKey := "/uploads/2026/06/13/slash_test.txt"
+	putSlashRes, err := backend.Put(ctx, slashKey, bytes.NewBufferString(content), int64(len(content)), "text/plain")
+	if err != nil {
+		t.Fatalf("Put(%q) returned error: %v", slashKey, err)
+	}
+	if putSlashRes.Key != slashKey {
+		t.Errorf("Put(%q) key = %q, want %q", slashKey, putSlashRes.Key, slashKey)
+	}
+	objSlash, err := backend.Get(ctx, slashKey)
+	if err != nil {
+		t.Fatalf("Get(%q) returned error: %v", slashKey, err)
+	}
+	_ = objSlash.Body.Close()
 }
+
