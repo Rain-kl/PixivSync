@@ -15,12 +15,12 @@ import (
 	"time"
 
 	uploadapp "github.com/Rain-kl/Wavelet/internal/apps/upload"
+	"github.com/Rain-kl/Wavelet/internal/common/response"
 	"github.com/Rain-kl/Wavelet/internal/db"
-	"github.com/Rain-kl/Wavelet/pkg/logger"
 	"github.com/Rain-kl/Wavelet/internal/model"
 	pixezsvc "github.com/Rain-kl/Wavelet/internal/service/pixez"
 	"github.com/Rain-kl/Wavelet/internal/task"
-	"github.com/Rain-kl/Wavelet/internal/common/response"
+	"github.com/Rain-kl/Wavelet/pkg/logger"
 	"github.com/gin-gonic/gin"
 	"gorm.io/gorm"
 )
@@ -699,7 +699,11 @@ func BatchDeleteMirroredItems(c *gin.Context) {
 //nolint:dupl // Illust and novel mirror dispatch flows keep parallel structures for distinct model types
 func dispatchIllustMirrorIfNeeded(c *gin.Context, illustID int64) (model.PixezMirrorIllust, error) {
 	record, err := pixezsvc.GetMirrorIllust(c.Request.Context(), illustID)
-	if err == nil && record.Status != model.PixezMirrorStatusFailed {
+	needed, checkErr := pixezsvc.MirrorNeedsWork(c.Request.Context(), model.PixezMirrorTargetIllust, illustID)
+	if checkErr != nil {
+		return record, checkErr
+	}
+	if err == nil && (!needed || record.Status == model.PixezMirrorStatusQueued || record.Status == model.PixezMirrorStatusProcessing) {
 		return record, nil
 	}
 	if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
@@ -716,7 +720,11 @@ func dispatchIllustMirrorIfNeeded(c *gin.Context, illustID int64) (model.PixezMi
 //nolint:dupl // Illust and novel mirror dispatch flows keep parallel structures for distinct model types
 func dispatchNovelMirrorIfNeeded(c *gin.Context, novelID int64) (model.PixezMirrorNovel, error) {
 	record, err := pixezsvc.GetMirrorNovel(c.Request.Context(), novelID)
-	if err == nil && record.Status != model.PixezMirrorStatusFailed {
+	needed, checkErr := pixezsvc.MirrorNeedsWork(c.Request.Context(), model.PixezMirrorTargetNovel, novelID)
+	if checkErr != nil {
+		return record, checkErr
+	}
+	if err == nil && (!needed || record.Status == model.PixezMirrorStatusQueued || record.Status == model.PixezMirrorStatusProcessing) {
 		return record, nil
 	}
 	if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {

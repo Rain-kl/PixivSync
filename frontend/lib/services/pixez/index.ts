@@ -25,3 +25,5 @@ export type {
   PixezRunStatus,
   PixivProfileResponse,
 } from "./types"
+
+export {ArtistService} from "./artists.service"

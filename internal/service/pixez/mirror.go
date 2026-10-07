@@ -51,6 +51,9 @@ type MirrorStatus struct {
 // EnsureMirrorIllustQueued creates or updates the read-model row for an illust mirror task.
 func EnsureMirrorIllustQueued(ctx context.Context, illustID int64, taskID string) (model.PixezMirrorIllust, error) {
 	now := time.Now()
+	if existing, err := GetMirrorIllust(ctx, illustID); err == nil && illustComplete(ctx, existing) {
+		return existing, nil
+	}
 	record := model.PixezMirrorIllust{
 		IllustID:        illustID,
 		TaskID:          taskID,
@@ -66,6 +69,9 @@ func EnsureMirrorIllustQueued(ctx context.Context, illustID int64, taskID string
 		var existing model.PixezMirrorIllust
 		err := tx.Where("illust_id = ?", illustID).First(&existing).Error
 		if err == nil {
+			if existing.LeaseExpiresAt != nil && existing.LeaseExpiresAt.After(now) {
+				return nil
+			}
 			updates := map[string]any{
 				keyTaskID:       taskID,
 				keyStatus:       model.PixezMirrorStatusQueued,
@@ -81,7 +87,7 @@ func EnsureMirrorIllustQueued(ctx context.Context, illustID int64, taskID string
 			if existing.RetryURLsJSON == "" {
 				updates["retry_urls_json"] = "[]"
 			}
-			return tx.Model(&model.PixezMirrorIllust{}).Where("illust_id = ?", illustID).Updates(updates).Error
+			return tx.Model(&model.PixezMirrorIllust{}).Where("illust_id = ? AND (lease_expires_at IS NULL OR lease_expires_at < ?)", illustID, now).Updates(updates).Error
 		}
 		if !errors.Is(err, gorm.ErrRecordNotFound) {
 			return err
@@ -98,6 +104,9 @@ func EnsureMirrorIllustQueued(ctx context.Context, illustID int64, taskID string
 // EnsureMirrorNovelQueued creates or updates the read-model row for a novel mirror task.
 func EnsureMirrorNovelQueued(ctx context.Context, novelID int64, taskID string) (model.PixezMirrorNovel, error) {
 	now := time.Now()
+	if existing, err := GetMirrorNovel(ctx, novelID); err == nil && novelComplete(existing) {
+		return existing, nil
+	}
 	record := model.PixezMirrorNovel{
 		NovelID:         novelID,
 		TaskID:          taskID,
@@ -112,6 +121,9 @@ func EnsureMirrorNovelQueued(ctx context.Context, novelID int64, taskID string) 
 		var existing model.PixezMirrorNovel
 		err := tx.Where("novel_id = ?", novelID).First(&existing).Error
 		if err == nil {
+			if existing.LeaseExpiresAt != nil && existing.LeaseExpiresAt.After(now) {
+				return nil
+			}
 			updates := map[string]any{
 				keyTaskID:       taskID,
 				keyStatus:       model.PixezMirrorStatusQueued,
@@ -124,7 +136,7 @@ func EnsureMirrorNovelQueued(ctx context.Context, novelID int64, taskID string) 
 			if existing.RetryURLsJSON == "" {
 				updates["retry_urls_json"] = "[]"
 			}
-			return tx.Model(&model.PixezMirrorNovel{}).Where("novel_id = ?", novelID).Updates(updates).Error
+			return tx.Model(&model.PixezMirrorNovel{}).Where("novel_id = ? AND (lease_expires_at IS NULL OR lease_expires_at < ?)", novelID, now).Updates(updates).Error
 		}
 		if !errors.Is(err, gorm.ErrRecordNotFound) {
 			return err
@@ -184,181 +196,162 @@ func MirrorNovelStatus(record model.PixezMirrorNovel) MirrorStatus {
 	}
 }
 
-// ProcessMirrorIllust executes one illustration mirror task.
+// ProcessMirrorIllust preserves saved pages and only downloads missing content.
 func ProcessMirrorIllust(ctx context.Context, client *Client, taskID string, illustID int64) error {
 	if client == nil {
 		client = DefaultClient
 	}
-
-	// 限制并发执行插画下载任务数
 	if err := waitMirrorConcurrencyLimit(ctx, &model.PixezMirrorIllust{}, "illust_id", illustID, model.ConfigKeyPixezMirrorIllustConcurrency); err != nil {
 		return err
 	}
+	return runProtectedMirror(ctx, model.PixezMirrorTargetIllust, illustID, taskID, func(leaseCtx context.Context) error {
+		return fillMirrorIllust(leaseCtx, client, illustID)
+	})
+}
 
-	if err := updateMirrorIllust(ctx, illustID, map[string]any{
-		keyTaskID:       taskID,
-		keyStatus:       model.PixezMirrorStatusProcessing,
-		keyErrorMessage: "",
-		keyUpdatedAt:    time.Now(),
-	}); err != nil {
-		return fmt.Errorf("mark illust mirror processing: %w", err)
-	}
-
-	user, err := latestMirrorUser(ctx)
+func fillMirrorIllust(ctx context.Context, client *Client, id int64) error {
+	row, detail, err := loadMirrorIllustSnapshot(ctx, client, id)
 	if err != nil {
-		task.AppendLog(ctx, "获取可用的 Pixiv Token 失败: %v", err)
-		markIllustFailed(ctx, illustID, taskID, err)
 		return err
 	}
-
-	task.AppendLog(ctx, "正在向 Pixiv 请求插画详情 [illust_id: %d]...", illustID)
-	detailBytes, detail, err := client.GetIllustDetail(ctx, user, illustID)
-	if err != nil {
-		wrapped := fmt.Errorf("fetch Pixiv illust detail illust_id=%d: %w", illustID, err)
-		task.AppendLog(ctx, "获取插画详情失败: %v", err)
-		markIllustFailed(ctx, illustID, taskID, wrapped)
-		return wrapped
+	urls := CollectIllustImageURLs(detail)
+	var oldFiles []model.PixezMirrorImageFile
+	if row.ImageFilesJSON != "" {
+		if err = json.Unmarshal([]byte(row.ImageFilesJSON), &oldFiles); err != nil {
+			return fmt.Errorf("decode existing image mappings: %w", err)
+		}
 	}
-
-	imageURLs := CollectIllustImageURLs(detail)
-	task.AppendLog(ctx, "成功获取插画详情: 「%s」 (画师: %s, 包含 %d 张图片)，开始下载...", detail.Illust.Title, detail.Illust.User.Name, len(imageURLs))
-	requestURLsJSON := mustJSON(imageURLs)
-	files := make([]model.PixezMirrorImageFile, 0, len(imageURLs))
-	failedURLs := make([]string, 0)
-
-	// 获取多图下载间隔
-	downloadInterval, err := repository.GetIntByKey(ctx, model.ConfigKeyPixezMirrorDownloadInterval)
-	if err != nil {
-		downloadInterval = 1 // 默认 1 秒
+	files := make([]model.PixezMirrorImageFile, 0, len(urls))
+	failed := make([]string, 0)
+	interval, e := repository.GetIntByKey(ctx, model.ConfigKeyPixezMirrorDownloadInterval)
+	if e != nil {
+		interval = 1
 	}
-
-	for idx, imageURL := range imageURLs {
-		if idx > 0 && downloadInterval > 0 {
-			task.AppendLog(ctx, "等待 %d 秒以满足多图下载间隔限制...", downloadInterval)
+	for page, u := range urls {
+		if saved, ok := savedMirrorPage(ctx, oldFiles, page, u); ok {
+			files = append(files, saved)
+			continue
+		}
+		if page > 0 && interval > 0 {
 			select {
 			case <-ctx.Done():
 				return ctx.Err()
-			case <-time.After(time.Duration(downloadInterval) * time.Second):
+			case <-time.After(time.Duration(interval) * time.Second):
 			}
 		}
-
-		task.AppendLog(ctx, "正在下载第 %d/%d 张图片...", idx+1, len(imageURLs))
-		data, mimeType, err := client.DownloadFile(ctx, imageURL)
-		if err != nil {
-			task.AppendLog(ctx, "第 %d/%d 张图片下载失败: %v", idx+1, len(imageURLs), err)
-			failedURLs = append(failedURLs, imageURL)
+		data, mimeType, downloadErr := client.DownloadFile(ctx, u)
+		if downloadErr != nil {
+			failed = append(failed, u)
 			continue
 		}
-		task.AppendLog(ctx, "第 %d/%d 张图片下载成功，大小: %d 字节, 正在保存到存储驱动...", idx+1, len(imageURLs), len(data))
-		fileRecord, err := registerMirrorUpload(ctx, imageURL, idx, data, mimeType)
-		if err != nil {
-			task.AppendLog(ctx, "第 %d/%d 张图片保存失败: %v", idx+1, len(imageURLs), err)
-			failedURLs = append(failedURLs, imageURL)
+		f, ingestErr := registerMirrorUpload(ctx, u, page, data, mimeType)
+		if ingestErr != nil {
+			failed = append(failed, u)
 			continue
 		}
-		task.AppendLog(ctx, "第 %d/%d 张图片保存并登记成功 [存储路径: %s]", idx+1, len(imageURLs), fileRecord.StorageKey)
-		files = append(files, fileRecord)
+		files = append(files, f)
+		// Persist each successful page so cancellation never loses references.
+		merged := mergeMirrorFiles(oldFiles, files)
+		if err = updateMirrorIllust(ctx, id, map[string]any{"image_files_json": mustJSON(merged), "success_count": len(merged)}); err != nil {
+			return err
+		}
 	}
-
 	status := model.PixezMirrorStatusSuccess
-	errMessage := ""
-	if len(files) == 0 {
+	message := ""
+	if len(failed) > 0 || (detail.Illust.PageCount > 0 && len(files) < detail.Illust.PageCount) {
 		status = model.PixezMirrorStatusFailed
-		errMessage = fmt.Sprintf("failed to mirror all %d Pixiv image files", len(imageURLs))
+		message = "illustration backup is incomplete"
 	}
-
-	updates := map[string]any{
-		keyTaskID:           taskID,
-		keyStatus:           status,
-		"detail_json":       string(detailBytes),
-		"image_files_json":  mustJSON(files),
-		"request_urls_json": requestURLsJSON,
-		"retry_urls_json":   mustJSON(failedURLs),
-		keyErrorMessage:     errMessage,
-		keyTotalCount:       len(imageURLs),
-		"success_count":     len(files),
-		"failed_count":      len(failedURLs),
-		keyUpdatedAt:        time.Now(),
-	}
-	if err := updateMirrorIllust(ctx, illustID, updates); err != nil {
-		return fmt.Errorf("save illust mirror result: %w", err)
+	if err = updateMirrorIllust(ctx, id, map[string]any{"status": status, "image_files_json": mustJSON(mergeMirrorFiles(oldFiles, files)), "request_urls_json": mustJSON(urls), "retry_urls_json": mustJSON(failed), "total_count": max(len(urls), detail.Illust.PageCount), "success_count": len(files), "failed_count": max(len(failed), detail.Illust.PageCount-len(files)), "error_message": message, "updated_at": time.Now()}); err != nil {
+		return err
 	}
 	if status == model.PixezMirrorStatusFailed {
-		updateBookmarkMirrorStatus(ctx, model.PixezMirrorTargetIllust, illustID, model.PixezBookmarkMirrorFailed)
-		return errors.New(errMessage)
+		updateBookmarkMirrorStatus(ctx, model.PixezMirrorTargetIllust, id, model.PixezBookmarkMirrorFailed)
+		return errors.New(message)
 	}
-	task.AppendLog(ctx, "插画镜像同步成功，共保存 %d/%d 张图片", len(files), len(imageURLs))
-	updateBookmarkMirrorStatus(ctx, model.PixezMirrorTargetIllust, illustID, model.PixezBookmarkMirrorDone)
+	updateBookmarkMirrorStatus(ctx, model.PixezMirrorTargetIllust, id, model.PixezBookmarkMirrorDone)
+	task.AppendLog(ctx, "插画备份完成 id=%d pages=%d", id, len(files))
 	return nil
 }
 
-// ProcessMirrorNovel executes one novel mirror task.
+func mergeMirrorFiles(oldFiles, newFiles []model.PixezMirrorImageFile) []model.PixezMirrorImageFile {
+	merged := append([]model.PixezMirrorImageFile{}, oldFiles...)
+	for _, f := range newFiles {
+		found := false
+		for i, old := range merged {
+			if old.Page == f.Page {
+				merged[i] = f
+				found = true
+				break
+			}
+		}
+		if !found {
+			merged = append(merged, f)
+		}
+	}
+	return merged
+}
+
+// ProcessMirrorNovel fills missing snapshots without replacing archived text.
 func ProcessMirrorNovel(ctx context.Context, client *Client, taskID string, novelID int64) error {
 	if client == nil {
 		client = DefaultClient
 	}
-
-	// 限制并发执行小说下载任务数
 	if err := waitMirrorConcurrencyLimit(ctx, &model.PixezMirrorNovel{}, "novel_id", novelID, model.ConfigKeyPixezMirrorNovelConcurrency); err != nil {
 		return err
 	}
+	return runProtectedMirror(ctx, model.PixezMirrorTargetNovel, novelID, taskID, func(leaseCtx context.Context) error { return fillMirrorNovel(leaseCtx, client, novelID) })
+}
 
-	if err := updateMirrorNovel(ctx, novelID, map[string]any{
-		keyTaskID:       taskID,
-		keyStatus:       model.PixezMirrorStatusProcessing,
-		keyErrorMessage: "",
-		keyUpdatedAt:    time.Now(),
-	}); err != nil {
-		return fmt.Errorf("mark novel mirror processing: %w", err)
-	}
-
-	user, err := latestMirrorUser(ctx)
+func fillMirrorNovel(ctx context.Context, client *Client, id int64) error {
+	row, err := GetMirrorNovel(ctx, id)
 	if err != nil {
-		task.AppendLog(ctx, "获取可用的 Pixiv Token 失败: %v", err)
-		markNovelFailed(ctx, novelID, taskID, err)
 		return err
 	}
-
-	task.AppendLog(ctx, "正在向 Pixiv 请求小说详情 [novel_id: %d]...", novelID)
-	detailBytes, detail, err := client.GetNovelDetail(ctx, user, novelID)
-	if err != nil {
-		wrapped := fmt.Errorf("fetch Pixiv novel detail novel_id=%d: %w", novelID, err)
-		task.AppendLog(ctx, "获取小说详情失败: %v", err)
-		markNovelFailed(ctx, novelID, taskID, wrapped)
-		return wrapped
+	var detail NovelDetail
+	validDetail := json.Unmarshal([]byte(row.DetailJSON), &detail) == nil && detail.Novel.ID == id
+	var content NovelWebContent
+	validText := json.Unmarshal([]byte(row.TextJSON), &content) == nil && content.Text != ""
+	var user model.PixezPixivUser
+	if !validDetail || !validText {
+		user, err = latestMirrorUser(ctx)
+		if err != nil {
+			return err
+		}
 	}
-	task.AppendLog(ctx, "成功获取小说详情: 「%s」 (字数: %d)，正在向 Pixiv 请求小说正文...", detail.Novel.Title, detail.Novel.TextLength)
-
-	textBytes, _, err := client.GetNovelText(ctx, user, novelID)
-	if err != nil {
-		wrapped := fmt.Errorf("fetch Pixiv novel text novel_id=%d: %w", novelID, err)
-		task.AppendLog(ctx, "获取小说正文失败: %v", err)
-		markNovelFailed(ctx, novelID, taskID, wrapped)
-		return wrapped
+	if !validDetail {
+		raw, d, e := client.GetNovelDetail(ctx, user, id)
+		if e != nil {
+			return e
+		}
+		if d.Novel.ID != id || strings.Contains(string(raw), limitUnknownNovel) {
+			return errors.New("pixiv novel unavailable")
+		}
+		detail = d
+		if err = updateMirrorNovel(ctx, id, map[string]any{"detail_json": string(raw)}); err != nil {
+			return err
+		}
 	}
-	task.AppendLog(ctx, "成功获取小说正文，正在保存至数据库中...")
-
-	updates := map[string]any{
-		keyTaskID:     taskID,
-		keyStatus:     model.PixezMirrorStatusSuccess,
-		"detail_json": string(detailBytes),
-		"text_json":   string(textBytes),
-		"request_urls_json": mustJSON([]string{
-			fmt.Sprintf("https://%s/v2/novel/detail?novel_id=%d", pixivAPIHost, novelID),
-			fmt.Sprintf("https://%s/webview/v2/novel?id=%d", pixivAPIHost, novelID),
-		}),
-		"retry_urls_json": "[]",
-		keyErrorMessage:   "",
-		keyTotalCount:     1,
-		"success_count":   1,
-		"failed_count":    0,
-		keyUpdatedAt:      time.Now(),
+	if err = IndexNovel(ctx, detail.Novel, true, ""); err != nil {
+		return err
 	}
-	if err := updateMirrorNovel(ctx, novelID, updates); err != nil {
-		return fmt.Errorf("save novel mirror result: %w", err)
+	if !validText {
+		raw, text, e := client.GetNovelText(ctx, user, id)
+		if e != nil {
+			return e
+		}
+		if text.Text == "" {
+			return errors.New("pixiv novel returned empty text")
+		}
+		if err = updateMirrorNovel(ctx, id, map[string]any{"text_json": string(raw)}); err != nil {
+			return err
+		}
 	}
-	task.AppendLog(ctx, "小说镜像及正文已成功保存")
-	updateBookmarkMirrorStatus(ctx, model.PixezMirrorTargetNovel, novelID, model.PixezBookmarkMirrorDone)
+	if err = updateMirrorNovel(ctx, id, map[string]any{"status": model.PixezMirrorStatusSuccess, "total_count": 1, "success_count": 1, "failed_count": 0, "retry_urls_json": "[]", "error_message": "", "updated_at": time.Now()}); err != nil {
+		return err
+	}
+	updateBookmarkMirrorStatus(ctx, model.PixezMirrorTargetNovel, id, model.PixezBookmarkMirrorDone)
+	task.AppendLog(ctx, "小说备份完成 id=%d", id)
 	return nil
 }
 
@@ -374,31 +367,11 @@ func latestMirrorUser(ctx context.Context) (model.PixezPixivUser, error) {
 }
 
 func updateMirrorIllust(ctx context.Context, illustID int64, updates map[string]any) error {
-	return db.DB(ctx).Model(&model.PixezMirrorIllust{}).Where("illust_id = ?", illustID).Updates(updates).Error
+	return protectedMirrorUpdate(ctx, model.PixezMirrorTargetIllust, illustID, updates)
 }
 
 func updateMirrorNovel(ctx context.Context, novelID int64, updates map[string]any) error {
-	return db.DB(ctx).Model(&model.PixezMirrorNovel{}).Where("novel_id = ?", novelID).Updates(updates).Error
-}
-
-func markIllustFailed(ctx context.Context, illustID int64, taskID string, err error) {
-	_ = updateMirrorIllust(ctx, illustID, map[string]any{
-		keyTaskID:       taskID,
-		keyStatus:       model.PixezMirrorStatusFailed,
-		keyErrorMessage: err.Error(),
-		keyUpdatedAt:    time.Now(),
-	})
-	updateBookmarkMirrorStatus(ctx, model.PixezMirrorTargetIllust, illustID, model.PixezBookmarkMirrorFailed)
-}
-
-func markNovelFailed(ctx context.Context, novelID int64, taskID string, err error) {
-	_ = updateMirrorNovel(ctx, novelID, map[string]any{
-		keyTaskID:       taskID,
-		keyStatus:       model.PixezMirrorStatusFailed,
-		keyErrorMessage: err.Error(),
-		keyUpdatedAt:    time.Now(),
-	})
-	updateBookmarkMirrorStatus(ctx, model.PixezMirrorTargetNovel, novelID, model.PixezBookmarkMirrorFailed)
+	return protectedMirrorUpdate(ctx, model.PixezMirrorTargetNovel, novelID, updates)
 }
 
 func updateBookmarkMirrorStatus(ctx context.Context, targetType string, targetID int64, status int) {
@@ -622,4 +595,40 @@ func waitMirrorConcurrencyLimit(ctx context.Context, modelObj any, idColumn stri
 		case <-time.After(checkInterval):
 		}
 	}
+}
+
+func loadMirrorIllustSnapshot(ctx context.Context, client *Client, id int64) (model.PixezMirrorIllust, IllustDetail, error) {
+	row, err := GetMirrorIllust(ctx, id)
+	if err != nil {
+		return row, IllustDetail{}, err
+	}
+	var detail IllustDetail
+	valid := json.Unmarshal([]byte(row.DetailJSON), &detail) == nil && detail.Illust.ID == id && len(CollectIllustImageURLs(detail)) > 0 && !IsLimitUnknownIllust(detail.Illust)
+	if !valid {
+		user, e := latestMirrorUser(ctx)
+		if e != nil {
+			return row, detail, e
+		}
+		raw, fetched, e := client.GetIllustDetail(ctx, user, id)
+		if e != nil {
+			return row, detail, e
+		}
+		if fetched.Illust.ID != id || IsLimitUnknownIllust(fetched.Illust) || len(CollectIllustImageURLs(fetched)) == 0 {
+			return row, detail, errors.New("pixiv illustration unavailable")
+		}
+		detail = fetched
+		if e = updateMirrorIllust(ctx, id, map[string]any{"detail_json": string(raw)}); e != nil {
+			return row, detail, e
+		}
+	}
+	err = IndexIllust(ctx, detail.Illust, true, "")
+	return row, detail, err
+}
+func savedMirrorPage(ctx context.Context, files []model.PixezMirrorImageFile, page int, u string) (model.PixezMirrorImageFile, bool) {
+	for _, f := range files {
+		if f.Page == page && f.PixivURL == u && validMirrorFile(ctx, f) {
+			return f, true
+		}
+	}
+	return model.PixezMirrorImageFile{}, false
 }

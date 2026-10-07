@@ -74,6 +74,7 @@ const data = {
     { title: "看板", url: "/home", icon: BarChart3 },
     { title: "账号管理", url: "/pixez/accounts", icon: UsersRound },
     { title: "镜像管理", url: "/pixez/mirrors", icon: GalleryVerticalEnd },
+    { title: "订阅管理", url: "/pixez/subscriptions", icon: Bell },
     { title: "收藏管理", url: "/pixez/bookmarks", icon: Heart },
   ],
   admin: [

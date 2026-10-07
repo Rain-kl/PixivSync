@@ -40,19 +40,21 @@ type PixezMirrorImageFile struct {
 
 // PixezMirrorIllust stores the read-model for a mirrored Pixiv illustration.
 type PixezMirrorIllust struct {
-	IllustID        int64     `gorm:"primaryKey;column:illust_id" json:"illust_id"`
-	TaskID          string    `gorm:"column:task_id;index" json:"task_id"`
-	Status          string    `gorm:"column:status;not null;default:queued;index" json:"status"`
-	DetailJSON      string    `gorm:"column:detail_json;type:text" json:"detail_json"`
-	ImageFilesJSON  string    `gorm:"column:image_files_json;type:text;not null;default:'[]'" json:"image_files_json"`
-	RequestURLsJSON string    `gorm:"column:request_urls_json;type:text;not null;default:'[]'" json:"request_urls_json"`
-	RetryURLsJSON   string    `gorm:"column:retry_urls_json;type:text;not null;default:'[]'" json:"retry_urls_json"`
-	ErrorMessage    string    `gorm:"column:error_message;type:text" json:"error_message"`
-	TotalCount      int       `gorm:"column:total_count;not null;default:0" json:"total_count"`
-	SuccessCount    int       `gorm:"column:success_count;not null;default:0" json:"success_count"`
-	FailedCount     int       `gorm:"column:failed_count;not null;default:0" json:"failed_count"`
-	CreatedAt       time.Time `gorm:"column:created_at" json:"created_at"`
-	UpdatedAt       time.Time `gorm:"column:updated_at" json:"updated_at"`
+	IllustID        int64      `gorm:"primaryKey;column:illust_id" json:"illust_id"`
+	ExecutionToken  string     `json:"-"`
+	LeaseExpiresAt  *time.Time `json:"-"`
+	TaskID          string     `gorm:"column:task_id;index" json:"task_id"`
+	Status          string     `gorm:"column:status;not null;default:queued;index" json:"status"`
+	DetailJSON      string     `gorm:"column:detail_json;type:text" json:"detail_json"`
+	ImageFilesJSON  string     `gorm:"column:image_files_json;type:text;not null;default:'[]'" json:"image_files_json"`
+	RequestURLsJSON string     `gorm:"column:request_urls_json;type:text;not null;default:'[]'" json:"request_urls_json"`
+	RetryURLsJSON   string     `gorm:"column:retry_urls_json;type:text;not null;default:'[]'" json:"retry_urls_json"`
+	ErrorMessage    string     `gorm:"column:error_message;type:text" json:"error_message"`
+	TotalCount      int        `gorm:"column:total_count;not null;default:0" json:"total_count"`
+	SuccessCount    int        `gorm:"column:success_count;not null;default:0" json:"success_count"`
+	FailedCount     int        `gorm:"column:failed_count;not null;default:0" json:"failed_count"`
+	CreatedAt       time.Time  `gorm:"column:created_at" json:"created_at"`
+	UpdatedAt       time.Time  `gorm:"column:updated_at" json:"updated_at"`
 }
 
 // TableName returns the PixEz read-model table name.
@@ -60,19 +62,21 @@ func (PixezMirrorIllust) TableName() string { return "mirror_illust" }
 
 // PixezMirrorNovel stores the read-model for a mirrored Pixiv novel.
 type PixezMirrorNovel struct {
-	NovelID         int64     `gorm:"primaryKey;column:novel_id" json:"novel_id"`
-	TaskID          string    `gorm:"column:task_id;index" json:"task_id"`
-	Status          string    `gorm:"column:status;not null;default:queued;index" json:"status"`
-	DetailJSON      string    `gorm:"column:detail_json;type:text" json:"detail_json"`
-	TextJSON        string    `gorm:"column:text_json;type:text" json:"text_json"`
-	RequestURLsJSON string    `gorm:"column:request_urls_json;type:text;not null;default:'[]'" json:"request_urls_json"`
-	RetryURLsJSON   string    `gorm:"column:retry_urls_json;type:text;not null;default:'[]'" json:"retry_urls_json"`
-	ErrorMessage    string    `gorm:"column:error_message;type:text" json:"error_message"`
-	TotalCount      int       `gorm:"column:total_count;not null;default:0" json:"total_count"`
-	SuccessCount    int       `gorm:"column:success_count;not null;default:0" json:"success_count"`
-	FailedCount     int       `gorm:"column:failed_count;not null;default:0" json:"failed_count"`
-	CreatedAt       time.Time `gorm:"column:created_at" json:"created_at"`
-	UpdatedAt       time.Time `gorm:"column:updated_at" json:"updated_at"`
+	NovelID         int64      `gorm:"primaryKey;column:novel_id" json:"novel_id"`
+	ExecutionToken  string     `json:"-"`
+	LeaseExpiresAt  *time.Time `json:"-"`
+	TaskID          string     `gorm:"column:task_id;index" json:"task_id"`
+	Status          string     `gorm:"column:status;not null;default:queued;index" json:"status"`
+	DetailJSON      string     `gorm:"column:detail_json;type:text" json:"detail_json"`
+	TextJSON        string     `gorm:"column:text_json;type:text" json:"text_json"`
+	RequestURLsJSON string     `gorm:"column:request_urls_json;type:text;not null;default:'[]'" json:"request_urls_json"`
+	RetryURLsJSON   string     `gorm:"column:retry_urls_json;type:text;not null;default:'[]'" json:"retry_urls_json"`
+	ErrorMessage    string     `gorm:"column:error_message;type:text" json:"error_message"`
+	TotalCount      int        `gorm:"column:total_count;not null;default:0" json:"total_count"`
+	SuccessCount    int        `gorm:"column:success_count;not null;default:0" json:"success_count"`
+	FailedCount     int        `gorm:"column:failed_count;not null;default:0" json:"failed_count"`
+	CreatedAt       time.Time  `gorm:"column:created_at" json:"created_at"`
+	UpdatedAt       time.Time  `gorm:"column:updated_at" json:"updated_at"`
 }
 
 // TableName returns the PixEz read-model table name.

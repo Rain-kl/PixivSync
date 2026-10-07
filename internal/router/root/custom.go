@@ -17,6 +17,13 @@ func RegisterCustomRootRoutes(r *gin.Engine) {
 	pixezRouter := r.Group("/api/pixez")
 	pixezRouter.Use(oauth.LoginRequired())
 	{
+		pixezRouter.GET("/artists", pixez.ListArtists)
+		pixezRouter.GET("/artists/:artist_id", pixez.GetArtist)
+		pixezRouter.GET("/artists/:artist_id/works", pixez.ListArtistWorks)
+		pixezRouter.POST("/artists/:artist_id/refresh", pixez.RefreshArtistDirectory)
+		pixezRouter.PUT("/artists/:artist_id/subscriptions/:type", pixez.UpdateArtistSubscription)
+		pixezRouter.POST("/artists/:artist_id/subscriptions/:type/sync", pixez.SyncArtistSubscription)
+		pixezRouter.GET("/artists/:artist_id/sync-runs", pixez.ListArtistSyncRuns)
 		pixezRouter.GET("/ping", pixez.Ping)
 		pixezRouter.GET("/dashboard", pixez.GetDashboard)
 		pixezRouter.GET("/bookmark-export-runs", pixez.ListBookmarkExportRuns)

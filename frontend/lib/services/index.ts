@@ -24,7 +24,7 @@ import {AuthService} from './auth';
 import {ConfigService} from './config';
 import {DbManageService} from './db-manage';
 import {PushService} from './push';
-import {PixezService} from './pixez';
+import {ArtistService, PixezService} from './pixez';
 import {AdminUploadService, UploadService} from './upload';
 import {UserService} from './user';
 
@@ -45,6 +45,7 @@ const services = {
   dbManage: DbManageService,
   push: PushService,
   pixez: PixezService,
+  artists: ArtistService,
 } as const;
 
 export default services;
@@ -174,3 +175,5 @@ export type {
   PixezRunStatus,
   PixivProfileResponse,
 } from './pixez';
+
+export {ArtistService} from "./pixez";

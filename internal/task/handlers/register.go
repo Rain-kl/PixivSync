@@ -38,6 +38,10 @@ func Register() {
 	task.RegisterTaskMeta(push.SendNotificationMeta)
 
 	// pixez
+	task.RegisterHandler(pixez.PixezArtistScanTask, &pixez.ArtistScanTaskHandler{})
+	task.RegisterTaskMeta(pixez.PixezArtistScanMeta)
+	task.RegisterHandler(pixez.PixezArtistDueTask, &pixez.ArtistDueTaskHandler{})
+	task.RegisterTaskMeta(pixez.PixezArtistDueMeta)
 	task.RegisterHandler(pixez.PixezMirrorTask, &pixez.MirrorTaskHandler{})
 	task.RegisterTaskMeta(pixez.PixezMirrorMeta)
 
