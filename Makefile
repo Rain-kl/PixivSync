@@ -1,4 +1,4 @@
-.PHONY: swagger license license-check build-embedded build-test cross-build code-check
+.PHONY: swagger license license-check format build-embedded build-test cross-build code-check build-backend build-frontend build-agent build-relay build-flared build-all
 
 VERSION ?= dev
 BUILD_DATE ?= $(shell date -u +'%Y-%m-%dT%H:%M:%SZ')
@@ -13,6 +13,16 @@ license:
 license-check:
 	scripts/update_go_license.sh --check
 
+format:
+	@echo "==> Formatting backend Go source and removing unused imports..."
+	@command -v goimports >/dev/null 2>&1 || { \
+		echo "goimports not found, installing..."; \
+		go install golang.org/x/tools/cmd/goimports@latest; \
+	}
+	goimports -w $$(find . -type f -name '*.go' -not -path './.git/*' -not -path './frontend/*')
+	@echo "==> Formatting frontend source and removing unused imports..."
+	cd frontend && pnpm format
+
 build-embedded:
 	@echo "==> Building embedded frontend version=$(VERSION) build_date=$(BUILD_DATE)..."
 	cd frontend && \
@@ -24,18 +34,48 @@ build-embedded:
 	go build \
 		-tags embed_frontend \
 		-ldflags "-s -w -X '$(MODULE)/internal/buildinfo.Version=$(VERSION)' -X '$(MODULE)/internal/buildinfo.BuildTime=$(BUILD_DATE)'" \
-		-o bin/pixez-sync \
+		-o bin/openflare-server \
 		main.go
+
 code-check:
+	@echo "==> Architecture guards..."
+	@command -v rg >/dev/null 2>&1 || { echo 'error: rg (ripgrep) is required for architecture guards' >&2; exit 1; }
+	@if rg -n 'db\.DB\(|db\.Redis' internal/model --glob '*.go' -g '!*_test.go' ; then \
+		echo 'error: internal/model must not access db.DB or db.Redis (non-test code)' >&2; \
+		exit 1; \
+	fi
 	golangci-lint run
-	cd frontend && pnpm tsc --noEmit --jsx preserve && npx eslint . --max-warnings 0
+	cd frontend && node scripts/merge-i18n-fragments.mjs && pnpm tsc --noEmit --jsx preserve && npx eslint . --max-warnings 0
 
 build-backend:
 	@echo "==> Building backend version=$(VERSION) build_date=$(BUILD_DATE)..."
 	go build \
 		-ldflags "-s -w -X '$(MODULE)/internal/buildinfo.Version=$(VERSION)' -X '$(MODULE)/internal/buildinfo.BuildTime=$(BUILD_DATE)'" \
-		-o bin/wavelet \
+		-o bin/openflare-server \
 		main.go
+
+build-agent:
+	@echo "==> Building agent version=$(VERSION)..."
+	go build \
+		-ldflags "-s -w -X '$(MODULE)/internal/apps/agent/config.Version=$(VERSION)'" \
+		-o bin/openflare-agent \
+		cmd/agent/main.go
+
+build-relay:
+	@echo "==> Building relay version=$(VERSION)..."
+	go build \
+		-ldflags "-s -w -X '$(MODULE)/internal/apps/relay/config.Version=$(VERSION)'" \
+		-o bin/openflare-relay \
+		cmd/relay/main.go
+
+build-flared:
+	@echo "==> Building flared version=$(VERSION)..."
+	go build \
+		-ldflags "-s -w -X '$(MODULE)/internal/apps/flared/config.Version=$(VERSION)'" \
+		-o bin/flared \
+		cmd/flared/main.go
+
+build-all: build-backend build-agent build-relay build-flared
 
 build-frontend:
 	@echo "==> Building frontend version=$(VERSION) build_date=$(BUILD_DATE)..."
@@ -77,3 +117,66 @@ cross-build:
 		.
 	@echo "==> Done. Binaries written to ./bin/"
 	@ls -lh bin/
+
+dev-f:
+	@echo "==> Starting frontend development server..."
+	cd frontend && pnpm dev
+
+dev-b:
+	@echo "==> Starting backend development server..."
+	go run main.go all
+
+dev:
+	@echo "==> Starting frontend and backend development servers in parallel..."
+	@PIDS=""; \
+	STATUS=0; \
+	( cd frontend && pnpm dev 2>&1 | sed 's/^/[frontend] /' ) & PIDS="$$PIDS $$!"; \
+	( go run main.go all 2>&1 | sed 's/^/[backend]  /' ) & PIDS="$$PIDS $$!"; \
+	for PID in $$PIDS; do \
+		wait $$PID || STATUS=1; \
+	done; \
+	if [ $$STATUS -eq 0 ]; then \
+		echo "==> All development servers exited successfully."; \
+	else \
+		echo "==> Development servers exited with errors." >&2; \
+		exit 1; \
+	fi
+
+
+# Merge the current local branch into canary, push canary, then restore it.
+# Dirty worktrees are auto-stashed and restored after the operation.
+canary:
+	@set -e; \
+	if ! git rev-parse --git-dir >/dev/null 2>&1; then \
+		echo "Error: not a git repository"; exit 1; \
+	fi; \
+	orig=$$(git rev-parse --abbrev-ref HEAD); \
+	if [ "$$orig" = "HEAD" ]; then \
+		echo "Error: detached HEAD; checkout a branch first"; exit 1; \
+	fi; \
+	if [ "$$orig" = "canary" ]; then \
+		echo "Error: already on canary; checkout a source branch first"; exit 1; \
+	fi; \
+	stashed=0; \
+	if [ -n "$$(git status --porcelain)" ]; then \
+		echo "Working tree is dirty; stashing local changes..."; \
+		git stash push -u -m "make canary auto-stash from $$orig"; \
+		stashed=1; \
+	fi; \
+	cleanup() { \
+		cur=$$(git rev-parse --abbrev-ref HEAD 2>/dev/null || true); \
+		if [ "$$cur" != "$$orig" ]; then \
+			echo "Restoring branch $$orig..."; \
+			git checkout -q "$$orig"; \
+		fi; \
+		if [ "$$stashed" = "1" ]; then \
+			echo "Restoring stashed local changes..."; \
+			git stash pop; \
+		fi; \
+	}; \
+	trap cleanup EXIT; \
+	echo "Merging $$orig -> canary..."; \
+	git checkout canary; \
+	git merge --no-edit "$$orig"; \
+	git push -u origin canary; \
+	echo "Done: $$orig merged into canary and pushed."
