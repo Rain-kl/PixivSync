@@ -21,7 +21,7 @@ app:
 # Supports Standalone and Primary-Replica (read/write split) modes.
 database:
   enabled: true
-  sqlite_path: "wavelet.db"        # PostgreSQL 禁用时使用此 SQLite 文件路径
+  sqlite_path: "wavelet.db"        # PostgreSQL 禁用时使用此 SQLite 文件路径，自动启用 WAL 并限制为单连接
   host: "127.0.0.1"
   port: 5432
   username: "postgres"

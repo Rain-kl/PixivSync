@@ -54,6 +54,9 @@ func initSQLite() {
 	if err != nil {
 		log.Fatalf("[SQLite] init connection failed: %v\n", err)
 	}
+	if err = configureSQLite(db); err != nil {
+		log.Fatalf("[SQLite] configure connection failed: %v\n", err)
+	}
 
 	// Trace 注入
 	if err = db.Use(
@@ -69,6 +72,18 @@ func initSQLite() {
 	}
 
 	log.Printf("[SQLite] initialized (path: %s)\n", sqlitePath)
+}
+
+func configureSQLite(database *gorm.DB) error {
+	sqlDB, err := database.DB()
+	if err != nil {
+		return err
+	}
+	// Serialize database work without limiting concurrent network requests.
+	sqlDB.SetMaxOpenConns(1)
+	sqlDB.SetMaxIdleConns(1)
+	_, err = sqlDB.ExecContext(context.Background(), "PRAGMA journal_mode=WAL")
+	return err
 }
 
 // initPostgres 初始化 PostgreSQL 数据库
