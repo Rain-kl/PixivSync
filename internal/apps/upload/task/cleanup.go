@@ -78,23 +78,7 @@ func (h *SystemCleanupHandler) Execute(ctx context.Context, _ []byte) (*task.Tas
 		for _, u := range unusedUploads {
 			totalProcessed++
 
-			if err := db.DB(ctx).Transaction(func(tx *gorm.DB) error {
-				if err := tx.Model(&model.Upload{}).
-					Where("id = ? AND status = ?", u.ID, model.UploadStatusPending).
-					Update("status", model.UploadStatusDeleted).Error; err != nil {
-					return err
-				}
-
-				_, backend, err := storage.Active(ctx)
-				if err != nil {
-					return err
-				}
-				if err := backend.Delete(ctx, u.FilePath); err != nil {
-					return err
-				}
-
-				return nil
-			}); err != nil {
+			if err := cleanupUnusedUpload(ctx, u); err != nil {
 				task.AppendLog(ctx, "清理上传文件失败 [ID:%d]: %v", u.ID, err)
 				lastID = u.ID
 				continue
@@ -143,4 +127,21 @@ func (h *SystemCleanupHandler) Execute(ctx context.Context, _ []byte) (*task.Tas
 	)
 	task.AppendLog(ctx, "%s", msg)
 	return &task.TaskResult{Message: msg}, nil
+}
+
+func cleanupUnusedUpload(ctx context.Context, upload model.Upload) error {
+	// Loading an uncached storage config needs a connection; do it before the
+	// transaction reserves the only SQLite connection.
+	_, backend, err := storage.Active(ctx)
+	if err != nil {
+		return err
+	}
+	return db.DB(ctx).Transaction(func(tx *gorm.DB) error {
+		if err := tx.Model(&model.Upload{}).
+			Where("id = ? AND status = ?", upload.ID, model.UploadStatusPending).
+			Update("status", model.UploadStatusDeleted).Error; err != nil {
+			return err
+		}
+		return backend.Delete(ctx, upload.FilePath)
+	})
 }
