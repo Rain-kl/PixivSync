@@ -104,7 +104,7 @@ export class PixezService extends BaseService {
     return this.get<PixezNovelBookmarkDetail>(`/bookmarks/novels/${novelID}/detail`)
   }
 
-  static async getMirroredNovelText(novelID: number): Promise<PixezNovelTextPreview> {
+  static async getMirroredNovelText(novelID: number | string): Promise<PixezNovelTextPreview> {
     return this.rawGet<PixezNovelTextPreview>("/mirror/webview/v2/novel", {
       novel_id: novelID,
     })
@@ -128,11 +128,11 @@ export class PixezService extends BaseService {
     )
   }
 
-  static async getMirroredIllustDetail(illustID: number): Promise<PixezMirroredIllustDetail> {
+  static async getMirroredIllustDetail(illustID: number | string): Promise<PixezMirroredIllustDetail> {
     return this.get<PixezMirroredIllustDetail>(`/mirror/illusts/${illustID}/detail`)
   }
 
-  static async getMirroredNovelDetail(novelID: number): Promise<PixezMirroredNovelDetail> {
+  static async getMirroredNovelDetail(novelID: number | string): Promise<PixezMirroredNovelDetail> {
     return this.get<PixezMirroredNovelDetail>(`/mirror/novels/${novelID}/detail`)
   }
 
